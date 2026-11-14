@@ -66,7 +66,8 @@ async function handleChat(request, env, origin) {
     model: env.BRAIN_MODEL || DEFAULT_MODEL,
     messages: body.messages,
     max_completion_tokens: Math.min(Math.max(parseInt(body.maxTokens, 10) || 2000, 100), MAX_OUTPUT_TOKENS),
-    reasoning_effort: env.REASONING_EFFORT || 'low'
+    // The app may ask for no reasoning (faster) on quick tasks such as the voice tutor.
+    reasoning_effort: ['none', 'low'].includes(body.effort) ? body.effort : (env.REASONING_EFFORT || 'low')
   };
   if (body.json) payload.response_format = { type: 'json_object' };
   const res = await fetch('https://api.openai.com/v1/chat/completions', {

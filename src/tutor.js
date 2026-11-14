@@ -3,14 +3,35 @@ import { normalize, isCorrect } from './stats.js';
 
 const L = (i) => String.fromCharCode(65 + i);
 
+const sentence = (x) => { const t = String(x).trim(); return /[.?!…]$/.test(t) ? t : t + '.'; };
+export const INTRO = {
+  definition: "I'll say a word. Tell me what it means.",
+  word: "I'll give a definition. Tell me the word.",
+  question: 'Here come some questions. Answer in your own words.',
+  'true/false': 'True or false. Say true or false.',
+  'multiple choice': 'Multiple choice. Say the letter, or the answer.'
+};
+
+// `spoken` is just the question; `intro` explains the kind of question and is said once per run of the same kind.
 export function describeQuestion(c, ask = 'term') {
-  if (c.type === 'tf') return { kind: 'true/false', label: 'True or false?', shown: c.prompt, spoken: `True or false: ${c.prompt}`, expected: c.answer, choices: c.choices };
-  if (c.type === 'mc') return { kind: 'multiple choice', label: 'Choose the correct answer', shown: c.prompt, spoken: `${c.prompt} ${c.choices.map((t, i) => `${L(i)}, ${t}.`).join(' ')}`, expected: c.answer, choices: c.choices };
-  if (c.type === 'qa') return { kind: 'question', label: 'Answer this question', shown: c.prompt, spoken: c.prompt, expected: c.answer, choices: null };
-  const reversed = ask === 'definition';
-  return reversed
-    ? { kind: 'word', label: 'Which word matches this definition?', shown: c.definition, spoken: `Which word matches this definition? ${c.definition}`, expected: c.term, choices: null }
-    : { kind: 'definition', label: 'What is the definition of…', shown: c.term, spoken: `What is the definition of ${c.term}?`, expected: c.definition, choices: null };
+  const base = (kind, label, shown, spoken, expected, choices) => ({ kind, label, shown, spoken, expected, choices, intro: INTRO[kind] });
+  if (c.type === 'tf') return base('true/false', 'True or false?', c.prompt, sentence(c.prompt), c.answer, c.choices);
+  if (c.type === 'mc') return base('multiple choice', 'Choose the correct answer', c.prompt, `${c.prompt} ${c.choices.map((t, i) => `${L(i)}, ${t}.`).join(' ')}`, c.answer, c.choices);
+  if (c.type === 'qa') return base('question', 'Answer this question', c.prompt, sentence(c.prompt), c.answer, null);
+  return ask === 'definition'
+    ? base('word', 'Which word matches this definition?', c.definition, sentence(c.definition), c.term, null)
+    : base('definition', 'What is the definition of…', c.term, sentence(c.term), c.definition, null);
+}
+export const utterance = (qd, withIntro) => (withIntro && qd.intro ? `${qd.intro} ${qd.spoken}` : qd.spoken);
+
+// An exact (or nearly exact) answer needs no AI: it is judged on the spot.
+export function quickCorrect(heard, expected) {
+  const h = normalize(heard), e = normalize(expected);
+  if (!h || !e) return false;
+  if (isCorrect(heard, expected)) return true;
+  const eWords = e.split(' '), hWords = h.split(' ');
+  const negated = /\b(not|no|never|isn't|isnt|don't|dont|doesn't|doesnt)\b/.test(clean(heard));
+  return eWords.length <= 3 && hWords.length <= 8 && !negated && ` ${h} `.includes(` ${e} `);
 }
 
 // Tries per kind: true/false has one, multiple choice two, spoken answers three.
@@ -90,6 +111,8 @@ Verdicts: "correct" = all essential points are there (different wording is fine)
 Modes: In mode "grade": for "correct" or "mostly", praise briefly and name what they got right (for "mostly", mention the small missing detail). For "partial", "incorrect" or "dont_know", do NOT reveal the expected answer unless final_attempt is true. Say what they got right (if anything), then give ONE hint or ask ONE short follow-up question that guides them toward the missing part. Each new hint must be different from the previous hints and a little more helpful.
 If final_attempt is true and the answer is not correct or mostly correct, do not give another hint: say the correct answer in your own words, then one very short tip to remember it.
 In mode "hint": the student chose a wrong option from a list. Do NOT say which option is correct. Give ONE short hint that helps them reason toward it.
+Length: for "correct" use at most 8 words (like "Yes, that's right!"); for "mostly" at most 18 words; for hints at most 25 words.
+If the student says they do not know or are not sure, your hint must be clearly different and more specific than every earlier hint (for example give the first letter, a related fact, or a small example). Never repeat an earlier hint.
 Be kind, never sarcastic, and always use plain spoken language.`;
 
 export function buildTutorMessages(p) {

@@ -20,8 +20,9 @@ export function explain(res, data, what = 'AI helper') {
 export async function askAI(code, opts) { return (await askAIDetailed(code, opts)).text; }
 
 // Same, but also returns how long it took and how many tokens were used.
-export async function askAIDetailed(code, { messages, json = false, maxTokens = 2000 }) {
+export async function askAIDetailed(code, { messages, json = false, maxTokens = 2000, effort }) {
   const t0 = Date.now();
+  if (isMock) { (window.__efforts ||= []).push(effort || null); }
   if (isMock) return { text: await mockAI(messages), usage: { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 }, ms: 5 };
   let token;
   try { token = await backend.idToken(); } catch { throw new Error('Not signed in. Reload the app and try again.'); }
@@ -30,7 +31,7 @@ export async function askAIDetailed(code, { messages, json = false, maxTokens = 
     res = await fetch(WORKER_URL + '/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token, 'X-Family-Code': code },
-      body: JSON.stringify({ messages, json, maxTokens })
+      body: JSON.stringify({ messages, json, maxTokens, effort })
     });
   } catch { throw new Error('Could not reach the AI helper. Check your internet connection.'); }
   const data = await res.json().catch(() => ({}));

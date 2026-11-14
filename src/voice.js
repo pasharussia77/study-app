@@ -3,6 +3,7 @@ import { isMock } from './firebase.js';
 import { workerFetch, explain } from './ai.js';
 
 const cache = new Map();
+const inflight = new Map();
 let currentAudio = null;
 let currentResolve = null;
 
@@ -11,35 +12,86 @@ export function stopSpeaking() {
   if (currentResolve) { const r = currentResolve; currentResolve = null; r(); }
 }
 
-// Speaks the text with the tutor voice and waits until it has finished. Repeated sentences are not paid for twice.
-export async function speak(code, text, onCost = () => {}) {
+// Fetches the audio for a sentence once; sentences already fetched (or being fetched) are reused.
+async function getAudio(code, text) {
+  if (cache.has(text)) return { blob: cache.get(text), cached: true };
+  let p = inflight.get(text);
+  if (!p) {
+    p = (async () => {
+      const res = await workerFetch(code, '/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
+      if (!res.ok) throw new Error(explain(res, await res.json().catch(() => ({})), 'voice'));
+      const blob = await res.blob();
+      if (cache.size > 80) cache.clear();
+      cache.set(text, blob);
+      return blob;
+    })().finally(() => inflight.delete(text));
+    inflight.set(text, p);
+  }
+  return { blob: await p, cached: false };
+}
+
+// Prepares a sentence in the background so it plays without a wait later.
+export function warm(code, text) {
+  if (isMock) { (window.__warmed ||= []).push(text); return; }
+  getAudio(code, text).catch(() => {});
+}
+
+// Speaks the text with the tutor voice and waits until it has finished.
+export async function speak(code, text, onCost = () => {}, onStart = () => {}) {
   if (isMock) {
     (window.__spoken ||= []).push(text);
-    onCost({ chars: text.length, cached: false });
+    onCost({ chars: text.length, cached: false, ms: 0 });
+    onStart();
     await new Promise((r) => setTimeout(r, 10));
     return;
   }
-  let blob = cache.get(text);
-  if (blob) onCost({ chars: 0, cached: true });
-  else {
-    const res = await workerFetch(code, '/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
-    if (!res.ok) throw new Error(explain(res, await res.json().catch(() => ({})), 'voice'));
-    blob = await res.blob();
-    if (cache.size > 60) cache.clear();
-    cache.set(text, blob);
-    onCost({ chars: text.length, cached: false });
-  }
+  const t0 = Date.now();
+  const { blob, cached } = await getAudio(code, text);
+  onCost({ chars: cached ? 0 : text.length, cached, ms: Date.now() - t0 });
   const url = URL.createObjectURL(blob);
   const audio = new Audio(url);
   currentAudio = audio;
   try {
     await new Promise((resolve, reject) => {
       currentResolve = resolve;
+      audio.onplaying = () => onStart();
       audio.onended = () => { currentResolve = null; resolve(); };
       audio.onerror = () => { currentResolve = null; reject(new Error('The voice audio could not be played.')); };
       audio.play().catch((e) => { currentResolve = null; reject(new Error(e.name === 'NotAllowedError' ? 'The browser blocked sound. Tap Resume to allow it.' : 'The voice audio could not be played.')); });
     });
   } finally { URL.revokeObjectURL(url); currentAudio = null; }
+}
+
+// Experimental screen-off mode: a silent looping sound plus lock-screen controls, to ask the phone to keep the app alive.
+let keep = null;
+export function startKeepAlive() {
+  if (isMock) { window.__keepAlive = true; return; }
+  if (keep) return;
+  try {
+    const sr = 8000, n = sr, buf = new Uint8Array(44 + n), dv = new DataView(buf.buffer);
+    const w = (o, s) => { for (let i = 0; i < s.length; i++) buf[o + i] = s.charCodeAt(i); };
+    w(0, 'RIFF'); dv.setUint32(4, 36 + n, true); w(8, 'WAVE'); w(12, 'fmt '); dv.setUint32(16, 16, true);
+    dv.setUint16(20, 1, true); dv.setUint16(22, 1, true); dv.setUint32(24, sr, true); dv.setUint32(28, sr, true);
+    dv.setUint16(32, 1, true); dv.setUint16(34, 8, true); w(36, 'data'); dv.setUint32(40, n, true); buf.fill(128, 44);
+    const url = URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+    const a = new Audio(url); a.loop = true; a.volume = 0.01;
+    keep = { a, url };
+    a.play().catch(() => {});
+  } catch { /* experimental: ignore */ }
+}
+export function stopKeepAlive() {
+  if (isMock) { window.__keepAlive = false; return; }
+  if (keep) { try { keep.a.pause(); } catch { /* stopped */ } URL.revokeObjectURL(keep.url); keep = null; }
+}
+export function setMediaSession(handlers) {
+  if (isMock) { window.__mediaSession = handlers ? 'on' : 'off'; return; }
+  if (!('mediaSession' in navigator)) return;
+  try {
+    if (!handlers) { navigator.mediaSession.metadata = null; ['play', 'pause'].forEach((a) => navigator.mediaSession.setActionHandler(a, null)); return; }
+    navigator.mediaSession.metadata = new MediaMetadata({ title: 'Voice quiz', artist: 'Family Study' });
+    navigator.mediaSession.setActionHandler('pause', handlers.pause);
+    navigator.mediaSession.setActionHandler('play', handlers.play);
+  } catch { /* experimental: ignore */ }
 }
 
 // A short tone that says "your turn" (useful when you are not looking at the screen).
@@ -57,7 +109,7 @@ export async function beep() {
 
 // Starts recording and stops by itself after the student has finished talking.
 // Returns { promise, stop, cancel }. The promise gives { blob, ext }, or null when nothing was said or it was cancelled.
-export function startListening({ maxMs = 60000, silenceMs = 1700, noSpeechMs = 9000 } = {}) {
+export function startListening({ maxMs = 60000, silenceMs = 1200, noSpeechMs = 9000 } = {}) {
   if (isMock) {
     let timer, done;
     const rec = () => ({ blob: new Blob(['mock'], { type: 'audio/webm' }), ext: 'webm' });

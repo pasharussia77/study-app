@@ -44,6 +44,17 @@ r = await worker.fetch(req('/chat', { headers: good, body: { messages: [{ role: 
 r = await worker.fetch(req('/chat', { headers: good, body: { nope: 1 } }), env); check('rejects missing messages', r.status === 400);
 r = await worker.fetch(req('/other', { headers: good, body: {} }), env); check('404 unknown path', r.status === 404);
 r = await worker.fetch(req('/chat', { headers: good, body: { messages: [{ role: 'user', content: 'x' }] } }), {}); check('missing key 500', r.status === 500);
+// ---- optional reasoning effort ----
+calls = [];
+r = await worker.fetch(req('/chat', { headers: good, body: { messages: [{ role: 'user', content: 'quick' }], effort: 'none' } }), env);
+check('effort none passes', JSON.parse(calls.find((c) => c.url.includes('openai')).init.body).reasoning_effort === 'none');
+calls = [];
+r = await worker.fetch(req('/chat', { headers: good, body: { messages: [{ role: 'user', content: 'quick' }], effort: 'xhigh' } }), env);
+check('other efforts are ignored', JSON.parse(calls.find((c) => c.url.includes('openai')).init.body).reasoning_effort === 'low');
+calls = [];
+r = await worker.fetch(req('/chat', { headers: good, body: { messages: [{ role: 'user', content: 'quick' }] } }), { ...env, REASONING_EFFORT: 'none' });
+check('env effort still the default', JSON.parse(calls.find((c) => c.url.includes('openai')).init.body).reasoning_effort === 'none');
+
 // ---- voice: text to speech and speech to text ----
 calls = [];
 r = await worker.fetch(req('/tts', { headers: good, body: { text: 'Hello there, nice work!' } }), env);
