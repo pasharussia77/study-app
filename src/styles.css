@@ -187,3 +187,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .radio input[type=radio] { width: 22px; height: 22px; accent-color: #0E9F7A; }
 .rl { font-weight: 900; }
 .rt { flex: 1; min-width: 0; border: 0; background: none; font: inherit; font-weight: 600; padding: 6px 0; outline: none; }
+
+/* ---- folded material section ---- */
+[hidden] { display: none !important; }
+.fold { width: 100%; text-align: left; display: flex; align-items: center; gap: 12px; background: #fff; border: 2px solid var(--line); border-radius: 18px; padding: 14px 16px; }
+.fold-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.fold-title { font-weight: 900; }
+.fold-sub { color: var(--muted); font-size: .85rem; }
+.fold-warn { color: #8A5A00; font-weight: 800; font-size: .85rem; }
+.chev { font-size: 1.2rem; color: var(--muted); transition: transform .2s; }
+.fold[aria-expanded="true"] .chev { transform: rotate(180deg); }
+.fold-body { display: flex; flex-direction: column; gap: 12px; padding: 4px 0 8px; }
+.link.swap { align-self: center; font-size: .9rem; padding: 4px 8px; }

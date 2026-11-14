@@ -269,6 +269,7 @@ function Project({ code, projectId, profile, onBack, onStudy, onReview }) {
   const [text, setText] = useState('');
   const [state, setState] = useState('saved');
   const [reporting, setReporting] = useState(false);
+  const [userOpen, setUserOpen] = useState(null); // null = not decided yet
   const timer = useRef(null);
   const latest = useRef('');
   useEffect(() => { backend.getProject(code, projectId).then((x) => { setP(x); setText(x?.text || ''); latest.current = x?.text || ''; }); }, [code, projectId]);
@@ -286,16 +287,35 @@ function Project({ code, projectId, profile, onBack, onStudy, onReview }) {
     change((base ? base + '\n\n' : '') + t.trim());
   };
   const { cards, skipped } = useMemo(() => parseCards(text), [text]);
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState(null);
+  const [files, setFiles] = useState(null);
   useEffect(() => backend.watchItems(code, projectId, setItems), [code, projectId]);
+  useEffect(() => backend.watchFiles(code, projectId, setFiles), [code, projectId]);
   useOverlay(reporting, () => setReporting(false));
-  const { deck, notReady } = useMemo(() => buildDeck(cards, items), [cards, items]);
-  const flagged = items.filter((i) => i.flagged).length;
+  const itemList = items || [], fileList = files || [];
+  const { deck, notReady } = useMemo(() => buildDeck(cards, itemList), [cards, items]); // eslint-disable-line
+  const flagged = itemList.filter((i) => i.flagged).length;
+  const unread = fileList.filter((f) => f.status !== 'done').length;
   const { sum } = useStats(code, projectId, deck);
+
+  // The material section starts folded once a project has anything in it; an empty project starts open.
+  const ready = p && items !== null && files !== null;
+  const empty = ready && deck.length === 0 && itemList.length === 0 && fileList.length === 0;
+  useEffect(() => { if (userOpen === null && empty) setUserOpen(true); }, [userOpen, empty]);
+  const open = userOpen === true;
+
   if (!p) return <section><Back onClick={onBack} /><p className="muted">Loading…</p></section>;
   const del = async () => {
     if (confirm('Delete this project and its material?')) { clearTimeout(timer.current); timer.current = null; await backend.deleteProject(code, projectId); diagClear(projectId); onBack(); }
   };
+  const bits = [];
+  if (fileList.length) bits.push(`${fileList.length} photo${fileList.length === 1 ? '' : 's'}`);
+  if (itemList.length) bits.push(`${itemList.length} study item${itemList.length === 1 ? '' : 's'}`);
+  if (cards.length) bits.push(`${cards.length} typed card${cards.length === 1 ? '' : 's'}`);
+  const warns = [];
+  if (unread) warns.push(`${unread} photo${unread === 1 ? '' : 's'} not read yet`);
+  if (flagged) warns.push(`${flagged} item${flagged === 1 ? '' : 's'} need${flagged === 1 ? 's' : ''} a look`);
+  if (notReady) warns.push(`${notReady} without an answer`);
   return (
     <section>
       <Back onClick={onBack} label="Projects" />
@@ -310,30 +330,40 @@ function Project({ code, projectId, profile, onBack, onStudy, onReview }) {
           {sum.incorrect > 0 && <p className="hint">{sum.incorrect} {sum.incorrect === 1 ? 'card needs' : 'cards need'} another try. Choose "Missed only" when you start.</p>}
         </>
       )}
-      {items.length > 0 && (
-        <button className="btn ghost" onClick={onReview}>
-          Review study items ({items.length}){flagged > 0 ? ` · ${flagged} need a look` : ''}
-        </button>
-      )}
-      {notReady > 0 && <p className="hint">{notReady} item{notReady === 1 ? ' has' : 's have'} no answer yet, so {notReady === 1 ? 'it is' : 'they are'} left out of studying. Open Review study items to set {notReady === 1 ? 'it' : 'them'}.</p>}
-      <Sources code={code} projectId={projectId} projectName={p.name} canSave={!!profile?.test} onAppend={append} onReview={onReview} />
-      <label className="muted" htmlFor="material">Your material</label>
-      <textarea id="material" className="material" value={text} onChange={(e) => change(e.target.value)}
-        placeholder={'Paste your notes here.\nWrite one item per line:\n\nphotosynthesis - how plants turn light into food\nmitochondria - the cell\'s power plant'} />
-      <p className="status" aria-live="polite">
-        {state === 'saving' ? 'Saving…' : state === 'error' ? 'Not saved – check your connection' : 'Saved'}
-        {cards.length > 0 ? ` · ${cards.length} typed ${cards.length === 1 ? 'card' : 'cards'}` : ''}
-      </p>
-      {skipped > 0 && <p className="hint">{skipped} {skipped === 1 ? 'line was' : 'lines were'} skipped. Write each card as <b>word - definition</b>.</p>}
-      {profile?.test && (
-        <div className="testtools">
-          <b>Testing tools</b>
-          <p className="muted tiny">Creates a report of what was read, how cards were made, and how your quiz went. Paste it to Claude.</p>
-          <button className="btn ghost" onClick={() => setReporting(true)}>Create diagnostic report</button>
-        </div>
-      )}
+
+      <button className="fold" aria-expanded={open} aria-controls="material-body" onClick={() => setUserOpen(!open)}>
+        <span className="fold-main">
+          <span className="fold-title">Material and photos</span>
+          <span className="fold-sub">{bits.length ? bits.join(' · ') : 'Add photos, a PDF or text'}</span>
+          {warns.length > 0 && <span className="fold-warn">{warns.join(' · ')}</span>}
+        </span>
+        <span className="chev" aria-hidden="true">▾</span>
+      </button>
+      <div id="material-body" className="fold-body" hidden={!open}>
+        <Sources code={code} projectId={projectId} projectName={p.name} canSave={!!profile?.test} onAppend={append} onReview={onReview} />
+        {itemList.length > 0 && (
+          <button className="btn ghost" onClick={onReview}>
+            Review study items ({itemList.length}){flagged > 0 ? ` · ${flagged} need a look` : ''}
+          </button>
+        )}
+        <label className="muted" htmlFor="material">Typed or pasted material</label>
+        <textarea id="material" className="material" value={text} onChange={(e) => change(e.target.value)}
+          placeholder={'Paste your notes here.\nWrite one item per line:\n\nphotosynthesis - how plants turn light into food\nmitochondria - the cell\'s power plant'} />
+        <p className="status" aria-live="polite">
+          {state === 'saving' ? 'Saving…' : state === 'error' ? 'Not saved – check your connection' : 'Saved'}
+          {cards.length > 0 ? ` · ${cards.length} typed ${cards.length === 1 ? 'card' : 'cards'}` : ''}
+        </p>
+        {skipped > 0 && <p className="hint">{skipped} {skipped === 1 ? 'line was' : 'lines were'} skipped. Write each card as <b>word - definition</b>.</p>}
+        {profile?.test && (
+          <div className="testtools">
+            <b>Testing tools</b>
+            <p className="muted tiny">Creates a report of what was read, how cards were made, and how your quiz went. Paste it to Claude.</p>
+            <button className="btn ghost" onClick={() => setReporting(true)}>Create diagnostic report</button>
+          </div>
+        )}
+        <button className="link danger" onClick={del}>Delete project</button>
+      </div>
       {reporting && <ReportSheet code={code} project={p} profile={profile} text={text} deck={deck} onClose={() => setReporting(false)} />}
-      <button className="link danger" onClick={del}>Delete project</button>
     </section>
   );
 }

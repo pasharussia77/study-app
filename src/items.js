@@ -24,7 +24,7 @@ A page can mix several kinds of material. Decide the type of EACH item separatel
 - "term": a word or term with its definition (word lists, glossaries).
 - "qa": a question without choices, with its answer if one is shown.
 Never merge, skip or invent items. Keep the printed question number. Ignore the student's name, doodles, scores' decorations, copyright lines, page headers and footers, and anything that is not part of the page (table, fingers, other papers, embossed marks).
-Printed instructions such as "True/False: Indicate whether..." are the "section" for the items under them until another section starts.${carry}
+Printed instructions such as "True/False: Indicate whether..." tell you the "section" for the items under them until another section starts. Give "section" as a SHORT label of at most 4 words (for example "True/False" or "Multiple Choice"), not the full instruction sentence.${carry}
 
 For every item record only what you SEE, do not work out correct answers yourself:
 - student_answer: what the student wrote for this item (a letter or text), or null.
@@ -34,11 +34,12 @@ For every item record only what you SEE, do not work out correct answers yoursel
 - answer_text: for "term" and "qa", the definition or answer shown on the page, or null.
 - confidence: "high", "medium" or "low" for how well you could read this item.
 - note: a short note if anything is unclear (cut off, smudged, ambiguous mark), else "".
+- needs_review: true ONLY if a person should double-check this item, for example the writing is smudged or cut off, you are unsure what the student wrote, or a red mark is ambiguous. A clear red X, a clear circle, or a clearly readable item is NOT a reason: use false.
 
 Also record for the page: graded (true if any teacher grading such as red marks or a score is visible), score (like "12/15" or null), and ends_with (the section, type and last question number the page ends with).
 
 JSON shape:
-{"page":{"graded":true,"score":"12/15"},"ends_with":{"section":"...","type":"mc","last_number":7},"items":[{"type":"mc","section":"...","number":1,"question":"...","choices":[{"label":"A","text":"..."}],"student_answer":"B","marked_wrong":false,"circled_choice":null,"printed_answer":null,"answer_text":null,"confidence":"high","note":""}]}`;
+{"page":{"graded":true,"score":"12/15"},"ends_with":{"section":"Multiple Choice","type":"mc","last_number":7},"items":[{"type":"mc","section":"Multiple Choice","number":1,"question":"...","choices":[{"label":"A","text":"..."}],"student_answer":"B","marked_wrong":false,"circled_choice":null,"printed_answer":null,"answer_text":null,"confidence":"high","note":"","needs_review":false}]}`;
 }
 
 export function parseAiJson(text) {
@@ -78,7 +79,7 @@ export function resolveItem(raw, page = {}, index = 0) {
   const out = {
     type, section: str(raw.section), number: raw.number == null ? null : raw.number, question: str(raw.question),
     choices, correctLabel: null, answer: null, source: 'none', studentAnswer: str(raw.student_answer) || null,
-    markedWrong, confidence, note: str(raw.note), order: index
+    markedWrong, confidence, note: str(raw.note), order: index, circled: null, printed: null
   };
   let unknownReason = '';
 
@@ -89,6 +90,7 @@ export function resolveItem(raw, page = {}, index = 0) {
     const printed = labelFor(raw.printed_answer, choices);
     const circled = labelFor(raw.circled_choice, choices);
     const student = labelFor(raw.student_answer, choices);
+    out.circled = circled; out.printed = printed;
     if (printed) { out.correctLabel = printed; out.source = 'printed key'; }
     else if (circled) { out.correctLabel = circled; out.source = 'circled by teacher'; }
     else if (markedWrong === true) {
@@ -100,7 +102,7 @@ export function resolveItem(raw, page = {}, index = 0) {
     if (out.correctLabel) out.answer = choices.find((c) => c.label === out.correctLabel).text;
   }
   if (unknownReason) out.note = [out.note, unknownReason].filter(Boolean).join(' ');
-  out.flagged = !out.answer || confidence === 'low' || (graded && markedWrong === null && type !== 'term' && type !== 'qa') || !!str(raw.note);
+  out.flagged = !out.answer || confidence === 'low' || raw.needs_review === true || (graded && markedWrong === null && type !== 'term' && type !== 'qa');
   return out;
 }
 

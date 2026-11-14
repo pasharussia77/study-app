@@ -34,14 +34,14 @@ export function buildReport({ version, device, health, profile, project, text, p
   docs.forEach((d) => L.push(`File "${d.name}" (${kb(d.size || 0)}): ${d.ok === false ? 'FAILED: ' + d.error : d.method + ', ' + (d.pages ? d.pages + ' page(s), ' : '') + d.chars + ' characters, ' + sec(d.ms || 0)}${d.note ? '. ' + d.note : ''}`));
   if (!files.length && !docs.length) L.push('No photos or files were added (text may have been typed or pasted).');
 
-  h('2. EXACT AI ANSWER FOR EACH PHOTO (raw JSON, before the app worked out answers)');
+  h('2. THE AI\'S RAW ANSWER FOR EACH PHOTO (first 1500 characters)');
   const rawReads = events.filter((e) => e.type === 'photo_read');
   if (!rawReads.length) L.push('No AI readings recorded.');
   rawReads.forEach((r, i) => {
     L.push(`--- Reading ${i + 1}${r.label ? ' (' + r.label + ')' : ''} at ${time(r.t)}: ${NAMES[r.ignore] || r.ignore} ---`);
-    L.push(r.ok ? clip(r.raw || '', 7000) : 'FAILED: ' + r.error + (r.raw ? '\nRaw answer:\n' + clip(r.raw, 2000) : ''));
+    L.push(r.ok ? clip(r.raw || '', 1500) : 'FAILED: ' + r.error + (r.raw ? '\nRaw answer:\n' + clip(r.raw, 2500) : ''));
   });
-  if (rawReads[0]) { L.push('', 'Instruction sent to the AI with each picture ("' + (NAMES[rawReads[0].ignore] || '') + '"):', rawReads[0].prompt); }
+  if (rawReads[0]) L.push('', `Instruction sent with each picture: mode "${NAMES[rawReads[0].ignore] || ''}", ${String(rawReads[0].prompt || '').length} characters (the full text is built into this app version).`);
 
   h('3. STUDY ITEMS THE APP BUILT FROM PHOTOS');
   L.push('Rule: the AI only reports what it sees (handwritten answers, red X marks, circles, printed keys). The app then decides each correct answer with fixed rules: printed key, then a circled choice, then a red X on a true/false (the other choice), then "no red mark = assumed correct" on a graded page. Anything else has no answer and is flagged.');
@@ -55,7 +55,7 @@ export function buildReport({ version, device, health, profile, project, text, p
     g.list.forEach((it) => {
       const ch = it.choices && it.choices.length ? ' | choices: ' + it.choices.map((c) => c.label + '. ' + one(c.text, 40)).join('; ') : '';
       L.push(`${it.number != null ? '#' + it.number + ' ' : ''}[${it.type}] "${one(it.question, 90)}"${ch}`);
-      L.push(`      student: ${it.studentAnswer ?? '-'} | marked wrong: ${it.markedWrong === true ? 'yes' : it.markedWrong === false ? 'no' : 'unsure'} | correct: ${it.answer ? (it.correctLabel ? it.correctLabel + '. ' : '') + one(it.answer, 60) : 'NONE'} | source: ${it.source} | confidence: ${it.confidence}${it.flagged ? ' | NEEDS A LOOK' : ''}${it.note ? ' | note: ' + one(it.note, 140) : ''}`);
+      L.push(`      student: ${it.studentAnswer ?? '-'} | circled: ${it.circled ?? '-'} | printed key: ${it.printed ?? '-'} | marked wrong: ${it.markedWrong === true ? 'yes' : it.markedWrong === false ? 'no' : 'unsure'} | correct: ${it.answer ? (it.correctLabel ? it.correctLabel + '. ' : '') + one(it.answer, 60) : 'NONE'} | source: ${it.source} | confidence: ${it.confidence}${it.flagged ? ' | NEEDS A LOOK' : ''}${it.note ? ' | note: ' + one(it.note, 140) : ''}`);
     });
   });
   if (!items.length) L.push('No study items yet.');

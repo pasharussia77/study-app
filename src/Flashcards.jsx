@@ -84,6 +84,11 @@ export default function Flashcards({ cards, code, projectId, onExit }) {
         </span>
         <span className="face face-back"><small>{f.bl}</small><b>{f.bt}</b></span>
       </button>
+      {deck[i].type === 'term' && (
+        <button className="link swap" onClick={() => { setFirst(first === 'term' ? 'definition' : 'term'); setFlipped(false); }}>
+          Showing {first === 'term' ? 'word' : 'definition'} first · Swap sides
+        </button>
+      )}
       <div className="row nav">
         <button className="btn miss" onClick={() => mark(false)}>Missed it</button>
         <button className="btn primary" onClick={() => mark(true)}>Got it</button>
