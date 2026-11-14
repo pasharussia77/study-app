@@ -3,7 +3,7 @@ import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
   doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, addDoc,
-  query, where, onSnapshot, serverTimestamp, increment
+  query, where, onSnapshot, serverTimestamp, increment, writeBatch
 } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -82,11 +82,40 @@ function createFirebaseBackend() {
       try {
         const fs = await getDocs(collection(db, 'families', code, 'projects', id, 'files'));
         await Promise.all(fs.docs.map((d) => deleteDoc(d.ref)));
+        const its = await getDocs(collection(db, 'families', code, 'projects', id, 'items'));
+        await Promise.all(its.docs.map((d) => deleteDoc(d.ref)));
         await deleteDoc(doc(db, 'families', code, 'projects', id, 'stats', 'main'));
       } catch {}
       await deleteDoc(doc(db, 'families', code, 'projects', id));
     },
     async idToken() { const u = await signedIn(); return u.getIdToken(); },
+    watchItems(code, pid, cb) {
+      let unsub = () => {};
+      signedIn().then(() => {
+        unsub = onSnapshot(collection(db, 'families', code, 'projects', pid, 'items'), (snap) => {
+          cb(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        }, () => cb([]));
+      });
+      return () => unsub();
+    },
+    // Replaces everything made from one photo with a fresh list (used when a photo is read or re-read).
+    async replaceItemsForFile(code, pid, fileId, list) {
+      await signedIn();
+      const col = collection(db, 'families', code, 'projects', pid, 'items');
+      const old = await getDocs(query(col, where('fileId', '==', fileId)));
+      const batch = writeBatch(db);
+      old.docs.forEach((d) => batch.delete(d.ref));
+      list.forEach((it) => batch.set(doc(col), { ...it, fileId, createdAt: serverTimestamp() }));
+      await batch.commit();
+    },
+    async updateItem(code, pid, id, patch) {
+      await signedIn();
+      await updateDoc(doc(db, 'families', code, 'projects', pid, 'items', id), patch);
+    },
+    async deleteItem(code, pid, id) {
+      await signedIn();
+      await deleteDoc(doc(db, 'families', code, 'projects', pid, 'items', id));
+    },
     watchFiles(code, pid, cb) {
       let unsub = () => {};
       signedIn().then(() => {
@@ -138,6 +167,7 @@ function createMockBackend() {
   const projs = {};
   const stats = {};
   const filesStore = {};
+  const itemsStore = {};
   const listeners = new Set();
   const notify = () => listeners.forEach((f) => f());
   let n = 0;
@@ -163,8 +193,21 @@ function createMockBackend() {
     },
     async getProject(code, id) { return projs[id] ? { ...projs[id] } : null; },
     async saveProjectText(code, id, text) { projs[id].text = text; notify(); },
-    async deleteProject(code, id) { delete projs[id]; delete filesStore[id]; notify(); },
+    async deleteProject(code, id) { delete projs[id]; delete filesStore[id]; delete itemsStore[id]; notify(); },
     async idToken() { return 'mock-token'; },
+    watchItems(code, pid, cb) {
+      const run = () => cb(Object.values(itemsStore[pid] || {}).map((x) => ({ ...x })));
+      listeners.add(run); run();
+      return () => listeners.delete(run);
+    },
+    async replaceItemsForFile(code, pid, fileId, list) {
+      const store = (itemsStore[pid] ||= {});
+      Object.keys(store).forEach((k) => { if (store[k].fileId === fileId) delete store[k]; });
+      list.forEach((it) => { const id = 'i' + (++n); store[id] = { id, ...JSON.parse(JSON.stringify(it)), fileId, createdAt: Date.now() + n }; });
+      notify();
+    },
+    async updateItem(code, pid, id, patch) { Object.assign(itemsStore[pid][id], JSON.parse(JSON.stringify(patch))); notify(); },
+    async deleteItem(code, pid, id) { delete itemsStore[pid][id]; notify(); },
     watchFiles(code, pid, cb) {
       const run = () => cb(Object.values(filesStore[pid] || {}).map((f) => ({ ...f })).sort((a, b) => a.createdAt - b.createdAt));
       listeners.add(run); run();

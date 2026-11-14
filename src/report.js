@@ -8,7 +8,7 @@ const one = (s, n = 140) => { const x = String(s ?? '').replace(/\s+/g, ' ').tri
 const sec = (ms) => (ms / 1000).toFixed(1) + ' s';
 const NAMES = { none: 'Read everything', handwriting: 'Ignore handwriting (printed only)', printed: 'Ignore printed text (handwriting only)' };
 
-export function buildReport({ version, device, health, profile, project, text, parsed, sum, files, events, notes }) {
+export function buildReport({ version, device, health, profile, project, text, parsed, sum, files, items = [], check = null, events, notes }) {
   const L = [];
   const h = (t) => L.push('', '=== ' + t + ' ===');
   L.push('FAMILY STUDY DIAGNOSTIC REPORT');
@@ -26,36 +26,49 @@ export function buildReport({ version, device, health, profile, project, text, p
   files.forEach((f, i) => {
     const added = photoEvents.find((e) => e.fileId === f.id);
     const reading = [...events].reverse().find((e) => e.type === 'photo_read' && e.fileId === f.id);
-    L.push(`Photo ${i + 1}: mode "${NAMES[f.ignore] || f.ignore}", status ${f.status}${f.error ? ' (' + f.error + ')' : ''}`);
+    L.push(`Photo ${i + 1}: mode "${NAMES[f.ignore] || f.ignore}", status ${f.status}${f.error ? ' (' + f.error + ')' : ''}${f.page ? `, page graded: ${f.page.graded ? 'yes' : 'no'}${f.page.score ? ', score ' + f.page.score : ''}` : ''}${f.made != null ? ', items made: ' + f.made : ''}`);
     if (added) L.push(`   original ${kb(added.origBytes || 0)} ${added.origType || ''}, stored as ${added.w}x${added.h} (${kb(added.storedChars || 0)})`);
-    if (reading) L.push(`   AI reading: ${reading.ok ? 'ok' : 'FAILED'}, ${sec(reading.ms || 0)}, tokens in/out ${reading.usage?.prompt_tokens ?? '?'}/${reading.usage?.completion_tokens ?? '?'}${reading.raw ? ', ' + reading.raw.split('\n').filter(Boolean).length + ' lines' : ''}`);
+    if (reading) L.push(`   AI reading: ${reading.ok ? 'ok' : 'FAILED'}, ${sec(reading.ms || 0)}, tokens in/out ${reading.usage?.prompt_tokens ?? '?'}/${reading.usage?.completion_tokens ?? '?'}${reading.made != null ? `, ${reading.made} items (${reading.flagged} need a look)` : ''}`);
   });
   const docs = events.filter((e) => e.type === 'doc_import');
   docs.forEach((d) => L.push(`File "${d.name}" (${kb(d.size || 0)}): ${d.ok === false ? 'FAILED: ' + d.error : d.method + ', ' + (d.pages ? d.pages + ' page(s), ' : '') + d.chars + ' characters, ' + sec(d.ms || 0)}${d.note ? '. ' + d.note : ''}`));
   if (!files.length && !docs.length) L.push('No photos or files were added (text may have been typed or pasted).');
 
-  h('2. EXACT AI READING OF EACH PHOTO (raw, before any editing)');
+  h('2. EXACT AI ANSWER FOR EACH PHOTO (raw JSON, before the app worked out answers)');
   const rawReads = events.filter((e) => e.type === 'photo_read');
   if (!rawReads.length) L.push('No AI readings recorded.');
   rawReads.forEach((r, i) => {
     L.push(`--- Reading ${i + 1}${r.label ? ' (' + r.label + ')' : ''} at ${time(r.t)}: ${NAMES[r.ignore] || r.ignore} ---`);
-    L.push(r.ok ? clip(r.raw || '', 3500) : 'FAILED: ' + r.error);
+    L.push(r.ok ? clip(r.raw || '', 7000) : 'FAILED: ' + r.error + (r.raw ? '\nRaw answer:\n' + clip(r.raw, 2000) : ''));
   });
   if (rawReads[0]) { L.push('', 'Instruction sent to the AI with each picture ("' + (NAMES[rawReads[0].ignore] || '') + '"):', rawReads[0].prompt); }
 
-  h(`3. MATERIAL TEXT NOW IN THE PROJECT (${text.length} characters)`);
-  L.push(text ? clip(text, 4000) : '(empty)');
+  h('3. STUDY ITEMS THE APP BUILT FROM PHOTOS');
+  L.push('Rule: the AI only reports what it sees (handwritten answers, red X marks, circles, printed keys). The app then decides each correct answer with fixed rules: printed key, then a circled choice, then a red X on a true/false (the other choice), then "no red mark = assumed correct" on a graded page. Anything else has no answer and is flagged.');
+  const types = {};
+  items.forEach((i) => { types[i.type] = (types[i.type] || 0) + 1; });
+  L.push(`Items: ${items.length} (${Object.entries(types).map(([k, v]) => v + ' ' + k).join(', ') || 'none'}); flagged "needs a look": ${items.filter((i) => i.flagged).length}; without an answer: ${items.filter((i) => !i.answer).length}`);
+  if (check) L.push(`Score cross-check: sheet says ${check.score} (so ${check.expectedWrong} wrong); items marked wrong: ${check.wrongFound} -> ${check.ok ? 'MATCH' : 'MISMATCH'}. Questions found ${check.questions} of ${check.total}${check.countOk ? '' : ' (MISSING SOME)'}.`);
+  const byFile = files.map((f, i) => ({ f, n: i + 1, list: items.filter((x) => x.fileId === f.id).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)) })).filter((g) => g.list.length);
+  byFile.forEach((g) => {
+    L.push(`--- from Photo ${g.n} ---`);
+    g.list.forEach((it) => {
+      const ch = it.choices && it.choices.length ? ' | choices: ' + it.choices.map((c) => c.label + '. ' + one(c.text, 40)).join('; ') : '';
+      L.push(`${it.number != null ? '#' + it.number + ' ' : ''}[${it.type}] "${one(it.question, 90)}"${ch}`);
+      L.push(`      student: ${it.studentAnswer ?? '-'} | marked wrong: ${it.markedWrong === true ? 'yes' : it.markedWrong === false ? 'no' : 'unsure'} | correct: ${it.answer ? (it.correctLabel ? it.correctLabel + '. ' : '') + one(it.answer, 60) : 'NONE'} | source: ${it.source} | confidence: ${it.confidence}${it.flagged ? ' | NEEDS A LOOK' : ''}${it.note ? ' | note: ' + one(it.note, 140) : ''}`);
+    });
+  });
+  if (!items.length) L.push('No study items yet.');
 
-  h('4. HOW THE APP TURNED THE TEXT INTO CARDS');
-  L.push('Rule: one line becomes one card only if it has a separator: " - ", " – ", " — ", a tab, " = " or ": ". The part before it is the word, the part after is the definition. Nothing else is read as a card yet.');
-  L.push(`Cards created: ${parsed.cards.length}`);
-  parsed.cards.slice(0, 60).forEach((c, i) => L.push(`  ${i + 1}. "${one(c.term, 80)}"  ->  "${one(c.definition, 120)}"`));
-  L.push(`Lines skipped (no separator): ${parsed.skipped}`);
-  parsed.skippedLines.slice(0, 40).forEach((s) => L.push('  - ' + one(s, 130)));
-  if (parsed.skippedLines.length > 40) L.push(`  ... and ${parsed.skippedLines.length - 40} more`);
+  h(`4. TYPED, PASTED AND FILE TEXT (${text.length} characters)`);
+  L.push(text ? clip(text, 3000) : '(empty)');
+  L.push('Rule: one line becomes one word card only if it has a separator: " - ", " – ", " — ", a tab, " = " or ": ".');
+  L.push(`Word cards made from this text: ${parsed.cards.length}; lines skipped: ${parsed.skipped}`);
+  parsed.cards.slice(0, 40).forEach((c, i) => L.push(`  ${i + 1}. "${one(c.term, 80)}"  ->  "${one(c.definition, 120)}"`));
+  parsed.skippedLines.slice(0, 25).forEach((s) => L.push('  - skipped: ' + one(s, 130)));
 
   h('5. PROGRESS NOW');
-  L.push(`Total ${sum.total}, covered ${sum.covered}, remaining ${sum.remainingCount}, correct ${sum.correct}, incorrect ${sum.incorrect}`);
+  L.push(`Everything studyable (typed + photo items with an answer): total ${sum.total}, covered ${sum.covered}, remaining ${sum.remainingCount}, correct ${sum.correct}, incorrect ${sum.incorrect}`);
 
   h('6. STUDY SESSIONS (most recent activity)');
   const study = events.filter((e) => ['session_start', 'answer', 'override', 'round_done'].includes(e.type)).slice(-70);

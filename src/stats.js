@@ -17,7 +17,7 @@ export function summarize(cards, items = {}) {
   let correct = 0, incorrect = 0;
   const missed = [], remaining = [];
   for (const c of cards) {
-    const last = items[cardKey(c)]?.last;
+    const last = items[c.key || cardKey(c)]?.last;
     if (last === 'right') correct++;
     else if (last === 'wrong') { incorrect++; missed.push(c); }
     else remaining.push(c);

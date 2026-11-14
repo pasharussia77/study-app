@@ -28,9 +28,16 @@ export async function askAIDetailed(code, { messages, json = false, maxTokens = 
 }
 
 // Test stand-in used only with ?mock=1
+const MOCK_DEFAULT = JSON.stringify({ page: { graded: false, score: null }, ends_with: {}, items: [
+  { type: 'term', question: 'photosynthesis', answer_text: 'how plants make food', confidence: 'high', note: '' },
+  { type: 'term', question: 'mitochondria', answer_text: "the cell's power plant", confidence: 'high', note: '' }
+] });
 async function mockAI(messages) {
   window.__lastMessages = messages;
+  window.__allMessages = [...(window.__allMessages || []), messages];
   if (new URLSearchParams(location.search).has('aifail')) throw new Error('Pretend AI failure.');
   const hasImage = JSON.stringify(messages).includes('image_url');
-  return hasImage ? 'photosynthesis - how plants make food\nmitochondria - the cell\'s power plant' : 'ok';
+  if (!hasImage) return 'ok';
+  if (window.__mockAI && window.__mockAI.length) { const next = window.__mockAI.shift(); return typeof next === 'string' ? next : JSON.stringify(next); }
+  return MOCK_DEFAULT;
 }

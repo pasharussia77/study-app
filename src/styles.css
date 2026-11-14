@@ -159,3 +159,31 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .viewer-bottom { padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 8px; }
 .viewer-bottom .tiny { margin: 0; text-align: center; opacity: .75; word-break: break-word; }
 .viewer .btn.ghost { background: transparent; color: #fff; border-color: rgba(255,255,255,.35); }
+
+/* ---- study items review ---- */
+.btn.small { min-height: 40px; padding: 8px 14px; font-size: .92rem; align-self: flex-start; }
+.link.inline { margin-left: 8px; padding: 4px 0; }
+.face-choices { list-style: none; margin: 6px 0 0; padding: 0; text-align: left; font-weight: 700; font-size: 1rem; align-self: stretch; }
+.face-choices li { margin: 4px 0; }
+.igroup { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.igroup-head { display: flex; align-items: center; gap: 10px; }
+.gthumb { width: 44px; height: 58px; border-radius: 8px; overflow: hidden; border: 2px solid var(--line); padding: 0; background: #fff; }
+.gthumb img { width: 100%; height: 100%; object-fit: cover; }
+.ilist { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.item { background: #fff; border: 2px solid var(--line); border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+.item.flagged { border-color: #F5C542; background: #FFFBEF; }
+.item-top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: .9rem; }
+.ttype { background: var(--paper); border: 1px solid var(--line); border-radius: 999px; padding: 1px 10px; font-weight: 800; font-size: .78rem; }
+.t-tf { background: #E6F3FF; } .t-mc { background: #EDE9FF; } .t-term { background: #E3F8F1; } .t-qa { background: #FFF1DD; }
+.src { color: var(--muted); font-size: .78rem; }
+.item-q { margin: 0; font-weight: 700; }
+.ichoices { list-style: none; margin: 0; padding: 0; font-size: .95rem; }
+.ichoices li { padding: 2px 0; } .ichoices li.right { color: #0E9F7A; font-weight: 800; }
+.ichoices-answer { margin: 0; }
+.needs { margin: 0; color: #8A5A00; font-size: .9rem; font-weight: 700; }
+.radios { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; }
+.radio { display: flex; align-items: center; gap: 10px; background: #fff; border: 2px solid var(--line); border-radius: 14px; padding: 8px 12px; }
+.radio.on { border-color: #19C79A; background: #E3F8F1; }
+.radio input[type=radio] { width: 22px; height: 22px; accent-color: #0E9F7A; }
+.rl { font-weight: 900; }
+.rt { flex: 1; min-width: 0; border: 0; background: none; font: inherit; font-weight: 600; padding: 6px 0; outline: none; }

@@ -7,7 +7,10 @@ import Quiz from './Quiz.jsx';
 import Sources from './Sources.jsx';
 import ReportSheet from './Report.jsx';
 import { diagClear } from './diag.js';
+import Items from './Items.jsx';
 import { useStats, StatsStrip } from './Session.jsx';
+import { buildDeck } from './deck.js';
+import { startNav, pushScreen, replaceScreen, resetTo, goUp, useOverlay } from './nav.js';
 
 const COLORS = ['#FF6B5E', '#2BB3FF', '#19C79A'];
 const store = {
@@ -17,12 +20,9 @@ const store = {
 };
 
 export default function App() {
-  const [screen, setScreen] = useState('loading');
+  const [view, setView] = useState({ screen: 'loading' });
   const [code, setCode] = useState(store.get('familyCode'));
   const [family, setFamily] = useState(store.get('family'));
-  const [profile, setProfile] = useState(null);
-  const [project, setProject] = useState(null);
-  const [study, setStudy] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -30,9 +30,9 @@ export default function App() {
       if (code && family) {
         const savedProfile = store.get('profileId');
         const p = savedProfile && family.profiles.find((x) => x.id === savedProfile);
-        setProfile(p || null);
-        setScreen(p ? 'home' : 'profiles');
-      } else setScreen('welcome');
+        // Opening straight into a profile still keeps "who's studying" one Back press below it.
+        startNav(p ? [{ screen: 'profiles' }, { screen: 'home', profile: p }] : [{ screen: 'profiles' }], setView);
+      } else startNav([{ screen: 'welcome' }], setView);
     })();
     // eslint-disable-next-line
   }, []);
@@ -44,11 +44,11 @@ export default function App() {
 
   const enterFamily = (c, f) => {
     store.set('familyCode', c); store.set('family', f);
-    setCode(c); setFamily(f); setScreen('profiles');
+    setCode(c); setFamily(f); resetTo({ screen: 'profiles' });
   };
   const leaveFamily = () => {
     ['familyCode', 'family', 'profileId'].forEach(store.del);
-    setCode(null); setFamily(null); setProfile(null); setScreen('welcome');
+    setCode(null); setFamily(null); resetTo({ screen: 'welcome' });
   };
   const addTest = async () => {
     if (family.profiles.some((p) => p.id === 'test')) return;
@@ -56,28 +56,31 @@ export default function App() {
     setFamily(next); store.set('family', next);
     try { await backend.setProfiles(code, next.profiles); } catch {}
   };
-  const pickProfile = (p) => { store.set('profileId', p.id); setProfile(p); setScreen('home'); };
+  const pickProfile = (p) => { store.set('profileId', p.id); pushScreen({ screen: 'home', profile: p }); };
 
+  const { screen, profile, project } = view;
   if (screen === 'loading') return <Shell><p className="muted center-msg">Loading…</p></Shell>;
-  if (screen === 'welcome') return <Shell><Welcome onCreate={() => setScreen('create')} onJoin={() => setScreen('join')} /></Shell>;
-  if (screen === 'create') return <Shell><CreateFamily onBack={() => setScreen('welcome')} onDone={enterFamily} /></Shell>;
-  if (screen === 'join') return <Shell><JoinFamily onBack={() => setScreen('welcome')} onDone={enterFamily} /></Shell>;
+  if (screen === 'welcome') return <Shell><Welcome onCreate={() => replaceScreen({ screen: 'create' })} onJoin={() => replaceScreen({ screen: 'join' })} /></Shell>;
+  if (screen === 'create') return <Shell><CreateFamily onBack={() => replaceScreen({ screen: 'welcome' })} onDone={enterFamily} /></Shell>;
+  if (screen === 'join') return <Shell><JoinFamily onBack={() => replaceScreen({ screen: 'welcome' })} onDone={enterFamily} /></Shell>;
   if (screen === 'profiles') return <Shell><Profiles family={family} code={code} onPick={pickProfile} onLeave={leaveFamily} onAddTest={addTest} /></Shell>;
   if (screen === 'home') return (
     <Shell>
-      <Home code={code} profile={profile} onSwitch={() => setScreen('profiles')}
-        onOpen={(p) => { setProject(p); setScreen('project'); }} />
+      <Home code={code} profile={profile} onSwitch={goUp}
+        onOpen={(p) => pushScreen({ screen: 'project', profile, project: p })} />
     </Shell>
   );
   if (screen === 'project') return (
     <Shell>
-      <Project code={code} projectId={project.id} profile={profile} onBack={() => setScreen('home')}
-        onStudy={(mode, cards) => { setStudy({ mode, cards }); setScreen('study'); }} />
+      <Project key={project.id} code={code} projectId={project.id} profile={profile} onBack={goUp}
+        onStudy={(mode, deck) => pushScreen({ screen: 'study', profile, project, mode, deck })}
+        onReview={() => pushScreen({ screen: 'items', profile, project })} />
     </Shell>
   );
+  if (screen === 'items') return <Shell><Items code={code} projectId={project.id} /></Shell>;
   if (screen === 'study') {
-    const Mode = study.mode === 'quiz' ? Quiz : Flashcards;
-    return <Shell><Mode cards={study.cards} code={code} projectId={project.id} onExit={() => setScreen('project')} /></Shell>;
+    const Mode = view.mode === 'quiz' ? Quiz : Flashcards;
+    return <Shell><Mode cards={view.deck} code={code} projectId={project.id} onExit={goUp} /></Shell>;
   }
   return null;
 }
@@ -240,7 +243,7 @@ function Home({ code, profile, onSwitch, onOpen }) {
           <li key={p.id}>
             <button className="card-row" onClick={() => onOpen(p)}>
               <span className="row-title">{p.name}</span>
-              <span className="muted">{parseCards(p.text).cards.length} cards</span>
+              <span className="muted">{niceDate(p.createdAt)}</span>
             </button>
           </li>
         ))}
@@ -261,7 +264,7 @@ function Home({ code, profile, onSwitch, onOpen }) {
   );
 }
 
-function Project({ code, projectId, profile, onBack, onStudy }) {
+function Project({ code, projectId, profile, onBack, onStudy, onReview }) {
   const [p, setP] = useState(null);
   const [text, setText] = useState('');
   const [state, setState] = useState('saved');
@@ -283,7 +286,12 @@ function Project({ code, projectId, profile, onBack, onStudy }) {
     change((base ? base + '\n\n' : '') + t.trim());
   };
   const { cards, skipped } = useMemo(() => parseCards(text), [text]);
-  const { sum } = useStats(code, projectId, cards);
+  const [items, setItems] = useState([]);
+  useEffect(() => backend.watchItems(code, projectId, setItems), [code, projectId]);
+  useOverlay(reporting, () => setReporting(false));
+  const { deck, notReady } = useMemo(() => buildDeck(cards, items), [cards, items]);
+  const flagged = items.filter((i) => i.flagged).length;
+  const { sum } = useStats(code, projectId, deck);
   if (!p) return <section><Back onClick={onBack} /><p className="muted">Loading…</p></section>;
   const del = async () => {
     if (confirm('Delete this project and its material?')) { clearTimeout(timer.current); timer.current = null; await backend.deleteProject(code, projectId); diagClear(projectId); onBack(); }
@@ -292,23 +300,29 @@ function Project({ code, projectId, profile, onBack, onStudy }) {
     <section>
       <Back onClick={onBack} label="Projects" />
       <h1 className="proj-title">{p.name}</h1>
-      {cards.length > 0 && (
+      {deck.length > 0 && (
         <>
           <StatsStrip sum={sum} />
           <div className="stack">
-            <button className="btn primary" onClick={() => onStudy('flash', cards)}>Flashcards</button>
-            <button className="btn primary alt" onClick={() => onStudy('quiz', cards)}>Written quiz</button>
+            <button className="btn primary" onClick={() => onStudy('flash', deck)}>Flashcards</button>
+            <button className="btn primary alt" onClick={() => onStudy('quiz', deck)}>Written quiz</button>
           </div>
           {sum.incorrect > 0 && <p className="hint">{sum.incorrect} {sum.incorrect === 1 ? 'card needs' : 'cards need'} another try. Choose "Missed only" when you start.</p>}
         </>
       )}
-      <Sources code={code} projectId={projectId} projectName={p.name} canSave={!!profile?.test} onAppend={append} />
+      {items.length > 0 && (
+        <button className="btn ghost" onClick={onReview}>
+          Review study items ({items.length}){flagged > 0 ? ` · ${flagged} need a look` : ''}
+        </button>
+      )}
+      {notReady > 0 && <p className="hint">{notReady} item{notReady === 1 ? ' has' : 's have'} no answer yet, so {notReady === 1 ? 'it is' : 'they are'} left out of studying. Open Review study items to set {notReady === 1 ? 'it' : 'them'}.</p>}
+      <Sources code={code} projectId={projectId} projectName={p.name} canSave={!!profile?.test} onAppend={append} onReview={onReview} />
       <label className="muted" htmlFor="material">Your material</label>
       <textarea id="material" className="material" value={text} onChange={(e) => change(e.target.value)}
         placeholder={'Paste your notes here.\nWrite one item per line:\n\nphotosynthesis - how plants turn light into food\nmitochondria - the cell\'s power plant'} />
       <p className="status" aria-live="polite">
         {state === 'saving' ? 'Saving…' : state === 'error' ? 'Not saved – check your connection' : 'Saved'}
-        {' · '}{cards.length} {cards.length === 1 ? 'card' : 'cards'}
+        {cards.length > 0 ? ` · ${cards.length} typed ${cards.length === 1 ? 'card' : 'cards'}` : ''}
       </p>
       {skipped > 0 && <p className="hint">{skipped} {skipped === 1 ? 'line was' : 'lines were'} skipped. Write each card as <b>word - definition</b>.</p>}
       {profile?.test && (
@@ -318,7 +332,7 @@ function Project({ code, projectId, profile, onBack, onStudy }) {
           <button className="btn ghost" onClick={() => setReporting(true)}>Create diagnostic report</button>
         </div>
       )}
-      {reporting && <ReportSheet code={code} project={p} profile={profile} text={text} onClose={() => setReporting(false)} />}
+      {reporting && <ReportSheet code={code} project={p} profile={profile} text={text} deck={deck} onClose={() => setReporting(false)} />}
       <button className="link danger" onClick={del}>Delete project</button>
     </section>
   );

@@ -4,12 +4,15 @@ import { buildReport } from './report.js';
 import { diagGet, diagClear } from './diag.js';
 import { parseCards } from './parse.js';
 import { summarize } from './stats.js';
+import { crossCheck } from './items.js';
+import { useOverlay } from './nav.js';
 import { APP_VERSION } from './version.js';
 
 const WORKER_URL = 'https://study-api.pasharussia77.workers.dev';
 
-export default function ReportSheet({ code, project, profile, text, onClose }) {
+export default function ReportSheet({ code, project, profile, text, deck, onClose }) {
   const [files, setFiles] = useState([]);
+  const [items, setItems] = useState([]);
   const [stats, setStats] = useState({});
   const [health, setHealth] = useState(null);
   const [notes, setNotes] = useState('');
@@ -18,6 +21,7 @@ export default function ReportSheet({ code, project, profile, text, onClose }) {
 
   useEffect(() => backend.watchFiles(code, project.id, setFiles), [code, project.id]);
   useEffect(() => backend.watchStats(code, project.id, setStats), [code, project.id]);
+  useEffect(() => backend.watchItems(code, project.id, setItems), [code, project.id]);
   useEffect(() => {
     if (new URLSearchParams(location.search).has('mock')) { setHealth({ model: 'mock-model', hasKey: true }); return; }
     fetch(WORKER_URL + '/health').then((r) => r.json()).then(setHealth).catch(() => {});
@@ -28,9 +32,9 @@ export default function ReportSheet({ code, project, profile, text, onClose }) {
     return buildReport({
       version: APP_VERSION,
       device: `${navigator.userAgent} | screen ${screen.width}x${screen.height} | online ${navigator.onLine}`,
-      health, profile, project, text, parsed, sum: summarize(parsed.cards, stats), files, events, notes
+      health, profile, project, text, parsed, sum: summarize(deck, stats), files, items, check: crossCheck(files, items), events, notes
     });
-  }, [text, stats, files, events, notes, health, profile, project]);
+  }, [text, stats, files, items, deck, events, notes, health, profile, project]);
 
   const copy = async () => {
     try { await navigator.clipboard.writeText(report); setCopied('Copied. Now paste it in the chat with Claude.'); }

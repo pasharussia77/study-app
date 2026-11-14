@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { backend } from './firebase.js';
 import { summarize, pickChoices } from './stats.js';
+import { deckTypes } from './deck.js';
+import { TYPE_LABEL } from './items.js';
 
 export function useStats(code, projectId, cards) {
   const [items, setItems] = useState({});
@@ -44,6 +46,19 @@ export function CardPicker({ sum, value, onChange }) {
     <fieldset className="seg stack-seg" aria-label="Which cards">
       <legend>Which cards</legend>
       {choices.map((c) => <button key={c.id} className={value === c.id ? 'on' : ''} onClick={() => onChange(c.id)}>{c.label}</button>)}
+    </fieldset>
+  );
+}
+
+export function TypePicker({ deck, value, onChange }) {
+  const counts = deckTypes(deck);
+  const kinds = Object.keys(counts);
+  if (kinds.length < 2) return null;
+  return (
+    <fieldset className="seg stack-seg" aria-label="Which kind">
+      <legend>Which kind</legend>
+      <button className={value === 'all' ? 'on' : ''} onClick={() => onChange('all')}>{`All kinds (${deck.length})`}</button>
+      {kinds.map((k) => <button key={k} className={value === k ? 'on' : ''} onClick={() => onChange(k)}>{`${TYPE_LABEL[k]} (${counts[k]})`}</button>)}
     </fieldset>
   );
 }

@@ -31,15 +31,11 @@ export async function compressImage(source) {
   throw new Error('That picture is too large to store.');
 }
 
-const RULES = 'Keep each line of the page on its own line. If the page is a word list or glossary with definitions, write one entry per line as: word - definition. If it has questions with answers, write each as: question - answer. Do not add commentary, titles you invented, or markdown. If there is no readable text, reply with exactly: NO TEXT';
-const PROMPTS = {
-  none: 'Transcribe all the text in this image. ' + RULES,
-  handwriting: 'Transcribe only the PRINTED text in this image. Ignore any handwriting, notes, underlines or annotations written by hand. ' + RULES,
-  printed: 'Transcribe only the HANDWRITTEN text in this image. Ignore all printed or typed text. ' + RULES
-};
+import { buildPrompt, parseAiJson, resolvePage } from './items.js';
 
-export async function readImageText(code, dataUrl, ignore = 'none', log = () => {}) {
-  const prompt = PROMPTS[ignore] || PROMPTS.none;
+// Reads one photo and returns clean study items plus notes for the next page.
+export async function readPhotoItems(code, dataUrl, ignore = 'none', ctx = null, log = () => {}) {
+  const prompt = buildPrompt(ignore, ctx);
   const t0 = Date.now();
   let res;
   try {
@@ -48,17 +44,26 @@ export async function readImageText(code, dataUrl, ignore = 'none', log = () => 
         { type: 'text', text: prompt },
         { type: 'image_url', image_url: { url: dataUrl } }
       ] }],
-      maxTokens: 3000
+      json: true,
+      maxTokens: 4000
     });
   } catch (e) {
     log({ type: 'photo_read', ignore, prompt, ok: false, error: e.message, ms: Date.now() - t0 });
     throw e;
   }
-  const t = res.text.trim();
-  const empty = !t || t === 'NO TEXT';
-  log({ type: 'photo_read', ignore, prompt, ok: !empty, error: empty ? 'No readable text found' : '', ms: res.ms, usage: res.usage, raw: res.text });
-  if (empty) throw new Error('No readable text was found in this picture.');
-  return t;
+  let result;
+  try { result = resolvePage(parseAiJson(res.text), ctx); }
+  catch (e) {
+    log({ type: 'photo_read', ignore, prompt, ok: false, error: e.message, ms: res.ms, usage: res.usage, raw: res.text });
+    throw e;
+  }
+  if (!result.items.length) {
+    log({ type: 'photo_read', ignore, prompt, ok: false, error: 'No study items found', ms: res.ms, usage: res.usage, raw: res.text });
+    throw new Error('No readable questions or words were found in this picture.');
+  }
+  log({ type: 'photo_read', ignore, prompt, ok: true, ms: res.ms, usage: res.usage, raw: res.text,
+        made: result.items.length, flagged: result.items.filter((i) => i.flagged).length, page: result.page });
+  return result;
 }
 
 export async function readTextFile(file) {
@@ -70,7 +75,7 @@ export async function readTextFile(file) {
 const MAX_PDF_PAGES = 30;
 const MAX_SCANNED_PAGES = 10;
 
-export async function readPdf(code, file, onProgress = () => {}, log = () => {}) {
+export async function readPdf(file, onProgress = () => {}, log = () => {}) {
   const t0 = Date.now();
   const pdfjs = await import('pdfjs-dist');
   pdfjs.GlobalWorkerOptions.workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default;
@@ -89,22 +94,19 @@ export async function readPdf(code, file, onProgress = () => {}, log = () => {})
     return { text, note };
   }
 
-  // Scanned PDF: no real text inside, so draw the pages and let the AI read them.
+  // Scanned PDF: no real text inside, so hand back the pages as pictures to be read like photos.
   const scanPages = Math.min(pdf.numPages, MAX_SCANNED_PAGES);
-  if (pdf.numPages > scanPages) note = `Only the first ${scanPages} pages were read.`;
-  const parts = [];
+  if (pdf.numPages > scanPages) note = `Only the first ${scanPages} pages were used.`;
+  const images = [];
   for (let i = 1; i <= scanPages; i++) {
-    onProgress(`Reading scanned page ${i} of ${scanPages}…`);
+    onProgress(`Preparing page ${i} of ${scanPages}…`);
     const page = await pdf.getPage(i);
     const vp = page.getViewport({ scale: 1.6 });
     const c = document.createElement('canvas');
     c.width = vp.width; c.height = vp.height;
     await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
-    const { data } = await compressImage(c);
-    try { parts.push(await readImageText(code, data, 'none', (e) => log({ ...e, label: `PDF page ${i}` }))); } catch (e) { if (scanPages === 1) throw e; }
+    images.push(await compressImage(c));
   }
-  if (!parts.length) throw new Error('No readable text was found in that PDF.');
-  const joined = parts.join('\n');
-  log({ type: 'doc_import', name: file.name, size: file.size, method: 'Scanned PDF read by AI', pages: scanPages, chars: joined.length, ms: Date.now() - t0, note });
-  return { text: joined, note };
+  log({ type: 'doc_import', name: file.name, size: file.size, method: 'Scanned PDF turned into page photos', pages: scanPages, chars: 0, ms: Date.now() - t0, note });
+  return { text: '', images, note };
 }
