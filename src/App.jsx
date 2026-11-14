@@ -5,6 +5,8 @@ import { APP_VERSION } from './version.js';
 import Flashcards from './Flashcards.jsx';
 import Quiz from './Quiz.jsx';
 import Sources from './Sources.jsx';
+import ReportSheet from './Report.jsx';
+import { diagClear } from './diag.js';
 import { useStats, StatsStrip } from './Session.jsx';
 
 const COLORS = ['#FF6B5E', '#2BB3FF', '#19C79A'];
@@ -35,6 +37,11 @@ export default function App() {
     // eslint-disable-next-line
   }, []);
 
+  useEffect(() => {
+    if (!code) return;
+    return backend.watchFamily(code, (f) => { setFamily(f); store.set('family', f); });
+  }, [code]);
+
   const enterFamily = (c, f) => {
     store.set('familyCode', c); store.set('family', f);
     setCode(c); setFamily(f); setScreen('profiles');
@@ -43,13 +50,19 @@ export default function App() {
     ['familyCode', 'family', 'profileId'].forEach(store.del);
     setCode(null); setFamily(null); setProfile(null); setScreen('welcome');
   };
+  const addTest = async () => {
+    if (family.profiles.some((p) => p.id === 'test')) return;
+    const next = { profiles: [...family.profiles, { id: 'test', name: 'Test', color: '#F59E0B', test: true }] };
+    setFamily(next); store.set('family', next);
+    try { await backend.setProfiles(code, next.profiles); } catch {}
+  };
   const pickProfile = (p) => { store.set('profileId', p.id); setProfile(p); setScreen('home'); };
 
   if (screen === 'loading') return <Shell><p className="muted center-msg">Loading…</p></Shell>;
   if (screen === 'welcome') return <Shell><Welcome onCreate={() => setScreen('create')} onJoin={() => setScreen('join')} /></Shell>;
   if (screen === 'create') return <Shell><CreateFamily onBack={() => setScreen('welcome')} onDone={enterFamily} /></Shell>;
   if (screen === 'join') return <Shell><JoinFamily onBack={() => setScreen('welcome')} onDone={enterFamily} /></Shell>;
-  if (screen === 'profiles') return <Shell><Profiles family={family} code={code} onPick={pickProfile} onLeave={leaveFamily} /></Shell>;
+  if (screen === 'profiles') return <Shell><Profiles family={family} code={code} onPick={pickProfile} onLeave={leaveFamily} onAddTest={addTest} /></Shell>;
   if (screen === 'home') return (
     <Shell>
       <Home code={code} profile={profile} onSwitch={() => setScreen('profiles')}
@@ -58,7 +71,7 @@ export default function App() {
   );
   if (screen === 'project') return (
     <Shell>
-      <Project code={code} projectId={project.id} onBack={() => setScreen('home')}
+      <Project code={code} projectId={project.id} profile={profile} onBack={() => setScreen('home')}
         onStudy={(mode, cards) => { setStudy({ mode, cards }); setScreen('study'); }} />
     </Shell>
   );
@@ -171,16 +184,17 @@ function JoinFamily({ onBack, onDone }) {
 
 /* ---------- Profiles and projects ---------- */
 
-function Profiles({ family, code, onPick, onLeave }) {
+function Profiles({ family, code, onPick, onLeave, onAddTest }) {
   const [show, setShow] = useState(false);
   return (
     <section>
       <h1>Who's studying?</h1>
       <div className="tiles">
         {family.profiles.map((p) => (
-          <button key={p.id} className="tile" onClick={() => onPick(p)} style={{ '--c': p.color }}>
+          <button key={p.id} className={'tile' + (p.test ? ' test' : '')} onClick={() => onPick(p)} style={{ '--c': p.color }}>
             <span className="avatar">{p.name[0].toUpperCase()}</span>
             <span className="tile-name">{p.name}</span>
+            {p.test && <span className="tag">Testing</span>}
           </button>
         ))}
       </div>
@@ -192,6 +206,7 @@ function Profiles({ family, code, onPick, onLeave }) {
             <button className="link danger" onClick={() => { if (confirm('Leave this family on this phone? Your projects stay saved.')) onLeave(); }}>Leave family on this phone</button>
           </>
         ) : <button className="link" onClick={() => setShow(true)}>Show family code</button>}
+        {!family.profiles.some((p) => p.test) && <button className="link" onClick={onAddTest}>Add a testing account</button>}
         <p className="muted tiny">Version {APP_VERSION}{isMock ? ' (test mode)' : ''}</p>
       </footer>
     </section>
@@ -246,10 +261,11 @@ function Home({ code, profile, onSwitch, onOpen }) {
   );
 }
 
-function Project({ code, projectId, onBack, onStudy }) {
+function Project({ code, projectId, profile, onBack, onStudy }) {
   const [p, setP] = useState(null);
   const [text, setText] = useState('');
   const [state, setState] = useState('saved');
+  const [reporting, setReporting] = useState(false);
   const timer = useRef(null);
   const latest = useRef('');
   useEffect(() => { backend.getProject(code, projectId).then((x) => { setP(x); setText(x?.text || ''); latest.current = x?.text || ''; }); }, [code, projectId]);
@@ -270,7 +286,7 @@ function Project({ code, projectId, onBack, onStudy }) {
   const { sum } = useStats(code, projectId, cards);
   if (!p) return <section><Back onClick={onBack} /><p className="muted">Loading…</p></section>;
   const del = async () => {
-    if (confirm('Delete this project and its material?')) { clearTimeout(timer.current); timer.current = null; await backend.deleteProject(code, projectId); onBack(); }
+    if (confirm('Delete this project and its material?')) { clearTimeout(timer.current); timer.current = null; await backend.deleteProject(code, projectId); diagClear(projectId); onBack(); }
   };
   return (
     <section>
@@ -295,6 +311,14 @@ function Project({ code, projectId, onBack, onStudy }) {
         {' · '}{cards.length} {cards.length === 1 ? 'card' : 'cards'}
       </p>
       {skipped > 0 && <p className="hint">{skipped} {skipped === 1 ? 'line was' : 'lines were'} skipped. Write each card as <b>word - definition</b>.</p>}
+      {profile?.test && (
+        <div className="testtools">
+          <b>Testing tools</b>
+          <p className="muted tiny">Creates a report of what was read, how cards were made, and how your quiz went. Paste it to Claude.</p>
+          <button className="btn ghost" onClick={() => setReporting(true)}>Create diagnostic report</button>
+        </div>
+      )}
+      {reporting && <ReportSheet code={code} project={p} profile={profile} text={text} onClose={() => setReporting(false)} />}
       <button className="link danger" onClick={del}>Delete project</button>
     </section>
   );

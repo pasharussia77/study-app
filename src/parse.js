@@ -4,6 +4,7 @@ const SEPARATORS = ['\t', ' – ', ' — ', ' - ', ': ', ' = '];
 export function parseCards(text) {
   const cards = [];
   let skipped = 0;
+  const skippedLines = [];
   for (const raw of (text || '').split(/\r?\n/)) {
     const line = raw.trim();
     if (!line) continue;
@@ -12,13 +13,13 @@ export function parseCards(text) {
       const i = line.indexOf(sep);
       if (i > 0 && (best === -1 || i < best)) { best = i; sepLen = sep.length; }
     }
-    if (best === -1) { skipped++; continue; }
+    if (best === -1) { skipped++; skippedLines.push(line); continue; }
     const term = line.slice(0, best).trim();
     const definition = line.slice(best + sepLen).trim();
-    if (!term || !definition) { skipped++; continue; }
+    if (!term || !definition) { skipped++; skippedLines.push(line); continue; }
     cards.push({ id: cards.length, term, definition });
   }
-  return { cards, skipped };
+  return { cards, skipped, skippedLines };
 }
 
 export function shuffle(list) {

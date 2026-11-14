@@ -42,6 +42,17 @@ function createFirebaseBackend() {
       await signedIn();
       await setDoc(fam(code), { profiles, createdAt: serverTimestamp() });
     },
+    watchFamily(code, cb) {
+      let unsub = () => {};
+      signedIn().then(() => {
+        unsub = onSnapshot(fam(code), (s) => { if (s.exists()) cb({ profiles: s.data().profiles }); }, () => {});
+      });
+      return () => unsub();
+    },
+    async setProfiles(code, profiles) {
+      await signedIn();
+      await updateDoc(fam(code), { profiles });
+    },
     watchProjects(code, profileId, cb, onError) {
       const q = query(projects(code), where('profileId', '==', profileId));
       let unsub = () => {};
@@ -134,6 +145,12 @@ function createMockBackend() {
     async init() {},
     async getFamily(code) { return families[code] || null; },
     async createFamily(code, profiles) { families[code] = { profiles }; },
+    watchFamily(code, cb) {
+      const run = () => { if (families[code]) cb({ profiles: [...families[code].profiles] }); };
+      listeners.add(run); run();
+      return () => listeners.delete(run);
+    },
+    async setProfiles(code, profiles) { families[code].profiles = profiles; notify(); },
     watchProjects(code, profileId, cb) {
       const run = () => cb(Object.values(projs).filter((p) => p.code === code && p.profileId === profileId).map((p) => ({ ...p })));
       listeners.add(run); run();

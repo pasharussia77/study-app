@@ -141,3 +141,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .mode { position: absolute; left: 6px; bottom: 30px; background: var(--sun); color: var(--ink); font-size: .68rem; font-weight: 800; padding: 2px 7px; border-radius: 999px; }
 .x { position: absolute; right: 4px; top: 4px; width: 32px; height: 32px; border-radius: 50%; border: 0; background: rgba(255,255,255,.92); font-size: 1.3rem; line-height: 1; font-weight: 800; color: var(--ink); }
 .okmsg { background: #E3F8F1; border-radius: 12px; padding: 10px 14px; margin: 0; }
+
+/* ---- test account and report ---- */
+.tile.test { border-style: dashed; border-left-style: solid; background: #FFFBEF; }
+.tag { margin-left: auto; background: var(--sun); font-size: .75rem; font-weight: 800; padding: 3px 10px; border-radius: 999px; }
+.testtools { background: #FFFBEF; border: 2px dashed #F5C542; border-radius: 18px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.report-sheet { max-height: 92vh; overflow-y: auto; }
+.notes { width: 100%; min-height: 70px; font: inherit; font-weight: 600; padding: 12px; border-radius: 14px; border: 2px solid var(--line); background: #fff; }
+.report-box { width: 100%; min-height: 220px; font: 500 .78rem/1.4 ui-monospace, Menlo, Consolas, monospace; padding: 12px; border-radius: 14px; border: 2px solid var(--line); background: #fff; }

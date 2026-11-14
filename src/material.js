@@ -1,4 +1,4 @@
-import { askAI } from './ai.js';
+import { askAIDetailed } from './ai.js';
 
 const MAX_DATA_CHARS = 850000; // Firestore documents must stay under 1 MiB
 
@@ -38,16 +38,26 @@ const PROMPTS = {
   printed: 'Transcribe only the HANDWRITTEN text in this image. Ignore all printed or typed text. ' + RULES
 };
 
-export async function readImageText(code, dataUrl, ignore = 'none') {
-  const text = await askAI(code, {
-    messages: [{ role: 'user', content: [
-      { type: 'text', text: PROMPTS[ignore] || PROMPTS.none },
-      { type: 'image_url', image_url: { url: dataUrl } }
-    ] }],
-    maxTokens: 3000
-  });
-  const t = text.trim();
-  if (!t || t === 'NO TEXT') throw new Error('No readable text was found in this picture.');
+export async function readImageText(code, dataUrl, ignore = 'none', log = () => {}) {
+  const prompt = PROMPTS[ignore] || PROMPTS.none;
+  const t0 = Date.now();
+  let res;
+  try {
+    res = await askAIDetailed(code, {
+      messages: [{ role: 'user', content: [
+        { type: 'text', text: prompt },
+        { type: 'image_url', image_url: { url: dataUrl } }
+      ] }],
+      maxTokens: 3000
+    });
+  } catch (e) {
+    log({ type: 'photo_read', ignore, prompt, ok: false, error: e.message, ms: Date.now() - t0 });
+    throw e;
+  }
+  const t = res.text.trim();
+  const empty = !t || t === 'NO TEXT';
+  log({ type: 'photo_read', ignore, prompt, ok: !empty, error: empty ? 'No readable text found' : '', ms: res.ms, usage: res.usage, raw: res.text });
+  if (empty) throw new Error('No readable text was found in this picture.');
   return t;
 }
 
@@ -60,7 +70,8 @@ export async function readTextFile(file) {
 const MAX_PDF_PAGES = 30;
 const MAX_SCANNED_PAGES = 10;
 
-export async function readPdf(code, file, onProgress = () => {}) {
+export async function readPdf(code, file, onProgress = () => {}, log = () => {}) {
+  const t0 = Date.now();
   const pdfjs = await import('pdfjs-dist');
   pdfjs.GlobalWorkerOptions.workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default;
   const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
@@ -73,7 +84,10 @@ export async function readPdf(code, file, onProgress = () => {}) {
   }
   text = text.trim();
   let note = pdf.numPages > pages ? `Only the first ${pages} pages were read.` : '';
-  if (text.replace(/\s/g, '').length >= 20 * pages) return { text, note };
+  if (text.replace(/\s/g, '').length >= 20 * pages) {
+    log({ type: 'doc_import', name: file.name, size: file.size, method: 'PDF text layer (no AI)', pages, chars: text.length, ms: Date.now() - t0, note });
+    return { text, note };
+  }
 
   // Scanned PDF: no real text inside, so draw the pages and let the AI read them.
   const scanPages = Math.min(pdf.numPages, MAX_SCANNED_PAGES);
@@ -87,8 +101,10 @@ export async function readPdf(code, file, onProgress = () => {}) {
     c.width = vp.width; c.height = vp.height;
     await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
     const { data } = await compressImage(c);
-    try { parts.push(await readImageText(code, data, 'none')); } catch (e) { if (scanPages === 1) throw e; }
+    try { parts.push(await readImageText(code, data, 'none', (e) => log({ ...e, label: `PDF page ${i}` }))); } catch (e) { if (scanPages === 1) throw e; }
   }
   if (!parts.length) throw new Error('No readable text was found in that PDF.');
-  return { text: parts.join('\n'), note };
+  const joined = parts.join('\n');
+  log({ type: 'doc_import', name: file.name, size: file.size, method: 'Scanned PDF read by AI', pages: scanPages, chars: joined.length, ms: Date.now() - t0, note });
+  return { text: joined, note };
 }

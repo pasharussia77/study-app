@@ -3,6 +3,7 @@ import { backend } from './firebase.js';
 import { shuffle } from './parse.js';
 import { cardKey, defaultPick, queueFor, isCorrect, normalize } from './stats.js';
 import { useStats, StatsSheet, CardPicker, RoundDone } from './Session.jsx';
+import { diagLog } from './diag.js';
 
 export default function Quiz({ cards, code, projectId, onExit }) {
   const { sum, sumNow } = useStats(code, projectId, cards);
@@ -25,6 +26,7 @@ export default function Quiz({ cards, code, projectId, onExit }) {
   const begin = (kind) => {
     const q = queueFor(kind, cards, sumNow());
     if (!q.length) return;
+    diagLog(projectId, { type: 'session_start', mode: 'written quiz', shows: ask === 'term' ? 'word' : 'definition', how: mode === 'type' ? 'typing' : 'choosing', pick: kind, shuffle: mix, deckSize: q.length });
     setDeck(mix ? shuffle(q) : q); setI(0); setAnswer(''); setResult(null);
     setRound({ right: 0, wrong: 0 }); setPhase('play');
   };
@@ -48,6 +50,7 @@ export default function Quiz({ cards, code, projectId, onExit }) {
   const submitTyped = () => {
     if (!answer.trim() || result) return;
     const right = isCorrect(answer, expected);
+    diagLog(projectId, { type: 'answer', mode: 'quiz (typed)', question: shown, expected, given: answer.trim(), correct: right });
     setResult({ right, given: answer.trim() });
     record(right);
     setRound((r) => ({ right: r.right + (right ? 1 : 0), wrong: r.wrong + (right ? 0 : 1) }));
@@ -55,17 +58,20 @@ export default function Quiz({ cards, code, projectId, onExit }) {
   const choose = (opt) => {
     if (result) return;
     const right = normalize(opt) === normalize(expected);
+    diagLog(projectId, { type: 'answer', mode: 'quiz (choice)', question: shown, expected, given: opt, correct: right });
     setResult({ right, given: opt });
     record(right);
     setRound((r) => ({ right: r.right + (right ? 1 : 0), wrong: r.wrong + (right ? 0 : 1) }));
   };
   const override = () => {
+    diagLog(projectId, { type: 'override', question: shown });
     setResult({ ...result, right: true, overridden: true });
     record(true, true);
     setRound((r) => ({ right: r.right + 1, wrong: r.wrong - 1 }));
   };
   const next = () => {
-    if (i + 1 < deck.length) { setI(i + 1); setAnswer(''); setResult(null); } else setPhase('done');
+    if (i + 1 < deck.length) { setI(i + 1); setAnswer(''); setResult(null); }
+    else { diagLog(projectId, { type: 'round_done', mode: 'quiz', right: round.right, wrong: round.wrong }); setPhase('done'); }
   };
 
   if (phase === 'setup') return (

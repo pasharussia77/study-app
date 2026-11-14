@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { backend } from './firebase.js';
 import { compressImage, readImageText, readTextFile, readPdf } from './material.js';
+import { diagLog } from './diag.js';
 
 const IGNORE_LABEL = { none: 'Everything', handwriting: 'Printed only', printed: 'Handwriting only' };
 
@@ -25,8 +26,9 @@ export default function Sources({ code, projectId, onAppend }) {
     try {
       for (let i = 0; i < list.length; i++) {
         setBusy(`Saving photo ${i + 1} of ${list.length}…`);
-        const { data } = await compressImage(list[i]);
-        await backend.addFile(code, projectId, { kind: 'photo', data, ignore, status: 'new' });
+        const { data, width, height } = await compressImage(list[i]);
+        const id = await backend.addFile(code, projectId, { kind: 'photo', data, ignore, status: 'new' });
+        diagLog(projectId, { type: 'photo_added', fileId: id, ignore, name: list[i].name, origBytes: list[i].size, origType: list[i].type, w: width, h: height, storedChars: data.length });
       }
     } catch (e) { setMsg({ kind: 'error', text: e.message }); }
     setBusy('');
@@ -39,7 +41,7 @@ export default function Sources({ code, projectId, onAppend }) {
       const f = todo[i];
       setBusy(`Reading photo ${i + 1} of ${todo.length}…`);
       try {
-        const text = await readImageText(code, f.data, f.ignore);
+        const text = await readImageText(code, f.data, f.ignore, (e) => diagLog(projectId, { ...e, fileId: f.id }));
         onAppend(text);
         await backend.updateFile(code, projectId, f.id, { status: 'done', error: '' });
         done++;
@@ -67,13 +69,18 @@ export default function Sources({ code, projectId, onAppend }) {
       let result;
       if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf') {
         setBusy('Reading PDF…');
-        result = await readPdf(code, file, setBusy);
+        result = await readPdf(code, file, setBusy, (e) => diagLog(projectId, e));
       } else if (/\.(txt|md|csv)$/i.test(file.name) || file.type.startsWith('text/')) {
+        const t0 = Date.now();
         result = { text: await readTextFile(file), note: '' };
+        diagLog(projectId, { type: 'doc_import', name: file.name, size: file.size, method: 'Text file (no AI)', chars: result.text.length, ms: Date.now() - t0 });
       } else throw new Error('Please choose a PDF or a text file.');
       onAppend(result.text);
       setMsg({ kind: 'ok', text: `Added text from ${file.name}. ${result.note}`.trim() });
-    } catch (err) { setMsg({ kind: 'error', text: err.message }); }
+    } catch (err) {
+      diagLog(projectId, { type: 'doc_import', name: file.name, size: file.size, ok: false, error: err.message });
+      setMsg({ kind: 'error', text: err.message });
+    }
     setBusy('');
   };
 

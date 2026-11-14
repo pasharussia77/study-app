@@ -3,6 +3,7 @@ import { backend } from './firebase.js';
 import { shuffle } from './parse.js';
 import { cardKey, defaultPick, queueFor } from './stats.js';
 import { useStats, StatsSheet, CardPicker, RoundDone } from './Session.jsx';
+import { diagLog } from './diag.js';
 
 export default function Flashcards({ cards, code, projectId, onExit }) {
   const { sum, sumNow } = useStats(code, projectId, cards);
@@ -20,11 +21,15 @@ export default function Flashcards({ cards, code, projectId, onExit }) {
   const begin = (kind) => {
     const q = queueFor(kind, cards, sumNow());
     if (!q.length) return;
+    diagLog(projectId, { type: 'session_start', mode: 'flashcards', shows: first === 'term' ? 'word first' : 'definition first', pick: kind, shuffle: mix, deckSize: q.length });
     setDeck(mix ? shuffle(q) : q); setI(0); setFlipped(false); setRound({ right: 0, wrong: 0 }); setPhase('play');
   };
   const reset = async () => { await backend.resetStats(code, projectId); begin('all'); };
   const mark = (right) => {
     backend.saveResult(code, projectId, cardKey(deck[i]), right).catch(() => {});
+    const c0 = deck[i];
+    diagLog(projectId, { type: 'answer', mode: 'flashcards', question: first === 'term' ? c0.term : c0.definition, expected: first === 'term' ? c0.definition : c0.term, correct: right });
+    if (i + 1 >= deck.length) diagLog(projectId, { type: 'round_done', mode: 'flashcards', right: round.right + (right ? 1 : 0), wrong: round.wrong + (right ? 0 : 1) });
     setRound((r) => ({ right: r.right + (right ? 1 : 0), wrong: r.wrong + (right ? 0 : 1) }));
     if (i + 1 < deck.length) { setFlipped(false); setI(i + 1); } else setPhase('done');
   };

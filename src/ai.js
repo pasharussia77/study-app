@@ -3,8 +3,12 @@ import { backend, isMock } from './firebase.js';
 const WORKER_URL = 'https://study-api.pasharussia77.workers.dev';
 
 // Sends a request to the family's AI helper (the Cloudflare Worker). Returns plain text.
-export async function askAI(code, { messages, json = false, maxTokens = 2000 }) {
-  if (isMock) return mockAI(messages);
+export async function askAI(code, opts) { return (await askAIDetailed(code, opts)).text; }
+
+// Same, but also returns how long it took and how many tokens were used.
+export async function askAIDetailed(code, { messages, json = false, maxTokens = 2000 }) {
+  const t0 = Date.now();
+  if (isMock) return { text: await mockAI(messages), usage: { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 }, ms: 5 };
   let token;
   try { token = await backend.idToken(); } catch { throw new Error('Not signed in. Reload the app and try again.'); }
   let res;
@@ -20,7 +24,7 @@ export async function askAI(code, { messages, json = false, maxTokens = 2000 }) 
     if (res.status === 401) throw new Error('The AI helper did not recognize this phone. Leave and rejoin the family, then try again.');
     throw new Error(data.error || 'The AI helper had a problem.');
   }
-  return data.text || '';
+  return { text: data.text || '', usage: data.usage || null, ms: Date.now() - t0 };
 }
 
 // Test stand-in used only with ?mock=1
