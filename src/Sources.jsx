@@ -5,12 +5,28 @@ import { diagLog } from './diag.js';
 
 const IGNORE_LABEL = { none: 'Everything', handwriting: 'Printed only', printed: 'Handwriting only' };
 
-export default function Sources({ code, projectId, onAppend }) {
+// File name for a saved photo: the project name, plus _1, _2... when there is more than one photo.
+export function photoFileName(projectName, index, total) {
+  const base = (projectName || 'photo').replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim().slice(0, 100) || 'photo';
+  return total > 1 ? `${base}_${index + 1}.jpg` : `${base}.jpg`;
+}
+
+async function downloadPhoto(dataUrl, name) {
+  const blob = await (await fetch(dataUrl)).blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+export default function Sources({ code, projectId, projectName, canSave, onAppend }) {
   const [files, setFiles] = useState([]);
   const [pending, setPending] = useState(null); // photos waiting for the "what to read" choice
   const [busy, setBusy] = useState('');
   const [msg, setMsg] = useState(null); // { kind: 'ok' | 'error', text }
   const [lastIgnore, setLastIgnore] = useState('none');
+  const [viewing, setViewing] = useState(null); // index of the photo shown large
   const cam = useRef(null), gallery = useRef(null), doc = useRef(null);
 
   useEffect(() => backend.watchFiles(code, projectId, setFiles), [code, projectId]);
@@ -101,7 +117,9 @@ export default function Sources({ code, projectId, onAppend }) {
         <ul className="thumbs" aria-label="Photos">
           {files.map((f) => (
             <li key={f.id} className={'thumb ' + f.status}>
-              <img src={f.data} alt="Saved page" />
+              <button className="open" aria-label={`View photo ${files.indexOf(f) + 1}`} onClick={() => setViewing(files.indexOf(f))}>
+                <img src={f.data} alt="Saved page" />
+              </button>
               <span className="badge">{f.status === 'done' ? 'Added' : f.status === 'error' ? 'Failed' : 'Not read'}</span>
               {f.ignore !== 'none' && <span className="mode">{IGNORE_LABEL[f.ignore]}</span>}
               <button className="x" aria-label="Remove photo" onClick={() => removePhoto(f)}>×</button>
@@ -112,6 +130,34 @@ export default function Sources({ code, projectId, onAppend }) {
       {unread > 0 && <button className="btn primary" disabled={!!busy} onClick={readPhotos}>{`Read ${unread} photo${unread > 1 ? 's' : ''}`}</button>}
       {busy && <p className="hint" role="status">{busy}</p>}
       {msg && <p className={msg.kind === 'ok' ? 'okmsg' : 'error'} role={msg.kind === 'ok' ? 'status' : 'alert'}>{msg.text}</p>}
+
+      {viewing !== null && files[viewing] && (() => {
+        const f = files[viewing];
+        const name = photoFileName(projectName, viewing, files.length);
+        return (
+          <div className="viewer" role="dialog" aria-label="Photo">
+            <div className="viewer-top">
+              <button className="chip" onClick={() => setViewing(null)}>Close</button>
+              <span data-testid="viewer-info">Photo {viewing + 1} of {files.length} · {IGNORE_LABEL[f.ignore]} · {f.status === 'done' ? 'Added' : f.status === 'error' ? 'Failed' : 'Not read'}</span>
+            </div>
+            <div className="viewer-img"><img src={f.data} alt={`Photo ${viewing + 1}`} data-testid="viewer-img" /></div>
+            <div className="viewer-bottom">
+              {canSave && (
+                <>
+                  <button className="btn primary" onClick={() => downloadPhoto(f.data, name)}>Save photo</button>
+                  <p className="tiny" data-testid="save-name">Saves as: {name}</p>
+                </>
+              )}
+              {files.length > 1 && (
+                <div className="row">
+                  <button className="btn ghost" disabled={viewing === 0} onClick={() => setViewing(viewing - 1)}>Previous</button>
+                  <button className="btn ghost" disabled={viewing === files.length - 1} onClick={() => setViewing(viewing + 1)}>Next</button>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {pending && (
         <div className="overlay" onClick={() => setPending(null)}>

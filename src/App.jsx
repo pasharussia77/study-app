@@ -302,7 +302,7 @@ function Project({ code, projectId, profile, onBack, onStudy }) {
           {sum.incorrect > 0 && <p className="hint">{sum.incorrect} {sum.incorrect === 1 ? 'card needs' : 'cards need'} another try. Choose "Missed only" when you start.</p>}
         </>
       )}
-      <Sources code={code} projectId={projectId} onAppend={append} />
+      <Sources code={code} projectId={projectId} projectName={p.name} canSave={!!profile?.test} onAppend={append} />
       <label className="muted" htmlFor="material">Your material</label>
       <textarea id="material" className="material" value={text} onChange={(e) => change(e.target.value)}
         placeholder={'Paste your notes here.\nWrite one item per line:\n\nphotosynthesis - how plants turn light into food\nmitochondria - the cell\'s power plant'} />
