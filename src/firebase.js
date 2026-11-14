@@ -3,7 +3,7 @@ import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
   doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc,
-  query, where, onSnapshot, serverTimestamp
+  query, where, onSnapshot, serverTimestamp, increment
 } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -69,6 +69,26 @@ function createFirebaseBackend() {
     async deleteProject(code, id) {
       await signedIn();
       await deleteDoc(doc(db, 'families', code, 'projects', id));
+    },
+    watchStats(code, pid, cb) {
+      let unsub = () => {};
+      signedIn().then(() => {
+        unsub = onSnapshot(doc(db, 'families', code, 'projects', pid, 'stats', 'main'),
+          (s) => cb(s.exists() ? s.data().items || {} : {}), () => cb({}));
+      });
+      return () => unsub();
+    },
+    // fix = true changes an earlier answer from wrong to right
+    async saveResult(code, pid, key, right, fix = false) {
+      await signedIn();
+      const entry = { last: right ? 'right' : 'wrong', t: Date.now() };
+      if (right) entry.right = increment(1); else entry.wrong = increment(1);
+      if (fix) entry.wrong = increment(-1);
+      await setDoc(doc(db, 'families', code, 'projects', pid, 'stats', 'main'), { items: { [key]: entry } }, { merge: true });
+    },
+    async resetStats(code, pid) {
+      await signedIn();
+      await setDoc(doc(db, 'families', code, 'projects', pid, 'stats', 'main'), { items: {} });
     }
   };
 }
@@ -77,6 +97,7 @@ function createFirebaseBackend() {
 function createMockBackend() {
   const families = {};
   const projs = {};
+  const stats = {};
   const listeners = new Set();
   const notify = () => listeners.forEach((f) => f());
   let n = 0;
@@ -96,7 +117,20 @@ function createMockBackend() {
     },
     async getProject(code, id) { return projs[id] ? { ...projs[id] } : null; },
     async saveProjectText(code, id, text) { projs[id].text = text; notify(); },
-    async deleteProject(code, id) { delete projs[id]; notify(); }
+    async deleteProject(code, id) { delete projs[id]; notify(); },
+    watchStats(code, pid, cb) {
+      const run = () => cb(JSON.parse(JSON.stringify(stats[pid] || {})));
+      listeners.add(run); run();
+      return () => listeners.delete(run);
+    },
+    async saveResult(code, pid, key, right, fix = false) {
+      const it = ((stats[pid] ||= {})[key] ||= { right: 0, wrong: 0 });
+      it.last = right ? 'right' : 'wrong';
+      if (right) it.right++; else it.wrong++;
+      if (fix) it.wrong--;
+      notify();
+    },
+    async resetStats(code, pid) { stats[pid] = {}; notify(); }
   };
 }
 

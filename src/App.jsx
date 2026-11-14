@@ -2,6 +2,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { backend, isMock } from './firebase.js';
 import { parseCards, shuffle, datedName, niceDate, makeFamilyCode, cleanCode } from './parse.js';
 import { APP_VERSION } from './version.js';
+import Flashcards from './Flashcards.jsx';
+import Quiz from './Quiz.jsx';
+import { useStats, StatsStrip } from './Session.jsx';
 
 const COLORS = ['#FF6B5E', '#2BB3FF', '#19C79A'];
 const store = {
@@ -55,10 +58,13 @@ export default function App() {
   if (screen === 'project') return (
     <Shell>
       <Project code={code} projectId={project.id} onBack={() => setScreen('home')}
-        onStudy={(cards) => { setStudy(cards); setScreen('study'); }} />
+        onStudy={(mode, cards) => { setStudy({ mode, cards }); setScreen('study'); }} />
     </Shell>
   );
-  if (screen === 'study') return <Shell><Study cards={study} onExit={() => setScreen('project')} /></Shell>;
+  if (screen === 'study') {
+    const Mode = study.mode === 'quiz' ? Quiz : Flashcards;
+    return <Shell><Mode cards={study.cards} code={code} projectId={project.id} onExit={() => setScreen('project')} /></Shell>;
+  }
   return null;
 }
 
@@ -256,6 +262,7 @@ function Project({ code, projectId, onBack, onStudy }) {
   };
   useEffect(() => () => { if (timer.current) { clearTimeout(timer.current); backend.saveProjectText(code, projectId, latest.current).catch(() => {}); } }, [code, projectId]);
   const { cards, skipped } = useMemo(() => parseCards(text), [text]);
+  const { sum } = useStats(code, projectId, cards);
   if (!p) return <section><Back onClick={onBack} /><p className="muted">Loading…</p></section>;
   const del = async () => {
     if (confirm('Delete this project and its material?')) { clearTimeout(timer.current); timer.current = null; await backend.deleteProject(code, projectId); onBack(); }
@@ -264,6 +271,16 @@ function Project({ code, projectId, onBack, onStudy }) {
     <section>
       <Back onClick={onBack} label="Projects" />
       <h1 className="proj-title">{p.name}</h1>
+      {cards.length > 0 && (
+        <>
+          <StatsStrip sum={sum} />
+          <div className="stack">
+            <button className="btn primary" onClick={() => onStudy('flash', cards)}>Flashcards</button>
+            <button className="btn primary alt" onClick={() => onStudy('quiz', cards)}>Written quiz</button>
+          </div>
+          {sum.incorrect > 0 && <p className="hint">{sum.incorrect} {sum.incorrect === 1 ? 'card needs' : 'cards need'} another try. Choose "Missed only" when you start.</p>}
+        </>
+      )}
       <label className="muted" htmlFor="material">Your material</label>
       <textarea id="material" className="material" value={text} onChange={(e) => change(e.target.value)}
         placeholder={'Paste your notes here.\nWrite one item per line:\n\nphotosynthesis - how plants turn light into food\nmitochondria - the cell\'s power plant'} />
@@ -272,76 +289,7 @@ function Project({ code, projectId, onBack, onStudy }) {
         {' · '}{cards.length} {cards.length === 1 ? 'card' : 'cards'}
       </p>
       {skipped > 0 && <p className="hint">{skipped} {skipped === 1 ? 'line was' : 'lines were'} skipped. Write each card as <b>word - definition</b>.</p>}
-      <div className="stack">
-        <button className="btn primary" disabled={cards.length === 0} onClick={() => onStudy(cards)}>Study flashcards</button>
-        <button className="link danger" onClick={del}>Delete project</button>
-      </div>
-    </section>
-  );
-}
-
-/* ---------- Flashcards ---------- */
-
-function Study({ cards, onExit }) {
-  const [phase, setPhase] = useState('setup');
-  const [first, setFirst] = useState('term');
-  const [mix, setMix] = useState(true);
-  const [deck, setDeck] = useState([]);
-  const [i, setI] = useState(0);
-  const [flipped, setFlipped] = useState(false);
-
-  const start = () => { setDeck(mix ? shuffle(cards) : cards); setI(0); setFlipped(false); setPhase('play'); };
-  const go = (n) => { setFlipped(false); setI(n); };
-
-  if (phase === 'setup') return (
-    <section>
-      <Back onClick={onExit} />
-      <h1>Flashcards</h1>
-      <p className="muted">{cards.length} {cards.length === 1 ? 'card' : 'cards'}</p>
-      <fieldset className="seg" aria-label="Show first">
-        <legend>Show first</legend>
-        <button className={first === 'term' ? 'on' : ''} onClick={() => setFirst('term')}>Word</button>
-        <button className={first === 'definition' ? 'on' : ''} onClick={() => setFirst('definition')}>Definition</button>
-      </fieldset>
-      <label className="switch">
-        <input type="checkbox" checked={mix} onChange={(e) => setMix(e.target.checked)} />
-        <span>Shuffle the cards</span>
-      </label>
-      <button className="btn primary bottom" onClick={start}>Start</button>
-    </section>
-  );
-
-  if (phase === 'done') return (
-    <section className="done">
-      <h1>Round complete</h1>
-      <p className="lead">You went through all {deck.length} cards.</p>
-      <div className="stack">
-        <button className="btn primary" onClick={start}>Go again</button>
-        <button className="btn ghost" onClick={onExit}>Back to project</button>
-      </div>
-    </section>
-  );
-
-  const c = deck[i];
-  const front = first === 'term' ? c.term : c.definition;
-  const back = first === 'term' ? c.definition : c.term;
-  const name = (k) => (k === 'term' ? 'word' : 'definition');
-  const label = (side) => name(side === 'front' ? first : first === 'term' ? 'definition' : 'term');
-  return (
-    <section className="play">
-      <header className="play-top">
-        <button className="back" onClick={() => setPhase('setup')}><span aria-hidden="true">‹</span> Exit</button>
-        <span className="count" data-testid="counter">{i + 1} / {deck.length}</span>
-      </header>
-      <div className="bar" role="progressbar" aria-valuemin="0" aria-valuemax={deck.length} aria-valuenow={i + 1}><span style={{ width: `${((i + 1) / deck.length) * 100}%` }} /></div>
-      <button className={'flip' + (flipped ? ' flipped' : '')} onClick={() => setFlipped(!flipped)} aria-label={flipped ? 'Show front' : 'Show back'} data-testid="card">
-        <span className="face face-front"><small>{label('front')}</small><b>{front}</b><em>Tap to flip</em></span>
-        <span className="face face-back"><small>{label('back')}</small><b>{back}</b></span>
-      </button>
-      <div className="row nav">
-        <button className="btn ghost" disabled={i === 0} onClick={() => go(i - 1)}>Previous</button>
-        <button className="btn primary" onClick={() => (i + 1 < deck.length ? go(i + 1) : setPhase('done'))}>{i + 1 < deck.length ? 'Next' : 'Finish'}</button>
-      </div>
+      <button className="link danger" onClick={del}>Delete project</button>
     </section>
   );
 }
