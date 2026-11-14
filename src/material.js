@@ -31,7 +31,7 @@ export async function compressImage(source) {
   throw new Error('That picture is too large to store.');
 }
 
-import { buildPrompt, parseAiJson, resolvePage } from './items.js';
+import { buildPrompt, buildTextPrompt, parseAiJson, resolvePage } from './items.js';
 
 // Reads one photo and returns clean study items plus notes for the next page.
 export async function readPhotoItems(code, dataUrl, ignore = 'none', ctx = null, log = () => {}) {
@@ -64,6 +64,36 @@ export async function readPhotoItems(code, dataUrl, ignore = 'none', ctx = null,
   log({ type: 'photo_read', ignore, prompt, ok: true, ms: res.ms, usage: res.usage, raw: res.text,
         made: result.items.length, flagged: result.items.filter((i) => i.flagged).length, page: result.page });
   return result;
+}
+
+// Reads one piece of typed or pasted text. If the AI's answer is cut off, the piece is split in two and retried once.
+export async function readTextChunk(code, chunk, ctx, log, part = 1, depth = 0) {
+  const t0 = Date.now();
+  let res;
+  try {
+    res = await askAIDetailed(code, {
+      messages: [{ role: 'user', content: buildTextPrompt(ctx) + '\n\nTEXT:\n<<<\n' + chunk + '\n>>>' }],
+      json: true, maxTokens: 4000
+    });
+  } catch (e) {
+    log({ type: 'text_read', part, chars: chunk.length, ok: false, error: e.message, ms: Date.now() - t0 });
+    throw e;
+  }
+  try {
+    const result = resolvePage(parseAiJson(res.text), ctx);
+    log({ type: 'text_read', part, chars: chunk.length, ok: true, ms: res.ms, usage: res.usage, raw: res.text, made: result.items.length, flagged: result.items.filter((i) => i.flagged).length });
+    return result;
+  } catch (e) {
+    log({ type: 'text_read', part, chars: chunk.length, ok: false, error: e.message, ms: res.ms, usage: res.usage, raw: res.text });
+    const lines = chunk.split('\n');
+    if (e.parse && depth < 1 && lines.length >= 2) {
+      const mid = Math.ceil(lines.length / 2);
+      const a = await readTextChunk(code, lines.slice(0, mid).join('\n'), ctx, log, part, depth + 1);
+      const b = await readTextChunk(code, lines.slice(mid).join('\n'), a.ctx, log, part, depth + 1);
+      return { items: [...a.items, ...b.items], page: a.page, ctx: b.ctx };
+    }
+    throw e;
+  }
 }
 
 export async function readTextFile(file) {

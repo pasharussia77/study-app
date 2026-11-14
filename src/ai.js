@@ -36,8 +36,6 @@ async function mockAI(messages) {
   window.__lastMessages = messages;
   window.__allMessages = [...(window.__allMessages || []), messages];
   if (new URLSearchParams(location.search).has('aifail')) throw new Error('Pretend AI failure.');
-  const hasImage = JSON.stringify(messages).includes('image_url');
-  if (!hasImage) return 'ok';
   if (window.__mockAI && window.__mockAI.length) { const next = window.__mockAI.shift(); return typeof next === 'string' ? next : JSON.stringify(next); }
   return MOCK_DEFAULT;
 }

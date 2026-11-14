@@ -3,7 +3,9 @@ import { cardKey } from './stats.js';
 
 export function buildDeck(textCards, items) {
   const deck = [];
-  for (const c of textCards) {
+  // Once the AI has made study items from the typed text, those replace the simple typed cards.
+  const textMade = items.some((i) => i.fileId === 'text');
+  for (const c of textMade ? [] : textCards) {
     deck.push({ key: cardKey(c), type: 'term', prompt: c.term, answer: c.definition, term: c.term, definition: c.definition });
   }
   let notReady = 0;

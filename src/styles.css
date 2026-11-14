@@ -199,3 +199,5 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .fold[aria-expanded="true"] .chev { transform: rotate(180deg); }
 .fold-body { display: flex; flex-direction: column; gap: 12px; padding: 4px 0 8px; }
 .link.swap { align-self: center; font-size: .9rem; padding: 4px 8px; }
+
+.textitems { display: flex; flex-direction: column; gap: 8px; }

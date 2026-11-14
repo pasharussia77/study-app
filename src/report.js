@@ -35,13 +35,13 @@ export function buildReport({ version, device, health, profile, project, text, p
   if (!files.length && !docs.length) L.push('No photos or files were added (text may have been typed or pasted).');
 
   h('2. THE AI\'S RAW ANSWER FOR EACH PHOTO (first 1500 characters)');
-  const rawReads = events.filter((e) => e.type === 'photo_read');
+  const rawReads = events.filter((e) => e.type === 'photo_read' || e.type === 'text_read');
   if (!rawReads.length) L.push('No AI readings recorded.');
   rawReads.forEach((r, i) => {
-    L.push(`--- Reading ${i + 1}${r.label ? ' (' + r.label + ')' : ''} at ${time(r.t)}: ${NAMES[r.ignore] || r.ignore} ---`);
+    L.push(`--- Reading ${i + 1}${r.label ? ' (' + r.label + ')' : ''} at ${time(r.t)}: ${r.type === 'text_read' ? `typed/pasted text, part ${r.part}, ${r.chars} characters` : (NAMES[r.ignore] || r.ignore)}${r.usage ? `, ${sec(r.ms || 0)}, tokens in/out ${r.usage.prompt_tokens}/${r.usage.completion_tokens}` : ''} ---`);
     L.push(r.ok ? clip(r.raw || '', 1500) : 'FAILED: ' + r.error + (r.raw ? '\nRaw answer:\n' + clip(r.raw, 2500) : ''));
   });
-  if (rawReads[0]) L.push('', `Instruction sent with each picture: mode "${NAMES[rawReads[0].ignore] || ''}", ${String(rawReads[0].prompt || '').length} characters (the full text is built into this app version).`);
+  if (rawReads.some((x) => x.type === 'photo_read')) L.push('', `Instruction sent with each picture: mode "${NAMES[(rawReads.find((x) => x.type === 'photo_read') || {}).ignore] || ''}", ${String((rawReads.find((x) => x.type === 'photo_read') || {}).prompt || '').length} characters (the full text is built into this app version).`);
 
   h('3. STUDY ITEMS THE APP BUILT FROM PHOTOS');
   L.push('Rule: the AI only reports what it sees (handwritten answers, red X marks, circles, printed keys). The app then decides each correct answer with fixed rules: printed key, then a circled choice, then a red X on a true/false (the other choice), then "no red mark = assumed correct" on a graded page. Anything else has no answer and is flagged.');
@@ -50,8 +50,10 @@ export function buildReport({ version, device, health, profile, project, text, p
   L.push(`Items: ${items.length} (${Object.entries(types).map(([k, v]) => v + ' ' + k).join(', ') || 'none'}); flagged "needs a look": ${items.filter((i) => i.flagged).length}; without an answer: ${items.filter((i) => !i.answer).length}`);
   if (check) L.push(`Score cross-check: sheet says ${check.score} (so ${check.expectedWrong} wrong); items marked wrong: ${check.wrongFound} -> ${check.ok ? 'MATCH' : 'MISMATCH'}. Questions found ${check.questions} of ${check.total}${check.countOk ? '' : ' (MISSING SOME)'}.`);
   const byFile = files.map((f, i) => ({ f, n: i + 1, list: items.filter((x) => x.fileId === f.id).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)) })).filter((g) => g.list.length);
+  const textItems = items.filter((x) => x.fileId === 'text').sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  if (textItems.length) byFile.unshift({ f: null, n: 'typed or pasted text', list: textItems });
   byFile.forEach((g) => {
-    L.push(`--- from Photo ${g.n} ---`);
+    L.push(`--- from ${typeof g.n === 'number' ? 'Photo ' + g.n : g.n} ---`);
     g.list.forEach((it) => {
       const ch = it.choices && it.choices.length ? ' | choices: ' + it.choices.map((c) => c.label + '. ' + one(c.text, 40)).join('; ') : '';
       L.push(`${it.number != null ? '#' + it.number + ' ' : ''}[${it.type}] "${one(it.question, 90)}"${ch}`);
@@ -63,7 +65,7 @@ export function buildReport({ version, device, health, profile, project, text, p
   h(`4. TYPED, PASTED AND FILE TEXT (${text.length} characters)`);
   L.push(text ? clip(text, 3000) : '(empty)');
   L.push('Rule: one line becomes one word card only if it has a separator: " - ", " – ", " — ", a tab, " = " or ": ".');
-  L.push(`Word cards made from this text: ${parsed.cards.length}; lines skipped: ${parsed.skipped}`);
+  L.push(`Word cards made from this text: ${parsed.cards.length}; lines skipped: ${parsed.skipped}${textItems.length ? ' (NOT USED: the AI made ' + textItems.length + ' study items from this text, which replace these simple cards)' : ''}`);
   parsed.cards.slice(0, 40).forEach((c, i) => L.push(`  ${i + 1}. "${one(c.term, 80)}"  ->  "${one(c.definition, 120)}"`));
   parsed.skippedLines.slice(0, 25).forEach((s) => L.push('  - skipped: ' + one(s, 130)));
 

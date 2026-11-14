@@ -8,6 +8,7 @@ import Sources from './Sources.jsx';
 import ReportSheet from './Report.jsx';
 import { diagClear } from './diag.js';
 import Items from './Items.jsx';
+import TextItems, { textHash } from './TextItems.jsx';
 import { useStats, StatsStrip } from './Session.jsx';
 import { buildDeck } from './deck.js';
 import { startNav, pushScreen, replaceScreen, resetTo, goUp, useOverlay } from './nav.js';
@@ -295,6 +296,8 @@ function Project({ code, projectId, profile, onBack, onStudy, onReview }) {
   const itemList = items || [], fileList = files || [];
   const { deck, notReady } = useMemo(() => buildDeck(cards, itemList), [cards, items]); // eslint-disable-line
   const flagged = itemList.filter((i) => i.flagged).length;
+  const textMade = itemList.some((i) => i.fileId === 'text');
+  const textChanged = textMade && itemList.find((i) => i.fileId === 'text').srcHash !== textHash(text);
   const unread = fileList.filter((f) => f.status !== 'done').length;
   const { sum } = useStats(code, projectId, deck);
 
@@ -311,11 +314,13 @@ function Project({ code, projectId, profile, onBack, onStudy, onReview }) {
   const bits = [];
   if (fileList.length) bits.push(`${fileList.length} photo${fileList.length === 1 ? '' : 's'}`);
   if (itemList.length) bits.push(`${itemList.length} study item${itemList.length === 1 ? '' : 's'}`);
-  if (cards.length) bits.push(`${cards.length} typed card${cards.length === 1 ? '' : 's'}`);
+  if (cards.length && !textMade) bits.push(`${cards.length} typed card${cards.length === 1 ? '' : 's'}`);
+  if (textMade) bits.push('typed text turned into items');
   const warns = [];
   if (unread) warns.push(`${unread} photo${unread === 1 ? '' : 's'} not read yet`);
   if (flagged) warns.push(`${flagged} item${flagged === 1 ? '' : 's'} need${flagged === 1 ? 's' : ''} a look`);
   if (notReady) warns.push(`${notReady} without an answer`);
+  if (textChanged) warns.push('text changed since items were made');
   return (
     <section>
       <Back onClick={onBack} label="Projects" />
@@ -351,9 +356,9 @@ function Project({ code, projectId, profile, onBack, onStudy, onReview }) {
           placeholder={'Paste your notes here.\nWrite one item per line:\n\nphotosynthesis - how plants turn light into food\nmitochondria - the cell\'s power plant'} />
         <p className="status" aria-live="polite">
           {state === 'saving' ? 'Saving…' : state === 'error' ? 'Not saved – check your connection' : 'Saved'}
-          {cards.length > 0 ? ` · ${cards.length} typed ${cards.length === 1 ? 'card' : 'cards'}` : ''}
+          {cards.length > 0 && !textMade ? ` · ${cards.length} typed ${cards.length === 1 ? 'card' : 'cards'}` : ''}
         </p>
-        {skipped > 0 && <p className="hint">{skipped} {skipped === 1 ? 'line was' : 'lines were'} skipped. Write each card as <b>word - definition</b>.</p>}
+        <TextItems code={code} projectId={projectId} text={text} items={itemList} onReview={onReview} />
         {profile?.test && (
           <div className="testtools">
             <b>Testing tools</b>

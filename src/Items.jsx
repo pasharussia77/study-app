@@ -4,7 +4,7 @@ import { TYPE_LABEL, crossCheck } from './items.js';
 import { useOverlay, goUp } from './nav.js';
 
 const SOURCE_LABEL = {
-  'printed key': 'Answer printed on the page', 'circled by teacher': 'Circled by the teacher',
+  'printed key': 'Answer given in the material', 'circled by teacher': 'Circled by the teacher',
   'inferred from red X': 'Worked out from the red X', 'assumed correct (no red mark)': 'Assumed correct (no red mark)',
   page: 'Taken from the page', 'set by you': 'Set by you', none: 'No answer yet'
 };
@@ -25,7 +25,9 @@ export default function Items({ code, projectId }) {
     items.forEach((it) => { if (!byFile.has(it.fileId)) byFile.set(it.fileId, []); byFile.get(it.fileId).push(it); });
     const out = files.filter((f) => byFile.has(f.id)).map((f, i) => ({ file: f, label: `Photo ${files.indexOf(f) + 1}`, list: byFile.get(f.id) }));
     const known = new Set(files.map((f) => f.id));
-    const orphan = items.filter((it) => !known.has(it.fileId));
+    const fromText = items.filter((it) => it.fileId === 'text');
+    if (fromText.length) out.unshift({ file: null, label: 'Typed or pasted text', list: fromText });
+    const orphan = items.filter((it) => !known.has(it.fileId) && it.fileId !== 'text');
     if (orphan.length) out.push({ file: null, label: 'From a removed photo', list: orphan });
     out.forEach((g) => g.list.sort((a, b) => (a.order ?? 0) - (b.order ?? 0)));
     return out;

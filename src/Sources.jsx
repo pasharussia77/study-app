@@ -106,14 +106,14 @@ export default function Sources({ code, projectId, projectName, canSave, onAppen
           setMsg({ kind: 'ok', text: `${file.name} is a scanned PDF, so its ${r.images.length} page${r.images.length > 1 ? 's were' : ' was'} added as photos. Tap Read to make study items. ${r.note}`.trim() });
         } else {
           onAppend(r.text);
-          setMsg({ kind: 'ok', text: `Added text from ${file.name}. ${r.note}`.trim() });
+          setMsg({ kind: 'ok', text: `Added text from ${file.name}. ${r.note} To turn it into questions, tap Make study items from this text, below.`.replace(/\s+/g, ' ').trim() });
         }
       } else if (/\.(txt|md|csv)$/i.test(file.name) || file.type.startsWith('text/')) {
         const t0 = Date.now();
         const text = await readTextFile(file);
         diagLog(projectId, { type: 'doc_import', name: file.name, size: file.size, method: 'Text file (no AI)', chars: text.length, ms: Date.now() - t0 });
         onAppend(text);
-        setMsg({ kind: 'ok', text: `Added text from ${file.name}.` });
+        setMsg({ kind: 'ok', text: `Added text from ${file.name}. To turn it into questions, tap Make study items from this text, below.` });
       } else throw new Error('Please choose a PDF or a text file.');
     } catch (err) {
       diagLog(projectId, { type: 'doc_import', name: file.name, size: file.size, ok: false, error: err.message });

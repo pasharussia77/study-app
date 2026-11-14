@@ -42,14 +42,53 @@ JSON shape:
 {"page":{"graded":true,"score":"12/15"},"ends_with":{"section":"Multiple Choice","type":"mc","last_number":7},"items":[{"type":"mc","section":"Multiple Choice","number":1,"question":"...","choices":[{"label":"A","text":"..."}],"student_answer":"B","marked_wrong":false,"circled_choice":null,"printed_answer":null,"answer_text":null,"confidence":"high","note":"","needs_review":false}]}`;
 }
 
+export function buildTextPrompt(ctx = null) {
+  const carry = ctx && (ctx.section || ctx.last_number)
+    ? `\nThe text before this part ended in the section "${ctx.section || 'unknown'}" (type ${ctx.type || 'unknown'}) at question number ${ctx.last_number ?? 'unknown'}. If this part continues that section without repeating the instructions, reuse that section and its type.`
+    : '';
+  return `You are turning study text typed or pasted by a student into study material. Reply with ONLY valid JSON (no markdown, no commentary).
+
+The text can mix several kinds of material. Decide the type of EACH item separately and keep the order of the text:
+- "mc": a multiple-choice question with labeled choices.
+- "tf": a true/false statement. Give its choices as written (for example A. True, B. False). If none are written use A. True and B. False.
+- "term": a word or term with its definition (word lists, glossaries, lines like "word - meaning").
+- "qa": a question without choices, with its answer if one is given.
+Never merge, skip or invent items. Keep the question number if there is one. Ignore headings, names, dates, page numbers, copyright lines and anything that is not study material. Written instructions such as "True/False: Indicate whether..." tell you the "section" for the items under them until another section starts. Give "section" as a SHORT label of at most 4 words (for example "True/False" or "Multiple Choice"), not the full instruction sentence.${carry}
+
+Do NOT work out or guess correct answers yourself. Only record an answer that is written in the text:
+- printed_answer: the correct choice letter (or text) if the text gives an answer or an answer key for this item (for example "Answer: B", "1. B", or a key at the end), otherwise null.
+- answer_text: for "term" and "qa", the definition or answer written in the text, or null.
+- confidence: "high", "medium" or "low" for how clearly you could read this item.
+- note: a short note if anything is unclear, else "".
+- needs_review: true ONLY if a person should double-check this item (for example the text is garbled, cut off, or you are unsure which answer belongs to it). Otherwise false.
+Also record ends_with (the section, type and last question number this text ends with).
+
+JSON shape:
+{"ends_with":{"section":"Multiple Choice","type":"mc","last_number":7},"items":[{"type":"mc","section":"Multiple Choice","number":1,"question":"...","choices":[{"label":"A","text":"..."}],"printed_answer":"B","answer_text":null,"confidence":"high","note":"","needs_review":false}]}`;
+}
+
+export function chunkText(text, size = 3000) {
+  const chunks = [];
+  let cur = '';
+  const push = () => { if (cur.trim()) chunks.push(cur.trim()); cur = ''; };
+  for (const line of String(text).split(/\r?\n/)) {
+    if (line.length > size) { push(); for (let i = 0; i < line.length; i += size) chunks.push(line.slice(i, i + size)); continue; }
+    if (cur.length + line.length + 1 > size) push();
+    cur += line + '\n';
+  }
+  push();
+  return chunks;
+}
+
 export function parseAiJson(text) {
   const cleaned = String(text || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
   const start = cleaned.indexOf('{'), end = cleaned.lastIndexOf('}');
-  if (start === -1 || end === -1) throw new Error('The AI did not return study items. Try reading the photo again.');
+  const bad = (m) => Object.assign(new Error(m), { parse: true });
+  if (start === -1 || end === -1) throw bad('The AI did not return study items. Try again.');
   let data;
   try { data = JSON.parse(cleaned.slice(start, end + 1)); }
-  catch { throw new Error('The AI answer was cut off or garbled. Try reading the photo again.'); }
-  if (!Array.isArray(data.items)) throw new Error('The AI answer had no items. Try reading the photo again.');
+  catch { throw bad('The AI answer was cut off or garbled. Try again.'); }
+  if (!Array.isArray(data.items)) throw bad('The AI answer had no items. Try again.');
   return data;
 }
 
