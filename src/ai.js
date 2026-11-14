@@ -1,0 +1,32 @@
+import { backend, isMock } from './firebase.js';
+
+const WORKER_URL = 'https://study-api.pasharussia77.workers.dev';
+
+// Sends a request to the family's AI helper (the Cloudflare Worker). Returns plain text.
+export async function askAI(code, { messages, json = false, maxTokens = 2000 }) {
+  if (isMock) return mockAI(messages);
+  let token;
+  try { token = await backend.idToken(); } catch { throw new Error('Not signed in. Reload the app and try again.'); }
+  let res;
+  try {
+    res = await fetch(WORKER_URL + '/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token, 'X-Family-Code': code },
+      body: JSON.stringify({ messages, json, maxTokens })
+    });
+  } catch { throw new Error('Could not reach the AI helper. Check your internet connection.'); }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    if (res.status === 401) throw new Error('The AI helper did not recognize this phone. Leave and rejoin the family, then try again.');
+    throw new Error(data.error || 'The AI helper had a problem.');
+  }
+  return data.text || '';
+}
+
+// Test stand-in used only with ?mock=1
+async function mockAI(messages) {
+  window.__lastMessages = messages;
+  if (new URLSearchParams(location.search).has('aifail')) throw new Error('Pretend AI failure.');
+  const hasImage = JSON.stringify(messages).includes('image_url');
+  return hasImage ? 'photosynthesis - how plants make food\nmitochondria - the cell\'s power plant' : 'ok';
+}

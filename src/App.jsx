@@ -4,6 +4,7 @@ import { parseCards, shuffle, datedName, niceDate, makeFamilyCode, cleanCode } f
 import { APP_VERSION } from './version.js';
 import Flashcards from './Flashcards.jsx';
 import Quiz from './Quiz.jsx';
+import Sources from './Sources.jsx';
 import { useStats, StatsStrip } from './Session.jsx';
 
 const COLORS = ['#FF6B5E', '#2BB3FF', '#19C79A'];
@@ -261,6 +262,10 @@ function Project({ code, projectId, onBack, onStudy }) {
     clearTimeout(timer.current); timer.current = setTimeout(() => save(t), 800);
   };
   useEffect(() => () => { if (timer.current) { clearTimeout(timer.current); backend.saveProjectText(code, projectId, latest.current).catch(() => {}); } }, [code, projectId]);
+  const append = (t) => {
+    const base = latest.current.replace(/\s+$/, '');
+    change((base ? base + '\n\n' : '') + t.trim());
+  };
   const { cards, skipped } = useMemo(() => parseCards(text), [text]);
   const { sum } = useStats(code, projectId, cards);
   if (!p) return <section><Back onClick={onBack} /><p className="muted">Loading…</p></section>;
@@ -281,6 +286,7 @@ function Project({ code, projectId, onBack, onStudy }) {
           {sum.incorrect > 0 && <p className="hint">{sum.incorrect} {sum.incorrect === 1 ? 'card needs' : 'cards need'} another try. Choose "Missed only" when you start.</p>}
         </>
       )}
+      <Sources code={code} projectId={projectId} onAppend={append} />
       <label className="muted" htmlFor="material">Your material</label>
       <textarea id="material" className="material" value={text} onChange={(e) => change(e.target.value)}
         placeholder={'Paste your notes here.\nWrite one item per line:\n\nphotosynthesis - how plants turn light into food\nmitochondria - the cell\'s power plant'} />

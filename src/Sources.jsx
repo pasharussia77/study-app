@@ -1,0 +1,127 @@
+import React, { useEffect, useRef, useState } from 'react';
+import { backend } from './firebase.js';
+import { compressImage, readImageText, readTextFile, readPdf } from './material.js';
+
+const IGNORE_LABEL = { none: 'Everything', handwriting: 'Printed only', printed: 'Handwriting only' };
+
+export default function Sources({ code, projectId, onAppend }) {
+  const [files, setFiles] = useState([]);
+  const [pending, setPending] = useState(null); // photos waiting for the "what to read" choice
+  const [busy, setBusy] = useState('');
+  const [msg, setMsg] = useState(null); // { kind: 'ok' | 'error', text }
+  const [lastIgnore, setLastIgnore] = useState('none');
+  const cam = useRef(null), gallery = useRef(null), doc = useRef(null);
+
+  useEffect(() => backend.watchFiles(code, projectId, setFiles), [code, projectId]);
+
+  const choosePhotos = (e) => {
+    const list = [...e.target.files].filter((f) => f.type.startsWith('image/'));
+    e.target.value = '';
+    if (list.length) setPending(list);
+  };
+
+  const savePhotos = async (ignore) => {
+    const list = pending; setPending(null); setLastIgnore(ignore); setMsg(null);
+    try {
+      for (let i = 0; i < list.length; i++) {
+        setBusy(`Saving photo ${i + 1} of ${list.length}…`);
+        const { data } = await compressImage(list[i]);
+        await backend.addFile(code, projectId, { kind: 'photo', data, ignore, status: 'new' });
+      }
+    } catch (e) { setMsg({ kind: 'error', text: e.message }); }
+    setBusy('');
+  };
+
+  const readPhotos = async () => {
+    const todo = files.filter((f) => f.status !== 'done');
+    setMsg(null); let done = 0, failed = 0, lastErr = '';
+    for (let i = 0; i < todo.length; i++) {
+      const f = todo[i];
+      setBusy(`Reading photo ${i + 1} of ${todo.length}…`);
+      try {
+        const text = await readImageText(code, f.data, f.ignore);
+        onAppend(text);
+        await backend.updateFile(code, projectId, f.id, { status: 'done', error: '' });
+        done++;
+      } catch (e) {
+        failed++; lastErr = e.message;
+        await backend.updateFile(code, projectId, f.id, { status: 'error', error: e.message }).catch(() => {});
+      }
+    }
+    setBusy('');
+    setMsg(failed
+      ? { kind: 'error', text: `${failed} photo${failed > 1 ? 's' : ''} could not be read. ${lastErr}` }
+      : { kind: 'ok', text: `Added text from ${done} photo${done > 1 ? 's' : ''}. Check it below.` });
+  };
+
+  const removePhoto = async (f) => {
+    const note = f.status === 'done' ? ' The text already added stays in your material.' : '';
+    if (confirm('Remove this photo?' + note)) await backend.deleteFile(code, projectId, f.id);
+  };
+
+  const chooseDoc = async (e) => {
+    const file = e.target.files[0]; e.target.value = '';
+    if (!file) return;
+    setMsg(null);
+    try {
+      let result;
+      if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf') {
+        setBusy('Reading PDF…');
+        result = await readPdf(code, file, setBusy);
+      } else if (/\.(txt|md|csv)$/i.test(file.name) || file.type.startsWith('text/')) {
+        result = { text: await readTextFile(file), note: '' };
+      } else throw new Error('Please choose a PDF or a text file.');
+      onAppend(result.text);
+      setMsg({ kind: 'ok', text: `Added text from ${file.name}. ${result.note}`.trim() });
+    } catch (err) { setMsg({ kind: 'error', text: err.message }); }
+    setBusy('');
+  };
+
+  const unread = files.filter((f) => f.status !== 'done').length;
+  return (
+    <div className="sources">
+      <div className="muted">Add material</div>
+      <div className="add-row">
+        <button className="btn ghost" disabled={!!busy} onClick={() => cam.current.click()}>Take photo</button>
+        <button className="btn ghost" disabled={!!busy} onClick={() => gallery.current.click()}>Photos</button>
+        <button className="btn ghost" disabled={!!busy} onClick={() => doc.current.click()}>PDF or text file</button>
+      </div>
+      <input ref={cam} type="file" accept="image/*" capture="environment" hidden onChange={choosePhotos} data-testid="in-camera" />
+      <input ref={gallery} type="file" accept="image/*" multiple hidden onChange={choosePhotos} data-testid="in-photos" />
+      <input ref={doc} type="file" accept=".pdf,.txt,.md,.csv,application/pdf,text/plain" hidden onChange={chooseDoc} data-testid="in-doc" />
+
+      {files.length > 0 && (
+        <ul className="thumbs" aria-label="Photos">
+          {files.map((f) => (
+            <li key={f.id} className={'thumb ' + f.status}>
+              <img src={f.data} alt="Saved page" />
+              <span className="badge">{f.status === 'done' ? 'Added' : f.status === 'error' ? 'Failed' : 'Not read'}</span>
+              {f.ignore !== 'none' && <span className="mode">{IGNORE_LABEL[f.ignore]}</span>}
+              <button className="x" aria-label="Remove photo" onClick={() => removePhoto(f)}>×</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {unread > 0 && <button className="btn primary" disabled={!!busy} onClick={readPhotos}>{`Read ${unread} photo${unread > 1 ? 's' : ''}`}</button>}
+      {busy && <p className="hint" role="status">{busy}</p>}
+      {msg && <p className={msg.kind === 'ok' ? 'okmsg' : 'error'} role={msg.kind === 'ok' ? 'status' : 'alert'}>{msg.text}</p>}
+
+      {pending && (
+        <div className="overlay" onClick={() => setPending(null)}>
+          <div className="stats-sheet" role="dialog" aria-label="What should be read?" onClick={(e) => e.stopPropagation()}>
+            <h2>What should be read?</h2>
+            <p className="muted">{pending.length} photo{pending.length > 1 ? 's' : ''} selected</p>
+            <div className="stack">
+              {['none', 'handwriting', 'printed'].map((k) => (
+                <button key={k} className={'btn ' + (k === lastIgnore ? 'primary' : 'ghost')} onClick={() => savePhotos(k)}>
+                  {k === 'none' ? 'Read everything' : k === 'handwriting' ? 'Ignore handwriting' : 'Ignore printed text'}
+                </button>
+              ))}
+              <button className="link" onClick={() => setPending(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

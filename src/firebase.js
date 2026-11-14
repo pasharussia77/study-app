@@ -2,7 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-  doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc,
+  doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, addDoc,
   query, where, onSnapshot, serverTimestamp, increment
 } from 'firebase/firestore';
 
@@ -68,7 +68,35 @@ function createFirebaseBackend() {
     },
     async deleteProject(code, id) {
       await signedIn();
+      try {
+        const fs = await getDocs(collection(db, 'families', code, 'projects', id, 'files'));
+        await Promise.all(fs.docs.map((d) => deleteDoc(d.ref)));
+        await deleteDoc(doc(db, 'families', code, 'projects', id, 'stats', 'main'));
+      } catch {}
       await deleteDoc(doc(db, 'families', code, 'projects', id));
+    },
+    async idToken() { const u = await signedIn(); return u.getIdToken(); },
+    watchFiles(code, pid, cb) {
+      let unsub = () => {};
+      signedIn().then(() => {
+        unsub = onSnapshot(collection(db, 'families', code, 'projects', pid, 'files'), (snap) => {
+          cb(snap.docs.map((d) => ({ id: d.id, ...d.data(), createdAt: ms(d.data().createdAt) })).sort((a, b) => a.createdAt - b.createdAt));
+        }, () => cb([]));
+      });
+      return () => unsub();
+    },
+    async addFile(code, pid, data) {
+      await signedIn();
+      const ref = await addDoc(collection(db, 'families', code, 'projects', pid, 'files'), { ...data, createdAt: serverTimestamp() });
+      return ref.id;
+    },
+    async updateFile(code, pid, id, patch) {
+      await signedIn();
+      await updateDoc(doc(db, 'families', code, 'projects', pid, 'files', id), patch);
+    },
+    async deleteFile(code, pid, id) {
+      await signedIn();
+      await deleteDoc(doc(db, 'families', code, 'projects', pid, 'files', id));
     },
     watchStats(code, pid, cb) {
       let unsub = () => {};
@@ -98,6 +126,7 @@ function createMockBackend() {
   const families = {};
   const projs = {};
   const stats = {};
+  const filesStore = {};
   const listeners = new Set();
   const notify = () => listeners.forEach((f) => f());
   let n = 0;
@@ -117,7 +146,20 @@ function createMockBackend() {
     },
     async getProject(code, id) { return projs[id] ? { ...projs[id] } : null; },
     async saveProjectText(code, id, text) { projs[id].text = text; notify(); },
-    async deleteProject(code, id) { delete projs[id]; notify(); },
+    async deleteProject(code, id) { delete projs[id]; delete filesStore[id]; notify(); },
+    async idToken() { return 'mock-token'; },
+    watchFiles(code, pid, cb) {
+      const run = () => cb(Object.values(filesStore[pid] || {}).map((f) => ({ ...f })).sort((a, b) => a.createdAt - b.createdAt));
+      listeners.add(run); run();
+      return () => listeners.delete(run);
+    },
+    async addFile(code, pid, data) {
+      const id = 'f' + (++n);
+      (filesStore[pid] ||= {})[id] = { id, ...data, createdAt: Date.now() + n };
+      notify(); return id;
+    },
+    async updateFile(code, pid, id, patch) { Object.assign(filesStore[pid][id], patch); notify(); },
+    async deleteFile(code, pid, id) { delete filesStore[pid][id]; notify(); },
     watchStats(code, pid, cb) {
       const run = () => cb(JSON.parse(JSON.stringify(stats[pid] || {})));
       listeners.add(run); run();
