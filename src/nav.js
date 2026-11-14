@@ -67,6 +67,12 @@ export function goUp() {
   if (n > 0) history.go(-n);
 }
 export function back() { history.back(); }
+// Jump up to the nearest level below this one with the given screen name (for the "Family > Anna" trail).
+export function goToScreen(name) {
+  for (let i = stack.length - 2; i >= 0; i--) {
+    if (stack[i].kind === 'screen' && stack[i].data.screen === name) { history.go(-(stack.length - 1 - i)); return; }
+  }
+}
 export function depth() { return stack.length; }
 
 function pushOverlay(onPop) {

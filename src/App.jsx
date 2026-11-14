@@ -11,7 +11,7 @@ import Items from './Items.jsx';
 import TextItems, { textHash } from './TextItems.jsx';
 import { useStats, StatsStrip } from './Session.jsx';
 import { buildDeck } from './deck.js';
-import { startNav, pushScreen, replaceScreen, resetTo, goUp, useOverlay } from './nav.js';
+import { startNav, pushScreen, replaceScreen, resetTo, goUp, goToScreen, useOverlay } from './nav.js';
 
 const COLORS = ['#FF6B5E', '#2BB3FF', '#19C79A'];
 const store = {
@@ -84,6 +84,20 @@ export default function App() {
     return <Shell><Mode cards={view.deck} code={code} projectId={project.id} onExit={goUp} /></Shell>;
   }
   return null;
+}
+
+// "Family > Anna": shows where you are; each earlier level is a button that jumps there.
+function Crumbs({ items }) {
+  return (
+    <nav className="crumbs" aria-label="You are here">
+      {items.map((c, i) => (
+        <React.Fragment key={i}>
+          {i > 0 && <span aria-hidden="true">›</span>}
+          {c.onClick ? <button onClick={c.onClick}>{c.label}</button> : <span aria-current="page">{c.label}</span>}
+        </React.Fragment>
+      ))}
+    </nav>
+  );
 }
 
 function Shell({ children }) { return <main className="shell">{children}</main>; }
@@ -192,7 +206,12 @@ function Profiles({ family, code, onPick, onLeave, onAddTest }) {
   const [show, setShow] = useState(false);
   return (
     <section>
+      <div className="famhead">
+        <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" fill="currentColor" /></svg>
+        <b>Our family</b>
+      </div>
       <h1>Who's studying?</h1>
+      <p className="muted">Tap a name to open that person's projects.</p>
       <div className="tiles">
         {family.profiles.map((p) => (
           <button key={p.id} className={'tile' + (p.test ? ' test' : '')} onClick={() => onPick(p)} style={{ '--c': p.color }}>
@@ -231,6 +250,8 @@ function Home({ code, profile, onSwitch, onOpen }) {
   };
   return (
     <section>
+      <Back onClick={onSwitch} label="Family" />
+      <Crumbs items={[{ label: 'Family', onClick: onSwitch }, { label: profile.name }]} />
       <header className="top">
         <button className="avatar sm" style={{ '--c': profile.color }} onClick={onSwitch} aria-label="Switch person">{profile.name[0].toUpperCase()}</button>
         <h1>{profile.name}'s projects</h1>
@@ -323,7 +344,8 @@ function Project({ code, projectId, profile, onBack, onStudy, onReview }) {
   if (textChanged) warns.push('text changed since items were made');
   return (
     <section>
-      <Back onClick={onBack} label="Projects" />
+      <Back onClick={onBack} label={`${profile.name}'s projects`} />
+      <Crumbs items={[{ label: 'Family', onClick: () => goToScreen('profiles') }, { label: profile.name, onClick: onBack }]} />
       <h1 className="proj-title">{p.name}</h1>
       {deck.length > 0 && (
         <>

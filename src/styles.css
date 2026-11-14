@@ -201,3 +201,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .link.swap { align-self: center; font-size: .9rem; padding: 4px 8px; }
 
 .textitems { display: flex; flex-direction: column; gap: 8px; }
+
+/* ---- where am I: family trail ---- */
+.famhead { display: flex; align-items: center; gap: 8px; color: var(--indigo); font-size: .95rem; }
+.crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: .88rem; color: var(--muted); margin: -4px 0 4px; }
+.crumbs button { background: none; border: 0; padding: 4px 2px; font-weight: 800; color: var(--indigo); text-decoration: underline; text-underline-offset: 3px; }
+.crumbs [aria-current] { font-weight: 800; color: var(--ink); }
+.feedback.check { background: #FFF6D6; }

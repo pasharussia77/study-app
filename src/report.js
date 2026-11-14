@@ -34,7 +34,7 @@ export function buildReport({ version, device, health, profile, project, text, p
   docs.forEach((d) => L.push(`File "${d.name}" (${kb(d.size || 0)}): ${d.ok === false ? 'FAILED: ' + d.error : d.method + ', ' + (d.pages ? d.pages + ' page(s), ' : '') + d.chars + ' characters, ' + sec(d.ms || 0)}${d.note ? '. ' + d.note : ''}`));
   if (!files.length && !docs.length) L.push('No photos or files were added (text may have been typed or pasted).');
 
-  h('2. THE AI\'S RAW ANSWER FOR EACH PHOTO (first 1500 characters)');
+  h('2. THE AI\'S RAW ANSWER FOR EACH READING (first 1500 characters)');
   const rawReads = events.filter((e) => e.type === 'photo_read' || e.type === 'text_read');
   if (!rawReads.length) L.push('No AI readings recorded.');
   rawReads.forEach((r, i) => {
@@ -43,8 +43,8 @@ export function buildReport({ version, device, health, profile, project, text, p
   });
   if (rawReads.some((x) => x.type === 'photo_read')) L.push('', `Instruction sent with each picture: mode "${NAMES[(rawReads.find((x) => x.type === 'photo_read') || {}).ignore] || ''}", ${String((rawReads.find((x) => x.type === 'photo_read') || {}).prompt || '').length} characters (the full text is built into this app version).`);
 
-  h('3. STUDY ITEMS THE APP BUILT FROM PHOTOS');
-  L.push('Rule: the AI only reports what it sees (handwritten answers, red X marks, circles, printed keys). The app then decides each correct answer with fixed rules: printed key, then a circled choice, then a red X on a true/false (the other choice), then "no red mark = assumed correct" on a graded page. Anything else has no answer and is flagged.');
+  h('3. STUDY ITEMS THE APP BUILT (from photos and typed text)');
+  L.push('Rule: the AI only reports what it sees or what is written (handwritten answers, red X marks, circles, printed keys). The app then decides each correct answer with fixed rules: printed key, then a circled choice, then a red X on a true/false (the other choice), then "no red mark = assumed correct" on a graded page. Anything else has no answer and is flagged.');
   const types = {};
   items.forEach((i) => { types[i.type] = (types[i.type] || 0) + 1; });
   L.push(`Items: ${items.length} (${Object.entries(types).map(([k, v]) => v + ' ' + k).join(', ') || 'none'}); flagged "needs a look": ${items.filter((i) => i.flagged).length}; without an answer: ${items.filter((i) => !i.answer).length}`);
@@ -57,7 +57,8 @@ export function buildReport({ version, device, health, profile, project, text, p
     g.list.forEach((it) => {
       const ch = it.choices && it.choices.length ? ' | choices: ' + it.choices.map((c) => c.label + '. ' + one(c.text, 40)).join('; ') : '';
       L.push(`${it.number != null ? '#' + it.number + ' ' : ''}[${it.type}] "${one(it.question, 90)}"${ch}`);
-      L.push(`      student: ${it.studentAnswer ?? '-'} | circled: ${it.circled ?? '-'} | printed key: ${it.printed ?? '-'} | marked wrong: ${it.markedWrong === true ? 'yes' : it.markedWrong === false ? 'no' : 'unsure'} | correct: ${it.answer ? (it.correctLabel ? it.correctLabel + '. ' : '') + one(it.answer, 60) : 'NONE'} | source: ${it.source} | confidence: ${it.confidence}${it.flagged ? ' | NEEDS A LOOK' : ''}${it.note ? ' | note: ' + one(it.note, 140) : ''}`);
+      if (it.type === 'term' || it.type === 'qa') L.push(`      answer: ${it.answer ? one(it.answer, 90) : 'NONE'} | source: ${it.source} | confidence: ${it.confidence}${it.flagged ? ' | NEEDS A LOOK' : ''}${it.note ? ' | note: ' + one(it.note, 140) : ''}`);
+      else L.push(`      student: ${it.studentAnswer ?? '-'} | circled: ${it.circled ?? '-'} | printed key: ${it.printed ?? '-'} | marked wrong: ${it.markedWrong === true ? 'yes' : it.markedWrong === false ? 'no' : 'unsure'} | correct: ${it.answer ? (it.correctLabel ? it.correctLabel + '. ' : '') + one(it.answer, 60) : 'NONE'} | source: ${it.source} | confidence: ${it.confidence}${it.flagged ? ' | NEEDS A LOOK' : ''}${it.note ? ' | note: ' + one(it.note, 140) : ''}`);
     });
   });
   if (!items.length) L.push('No study items yet.');

@@ -69,6 +69,11 @@ export default function Quiz({ cards, code, projectId, onExit }) {
   const submitTyped = () => {
     if (!answer.trim() || result) return;
     const right = isCorrect(answer, q.expected);
+    if (!right && q.expected.trim().split(/\s+/).length > 6) {
+      // Long answers can be worded many ways: show the answer and let the student judge.
+      setResult({ right: false, given: answer.trim(), selfCheck: true });
+      return;
+    }
     diagLog(projectId, { type: 'answer', mode: `quiz ${c.type} (typed)`, question: q.shown, expected: q.expected, given: answer.trim(), correct: right });
     setResult({ right, given: answer.trim() });
     record(right); count(right);
@@ -78,6 +83,11 @@ export default function Quiz({ cards, code, projectId, onExit }) {
     const right = normalize(opt) === normalize(q.expected);
     diagLog(projectId, { type: 'answer', mode: `quiz ${c.type} (choice)`, question: q.shown, expected: q.expected, given: opt, correct: right });
     setResult({ right, given: opt });
+    record(right); count(right);
+  };
+  const decide = (right) => {
+    diagLog(projectId, { type: 'answer', mode: `quiz ${c.type} (typed, self-checked)`, question: q.shown, expected: q.expected, given: result.given, correct: right });
+    setResult({ right, given: result.given, selfChecked: true });
     record(right); count(right);
   };
   const override = () => {
@@ -155,13 +165,26 @@ export default function Quiz({ cards, code, projectId, onExit }) {
         </div>
       )}
 
-      {result && (
+      {result && result.selfCheck && (
+        <div className="feedback check" role="status" data-testid="feedback">
+          <b>Compare your answer</b>
+          <p className="given">You wrote: {result.given}</p>
+          <p className="answer-line">Answer: <b>{q.expected}</b></p>
+          <p className="muted tiny">Long answers can be worded in many ways, so you decide.</p>
+          <div className="row">
+            <button className="btn miss" onClick={() => decide(false)}>Missed it</button>
+            <button className="btn primary" onClick={() => decide(true)}>I got it</button>
+          </div>
+        </div>
+      )}
+
+      {result && !result.selfCheck && (
         <div className={'feedback ' + (result.right ? 'good' : 'bad')} role="status" data-testid="feedback">
-          <b>{result.overridden ? 'Counted as correct' : result.right ? 'Correct' : 'Not quite'}</b>
-          {!result.right && mode === 'type' && <p className="given">You wrote: {result.given}</p>}
+          <b>{result.selfChecked ? (result.right ? 'Counted as correct' : 'Counted as missed') : result.overridden ? 'Counted as correct' : result.right ? 'Correct' : 'Not quite'}</b>
+          {!result.right && mode === 'type' && !result.selfChecked && <p className="given">You wrote: {result.given}</p>}
           {(!result.right || result.given.trim() !== q.expected) && <p className="answer-line">Answer: <b>{q.expected}</b></p>}
           <div className="row">
-            {!result.right && mode === 'type' && <button className="btn ghost" onClick={override}>I was right</button>}
+            {!result.right && mode === 'type' && !result.selfChecked && <button className="btn ghost" onClick={override}>I was right</button>}
             <button className="btn primary" onClick={next} data-testid="next">{i + 1 < deck.length ? 'Next' : 'Finish'}</button>
           </div>
         </div>
