@@ -74,11 +74,18 @@ export function buildReport({ version, device, health, profile, project, text, p
   L.push(`Everything studyable (typed + photo items with an answer): total ${sum.total}, covered ${sum.covered}, remaining ${sum.remainingCount}, correct ${sum.correct}, incorrect ${sum.incorrect}`);
 
   h('6. STUDY SESSIONS (most recent activity)');
-  const study = events.filter((e) => ['session_start', 'answer', 'override', 'round_done'].includes(e.type)).slice(-70);
+  const voiceRes = events.filter((e) => e.type === 'voice_result');
+  if (voiceRes.length) {
+    const sum = (k) => voiceRes.reduce((a, e) => a + (e[k] || 0), 0);
+    L.push(`Voice usage in this log: ${sum('recordings')} recordings (${(sum('sttMs') / 1000).toFixed(0)} s waiting on transcription), ${sum('ttsChars')} characters spoken by the tutor voice, AI tokens in/out ${sum('aiIn')}/${sum('aiOut')}.`);
+  }
+  const study = events.filter((e) => ['session_start', 'answer', 'override', 'round_done', 'voice_turn', 'voice_result'].includes(e.type)).slice(-90);
   if (!study.length) L.push('No flashcard or quiz activity recorded yet.');
   study.forEach((e) => {
     if (e.type === 'session_start') L.push(`[${time(e.t)}] START ${e.mode}: shows ${e.shows}${e.how ? ', answers by ' + e.how : ''}, cards: ${e.pick}, shuffle ${e.shuffle ? 'on' : 'off'}, ${e.deckSize} in this round`);
     else if (e.type === 'answer') L.push(`[${time(e.t)}] ${e.mode} | Q: "${one(e.question, 90)}" | correct answer: "${one(e.expected, 90)}"${e.given != null ? ' | given: "' + one(e.given, 90) + '"' : ''} | ${e.correct ? 'RIGHT' : 'WRONG'}`);
+    else if (e.type === 'voice_turn') L.push(`[${time(e.t)}] voice | Q: "${one(e.question, 80)}" | expected: "${one(e.expected, 80)}" | try ${e.attempt} | heard: "${one(e.heard, 120)}" | ${e.byRule ? 'rule' : 'AI'} verdict: ${e.verdict} | tutor said: "${one(e.tutor, 140)}"`);
+    else if (e.type === 'voice_result') L.push(`[${time(e.t)}] voice result | "${one(e.question, 80)}" -> ${e.right ? 'RIGHT' : 'WRONG'} after ${e.attempts} ${e.attempts === 1 ? 'try' : 'tries'}${e.skipped ? ' (skipped)' : ''}`);
     else if (e.type === 'override') L.push(`[${time(e.t)}] marked "I was right" for: "${one(e.question, 90)}"`);
     else if (e.type === 'round_done') L.push(`[${time(e.t)}] ROUND DONE (${e.mode}): ${e.right} right, ${e.wrong} wrong`);
   });

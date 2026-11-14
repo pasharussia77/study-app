@@ -8,6 +8,8 @@ globalThis.fetch = async (url, init) => {
     const ok = String(url).endsWith('/families/good-code-123') && init.headers.Authorization === 'Bearer goodtoken-aaaaaaaaaaaaaaaaaaaaaa';
     return new Response('{}', { status: ok ? 200 : 403 });
   }
+  if (String(url).includes('/audio/speech')) return new Response(new Uint8Array([1, 2, 3, 4]), { status: 200, headers: { 'content-type': 'audio/mpeg' } });
+  if (String(url).includes('/audio/transcriptions')) return new Response(JSON.stringify({ text: 'it is a small furry pet' }), { status: 200 });
   if (String(url).includes('api.openai.com')) return new Response(JSON.stringify({ choices: [{ message: { content: 'hi there' } }], usage: { total_tokens: 5 } }), { status: 200 });
   throw new Error('unexpected ' + url);
 };
@@ -42,4 +44,32 @@ r = await worker.fetch(req('/chat', { headers: good, body: { messages: [{ role: 
 r = await worker.fetch(req('/chat', { headers: good, body: { nope: 1 } }), env); check('rejects missing messages', r.status === 400);
 r = await worker.fetch(req('/other', { headers: good, body: {} }), env); check('404 unknown path', r.status === 404);
 r = await worker.fetch(req('/chat', { headers: good, body: { messages: [{ role: 'user', content: 'x' }] } }), {}); check('missing key 500', r.status === 500);
+// ---- voice: text to speech and speech to text ----
+calls = [];
+r = await worker.fetch(req('/tts', { headers: good, body: { text: 'Hello there, nice work!' } }), env);
+check('tts 200 audio', r.status === 200 && r.headers.get('content-type') === 'audio/mpeg' && (await r.arrayBuffer()).byteLength === 4);
+let sp = JSON.parse(calls.find((c) => c.url.includes('/audio/speech')).init.body);
+check('tts uses key', calls.find((c) => c.url.includes('/audio/speech')).init.headers.Authorization === 'Bearer sk-test-123');
+check('tts defaults', sp.model === 'gpt-4o-mini-tts' && sp.voice === 'coral' && sp.response_format === 'mp3' && sp.input === 'Hello there, nice work!' && !!sp.instructions);
+r = await worker.fetch(req('/tts', { headers: good, body: { text: 'Hi' } }), { ...env, TTS_MODEL: 'tts-1', TTS_VOICE: 'nova' });
+sp = JSON.parse(calls.filter((c) => c.url.includes('/audio/speech')).pop().init.body);
+check('tts env overrides, no instructions on older model', sp.model === 'tts-1' && sp.voice === 'nova' && sp.instructions === undefined);
+check('tts audio keys not leaked', !(await r.clone().text()).includes('sk-test'));
+r = await worker.fetch(req('/tts', { headers: good, body: { text: '' } }), env); check('tts rejects empty', r.status === 400);
+r = await worker.fetch(req('/tts', { headers: good, body: { text: 'x'.repeat(1501) } }), env); check('tts rejects long', r.status === 400);
+r = await worker.fetch(req('/tts', { origin: 'https://evil.example', headers: good, body: { text: 'Hi' } }), env); check('tts blocks other origin', r.status === 403);
+r = await worker.fetch(req('/tts', { headers: { ...good, 'X-Family-Code': 'wrong-code-999' }, body: { text: 'Hi' } }), env); check('tts needs family', r.status === 401);
+
+const audioReq = (headers, file) => { const f = new FormData(); if (file !== null) f.append('file', file, 'answer.webm'); return new Request('https://api.test/stt', { method: 'POST', headers: { Origin: ORIGIN, ...headers }, body: f }); };
+const { 'Content-Type': _ct, ...goodNoType } = good;
+calls = [];
+r = await worker.fetch(audioReq(goodNoType, new Blob([new Uint8Array(200)], { type: 'audio/webm' })), env); j = await r.json();
+check('stt 200 text', r.status === 200 && j.text === 'it is a small furry pet');
+const stt = calls.find((c) => c.url.includes('/audio/transcriptions'));
+check('stt forwards file and model', stt.init.headers.Authorization === 'Bearer sk-test-123' && stt.init.body.get('model') === 'gpt-4o-mini-transcribe' && stt.init.body.get('language') === 'en' && stt.init.body.get('file').size === 200);
+r = await worker.fetch(audioReq(goodNoType, null), env); check('stt rejects no file', r.status === 400);
+r = await worker.fetch(audioReq(goodNoType, new Blob([])), env); check('stt rejects empty file', r.status === 400);
+r = await worker.fetch(audioReq(goodNoType, new Blob([new Uint8Array(6_000_001)])), env); check('stt rejects huge file', r.status === 400);
+r = await worker.fetch(audioReq({ ...goodNoType, 'X-Family-Code': 'wrong-code-999' }, new Blob([new Uint8Array(10)])), env); check('stt needs family', r.status === 401);
+r = await worker.fetch(new Request('https://api.test/stt', { method: 'POST', headers: { Origin: ORIGIN, ...good }, body: 'not a form' }), env); check('stt rejects non-form', r.status === 400);
 console.log(`worker tests: ${pass} passed, ${fail} failed`);

@@ -1,6 +1,7 @@
 // Family Study API: keeps the OpenAI key off the phones.
 // Secrets/variables are set in the Cloudflare dashboard, never in this file:
 //   OPENAI_API_KEY (secret)  BRAIN_MODEL (optional, default gpt-5.6-luna)  REASONING_EFFORT (optional, default low)
+//   TTS_MODEL (optional, default gpt-4o-mini-tts)  TTS_VOICE (optional, default coral)  STT_MODEL (optional, default gpt-4o-mini-transcribe)
 
 const ALLOWED_ORIGINS = ['https://pasharussia77.github.io'];
 const FIREBASE_PROJECT = 'family-study-94e10';
@@ -8,6 +9,8 @@ const DEFAULT_MODEL = 'gpt-5.6-luna';
 const MAX_BODY_BYTES = 8_000_000; // photos are sent as compressed data URLs
 const MAX_MESSAGES = 40;
 const MAX_OUTPUT_TOKENS = 4000;
+const MAX_TTS_CHARS = 1500;
+const MAX_AUDIO_BYTES = 6_000_000;
 
 const verified = new Map(); // "code:token-tail" -> expiry time (ms)
 const VERIFY_TTL_MS = 5 * 60 * 1000;
@@ -76,6 +79,46 @@ async function handleChat(request, env, origin) {
   return json({ text: data.choices?.[0]?.message?.content ?? '', usage: data.usage || null }, 200, origin);
 }
 
+// Text to speech: returns an mp3 of what the tutor says.
+async function handleTts(request, env, origin) {
+  let body;
+  try { body = await request.json(); } catch { return json({ error: 'Invalid JSON.' }, 400, origin); }
+  const text = String((body && body.text) || '').trim();
+  if (!text || text.length > MAX_TTS_CHARS) return json({ error: 'Invalid text.' }, 400, origin);
+  const model = env.TTS_MODEL || 'gpt-4o-mini-tts';
+  const payload = { model, voice: env.TTS_VOICE || 'coral', input: text, response_format: 'mp3' };
+  if (model.startsWith('gpt-4o')) payload.instructions = 'Speak clearly and warmly, like a friendly tutor talking to a teenager. Keep a natural, unhurried pace.';
+  const res = await fetch('https://api.openai.com/v1/audio/speech', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + env.OPENAI_API_KEY },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    return json({ error: (d && d.error && d.error.message) || 'The voice service returned an error.' }, 502, origin);
+  }
+  return new Response(res.body, { status: 200, headers: { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'no-store', ...cors(origin) } });
+}
+
+// Speech to text: takes a short recording, returns what was said.
+async function handleStt(request, env, origin) {
+  let form;
+  try { form = await request.formData(); } catch { return json({ error: 'Invalid upload.' }, 400, origin); }
+  const file = form.get('file');
+  if (!file || typeof file === 'string' || !file.size || file.size > MAX_AUDIO_BYTES) return json({ error: 'Invalid audio.' }, 400, origin);
+  const out = new FormData();
+  out.append('file', file, file.name || 'answer.webm');
+  out.append('model', env.STT_MODEL || 'gpt-4o-mini-transcribe');
+  out.append('language', 'en');
+  out.append('response_format', 'json');
+  const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    method: 'POST', headers: { Authorization: 'Bearer ' + env.OPENAI_API_KEY }, body: out
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) return json({ error: (data && data.error && data.error.message) || 'The speech service returned an error.' }, 502, origin);
+  return json({ text: (data && data.text) || '' }, 200, origin);
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -98,6 +141,8 @@ export default {
     if (request.method === 'POST') {
       if (Number(request.headers.get('Content-Length') || 0) > MAX_BODY_BYTES) return json({ error: 'Too large.' }, 413, origin);
       if (url.pathname === '/chat') return handleChat(request, env, origin);
+      if (url.pathname === '/tts') return handleTts(request, env, origin);
+      if (url.pathname === '/stt') return handleStt(request, env, origin);
     }
     return json({ error: 'Not found.' }, 404, origin);
   }

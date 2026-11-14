@@ -4,6 +4,7 @@ import { parseCards, shuffle, datedName, niceDate, makeFamilyCode, cleanCode } f
 import { APP_VERSION } from './version.js';
 import Flashcards from './Flashcards.jsx';
 import Quiz from './Quiz.jsx';
+import Voice from './Voice.jsx';
 import Sources from './Sources.jsx';
 import ReportSheet from './Report.jsx';
 import { diagClear } from './diag.js';
@@ -80,7 +81,7 @@ export default function App() {
   );
   if (screen === 'items') return <Shell><Items code={code} projectId={project.id} /></Shell>;
   if (screen === 'study') {
-    const Mode = view.mode === 'quiz' ? Quiz : Flashcards;
+    const Mode = view.mode === 'quiz' ? Quiz : view.mode === 'voice' ? Voice : Flashcards;
     return <Shell><Mode cards={view.deck} code={code} projectId={project.id} onExit={goUp} /></Shell>;
   }
   return null;
@@ -353,6 +354,7 @@ function Project({ code, projectId, profile, onBack, onStudy, onReview }) {
           <div className="stack">
             <button className="btn primary" onClick={() => onStudy('flash', deck)}>Flashcards</button>
             <button className="btn primary alt" onClick={() => onStudy('quiz', deck)}>Written quiz</button>
+            <button className="btn primary voice" onClick={() => onStudy('voice', deck)}>Voice quiz</button>
           </div>
           {sum.incorrect > 0 && <p className="hint">{sum.incorrect} {sum.incorrect === 1 ? 'card needs' : 'cards need'} another try. Choose "Missed only" when you start.</p>}
         </>

@@ -2,6 +2,20 @@ import { backend, isMock } from './firebase.js';
 
 const WORKER_URL = 'https://study-api.pasharussia77.workers.dev';
 
+// Calls any endpoint on the family's AI helper with the sign-in and family code attached.
+export async function workerFetch(code, path, init = {}) {
+  let token;
+  try { token = await backend.idToken(); } catch { throw new Error('Not signed in. Reload the app and try again.'); }
+  try {
+    return await fetch(WORKER_URL + path, { ...init, headers: { ...(init.headers || {}), Authorization: 'Bearer ' + token, 'X-Family-Code': code } });
+  } catch { throw new Error('Could not reach the AI helper. Check your internet connection.'); }
+}
+export function explain(res, data, what = 'AI helper') {
+  if (res.status === 401) return 'The AI helper did not recognize this phone. Leave and rejoin the family, then try again.';
+  if (res.status === 404) return `The AI helper has no ${what} yet. It needs the latest update in Cloudflare.`;
+  return (data && data.error) || `The ${what} had a problem.`;
+}
+
 // Sends a request to the family's AI helper (the Cloudflare Worker). Returns plain text.
 export async function askAI(code, opts) { return (await askAIDetailed(code, opts)).text; }
 
