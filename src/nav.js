@@ -4,6 +4,9 @@ import { useEffect, useRef } from 'react';
 let stack = [];          // entries from the bottom of the app upward
 let setView = () => {};  // tells React which screen to show
 let skip = 0;            // popstate events we caused ourselves and should ignore
+const screenListeners = new Set();
+// Called every time a different screen is shown (used to draw a fresh worn-book pattern).
+export function onScreenChange(f) { screenListeners.add(f); return () => screenListeners.delete(f); }
 
 window.addEventListener('popstate', (e) => {
   if (skip > 0) { skip--; return; }
@@ -19,7 +22,7 @@ window.addEventListener('popstate', (e) => {
 
 // entries: screens from the bottom of the app to the one to show first.
 export function startNav(entries, apply) {
-  setView = apply;
+  setView = (d) => { apply(d); screenListeners.forEach((f) => f()); };
   const init = () => {
     stack = [];
     history.replaceState({ d: 1 }, '');

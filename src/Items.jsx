@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { backend } from './firebase.js';
 import { TYPE_LABEL, crossCheck } from './items.js';
 import { useOverlay, goUp } from './nav.js';
+import { Icon } from './art.jsx';
+import { ScreenHead } from './Session.jsx';
 
 const SOURCE_LABEL = {
   'printed key': 'Answer given in the material', 'circled by teacher': 'Circled by the teacher',
@@ -40,8 +42,7 @@ export default function Items({ code, projectId }) {
 
   return (
     <section>
-      <button className="back" onClick={goUp}><span aria-hidden="true">‹</span> Project</button>
-      <h1>Study items</h1>
+      <ScreenHead onBack={goUp} backLabel="Project" icon={<span className="head-ic"><Icon name="list" size={26} /></span>} title="Study items" />
       {!loaded ? <p className="muted" data-testid="items-loading">Loading…</p> : (
       <>
       <p className="muted" data-testid="items-summary">{items.length} item{items.length === 1 ? '' : 's'}{flaggedCount ? ` · ${flaggedCount} need a look` : ' · all look fine'}</p>
@@ -52,7 +53,7 @@ export default function Items({ code, projectId }) {
         </div>
       )}
       {flaggedCount > 0 && (
-        <label className="switch"><input type="checkbox" checked={onlyFlagged} onChange={(e) => setOnlyFlagged(e.target.checked)} /><span>Only show items that need a look</span></label>
+        <label className="switch"><Icon name="alert" /><span>Only show items that need a look</span><input type="checkbox" checked={onlyFlagged} onChange={(e) => setOnlyFlagged(e.target.checked)} /></label>
       )}
       {items.length === 0 && <div className="empty"><p>No study items yet.</p><p className="muted">Take a photo and tap Read.</p></div>}
 

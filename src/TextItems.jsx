@@ -4,6 +4,7 @@ import { readTextChunk } from './material.js';
 import { chunkText } from './items.js';
 import { diagLog } from './diag.js';
 import { cardKey } from './stats.js';
+import { Icon } from './art.jsx';
 
 const MAX_TEXT = 30000;
 
@@ -47,7 +48,7 @@ export default function TextItems({ code, projectId, text, items, onReview }) {
     <div className="textitems">
       <p className="muted tiny">Lines like <b>word - definition</b> become cards on their own. For anything else, such as a pasted quiz or notes, let the AI make study items.</p>
       <button className="btn ghost" disabled={trimmed.length < 10 || !!busy} onClick={run}>
-        {made.length ? 'Make study items from this text again' : 'Make study items from this text'}
+        <Icon name="sparkle" />{made.length ? 'Make study items from this text again' : 'Make study items from this text'}
       </button>
       {changed && !busy && <p className="hint">The text changed since the study items were made. Make them again to include the changes.</p>}
       {busy && <p className="hint" role="status">{busy}</p>}

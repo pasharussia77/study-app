@@ -3,7 +3,8 @@ import { backend } from './firebase.js';
 import { shuffle } from './parse.js';
 import { defaultPick, queueFor } from './stats.js';
 import { cardFaces } from './deck.js';
-import { useStats, StatsSheet, CardPicker, TypePicker, RoundDone } from './Session.jsx';
+import { useStats, StatsSheet, CardPicker, TypePicker, RoundDone, ScreenHead, PlayTop } from './Session.jsx';
+import { Icon, Scenery, TileArt } from './art.jsx';
 import { diagLog } from './diag.js';
 import { useOverlay, back } from './nav.js';
 
@@ -45,8 +46,7 @@ export default function Flashcards({ cards, code, projectId, onExit }) {
 
   if (phase === 'setup') return (
     <section>
-      <button className="back" onClick={onExit}><span aria-hidden="true">‹</span> Back</button>
-      <h1>Flashcards</h1>
+      <ScreenHead onBack={onExit} icon={<TileArt kind="flash" />} title="Flashcards" />
       {hasTerm && (
         <fieldset className="seg" aria-label="Show first">
           <legend>Show first (for words)</legend>
@@ -57,11 +57,12 @@ export default function Flashcards({ cards, code, projectId, onExit }) {
       <TypePicker deck={cards} value={kind} onChange={setKind} />
       <CardPicker sum={sum} value={chosen} onChange={setPick} />
       <label className="switch">
-        <input type="checkbox" checked={mix} onChange={(e) => setMix(e.target.checked)} />
+        <Icon name="shuffle" />
         <span>Shuffle the cards</span>
+        <input type="checkbox" checked={mix} onChange={(e) => setMix(e.target.checked)} />
       </label>
       {available === 0 && <p className="hint">Nothing to study with this selection.</p>}
-      <button className="btn primary bottom" disabled={available === 0} onClick={() => begin(chosen)}>Start</button>
+      <button className="btn primary bottom" disabled={available === 0} onClick={() => begin(chosen)}><Icon name="play" />Start</button>
     </section>
   );
 
@@ -69,29 +70,25 @@ export default function Flashcards({ cards, code, projectId, onExit }) {
 
   const f = cardFaces(deck[i], first);
   return (
-    <section className="play">
-      <header className="play-top">
-        <button className="back" onClick={back}><span aria-hidden="true">‹</span> Exit</button>
-        <span className="count" data-testid="counter">{i + 1} / {deck.length}</span>
-        <button className="chip" onClick={() => setShowStats(true)}>Stats</button>
-      </header>
-      <div className="bar" role="progressbar" aria-valuemin="0" aria-valuemax={deck.length} aria-valuenow={i + 1}><span style={{ width: `${((i + 1) / deck.length) * 100}%` }} /></div>
+    <section className="play on-scene">
+      <Scenery kind="peaks" />
+      <PlayTop onExit={back} index={i} total={deck.length} onStats={() => setShowStats(true)} title="Flashcards" />
       <button className={'flip' + (flipped ? ' flipped' : '')} onClick={() => setFlipped(!flipped)} aria-label={flipped ? 'Show front' : 'Show back'} data-testid="card">
         <span className="face face-front">
           <small>{f.fl}</small><b>{f.ft}</b>
           {f.extra && <ul className="face-choices">{f.extra.map((x) => <li key={x}>{x}</li>)}</ul>}
-          <em>Tap to flip</em>
+          <em><Icon name="tap" size={18} />Tap to flip</em>
         </span>
-        <span className="face face-back"><small>{f.bl}</small><b>{f.bt}</b></span>
+        <span className="face face-back"><small>{f.bl}</small><b>{f.bt}</b><em><Icon name="swap" size={18} />Tap to flip back</em></span>
       </button>
       {deck[i].type === 'term' && (
         <button className="link swap" onClick={() => { setFirst(first === 'term' ? 'definition' : 'term'); setFlipped(false); }}>
-          Showing {first === 'term' ? 'word' : 'definition'} first · Swap sides
+          <Icon name="swap" size={18} />Showing {first === 'term' ? 'word' : 'definition'} first · Swap sides
         </button>
       )}
       <div className="row nav">
-        <button className="btn miss" onClick={() => mark(false)}>Missed it</button>
-        <button className="btn primary" onClick={() => mark(true)}>Got it</button>
+        <button className="btn miss" onClick={() => mark(false)}><Icon name="x" />Missed it</button>
+        <button className="btn primary" onClick={() => mark(true)}><Icon name="check" />Got it</button>
       </div>
       {showStats && <StatsSheet sum={sum} onClose={() => setShowStats(false)} />}
     </section>

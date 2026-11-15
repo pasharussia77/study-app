@@ -3,6 +3,7 @@ import { backend } from './firebase.js';
 import { compressImage, readPhotoItems, readTextFile, readPdf } from './material.js';
 import { diagLog } from './diag.js';
 import { useOverlay } from './nav.js';
+import { Icon } from './art.jsx';
 
 const IGNORE_LABEL = { none: 'Everything', handwriting: 'Printed only', printed: 'Handwriting only' };
 
@@ -125,11 +126,11 @@ export default function Sources({ code, projectId, projectName, canSave, onAppen
   const unread = files.filter((f) => f.status !== 'done').length;
   return (
     <div className="sources">
-      <div className="muted">Add material</div>
+      <div className="label">Add material</div>
       <div className="add-row">
-        <button className="btn ghost" disabled={!!busy} onClick={() => cam.current.click()}>Take photo</button>
-        <button className="btn ghost" disabled={!!busy} onClick={() => gallery.current.click()}>Photos</button>
-        <button className="btn ghost" disabled={!!busy} onClick={() => doc.current.click()}>PDF or text file</button>
+        <button className="btn ghost" disabled={!!busy} onClick={() => cam.current.click()}><Icon name="camera" />Take photo</button>
+        <button className="btn ghost" disabled={!!busy} onClick={() => gallery.current.click()}><Icon name="image" />Photos</button>
+        <button className="btn ghost" disabled={!!busy} onClick={() => doc.current.click()}><Icon name="file" />PDF or text file</button>
       </div>
       <input ref={cam} type="file" accept="image/*" capture="environment" hidden onChange={choosePhotos} data-testid="in-camera" />
       <input ref={gallery} type="file" accept="image/*" multiple hidden onChange={choosePhotos} data-testid="in-photos" />
@@ -149,7 +150,7 @@ export default function Sources({ code, projectId, projectName, canSave, onAppen
           ))}
         </ul>
       )}
-      {unread > 0 && <button className="btn primary" disabled={!!busy} onClick={readPhotos}>{`Read ${unread} photo${unread > 1 ? 's' : ''}`}</button>}
+      {unread > 0 && <button className="btn primary" disabled={!!busy} onClick={readPhotos}><Icon name="sparkle" />{`Read ${unread} photo${unread > 1 ? 's' : ''}`}</button>}
       {busy && <p className="hint" role="status">{busy}</p>}
       {msg && (
         <div className={msg.kind === 'ok' ? 'okmsg' : 'error'} role={msg.kind === 'ok' ? 'status' : 'alert'}>

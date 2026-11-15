@@ -5,7 +5,8 @@ import { defaultPick, queueFor, normalize } from './stats.js';
 import { askAIDetailed } from './ai.js';
 import { describeQuestion, utterance, maxAttempts, countsRight, matchChoice, detectCommand, quickCorrect, praise, revealCanned, buildTutorMessages, parseTutor } from './tutor.js';
 import { speak, warm, stopSpeaking, startListening, transcribe, beep } from './voice.js';
-import { useStats, StatsSheet, CardPicker, TypePicker, RoundDone } from './Session.jsx';
+import { useStats, StatsSheet, CardPicker, TypePicker, RoundDone, ScreenHead, PlayTop } from './Session.jsx';
+import { Icon, Scenery, TileArt } from './art.jsx';
 import { diagLog } from './diag.js';
 import { useOverlay, back } from './nav.js';
 
@@ -251,8 +252,8 @@ export default function Voice({ cards, code, projectId, onExit }) {
 
   if (phase === 'setup') return (
     <section>
-      <button className="back" onClick={onExit}><span aria-hidden="true">‹</span> Back</button>
-      <h1>Voice quiz</h1>
+      <Scenery kind="waves" />
+      <ScreenHead onBack={onExit} icon={<TileArt kind="voice" />} title="Voice quiz" />
       <p className="muted">The tutor asks one question at a time. You answer out loud, and it helps you get to the right answer.</p>
       {hasTerm && (
         <fieldset className="seg" aria-label="Question shows">
@@ -262,21 +263,23 @@ export default function Voice({ cards, code, projectId, onExit }) {
         </fieldset>
       )}
       <label className="switch">
-        <input type="checkbox" checked={readAloud} onChange={(e) => setReadAloud(e.target.checked)} />
+        <Icon name="speaker" />
         <span>Read each question aloud</span>
+        <input type="checkbox" checked={readAloud} onChange={(e) => setReadAloud(e.target.checked)} />
       </label>
       <p className="muted tiny">The question always stays on the screen. The tutor always speaks its feedback.</p>
       <TypePicker deck={cards} value={kind} onChange={setKind} />
       <CardPicker sum={sum} value={chosen} onChange={setPick} />
       <label className="switch">
-        <input type="checkbox" checked={mix} onChange={(e) => setMix(e.target.checked)} />
+        <Icon name="shuffle" />
         <span>Shuffle the questions</span>
+        <input type="checkbox" checked={mix} onChange={(e) => setMix(e.target.checked)} />
       </label>
       <div className="micbox">
         <b>Check the sound first</b>
         <div className="row">
-          <button className="btn ghost small" onClick={testMic} disabled={!!(mic && mic.busy)}>Test my microphone</button>
-          <button className="btn ghost small" onClick={testVoice}>Test the tutor voice</button>
+          <button className="btn ghost small" onClick={testMic} disabled={!!(mic && mic.busy)}><Icon name="mic" size={18} />Test my microphone</button>
+          <button className="btn ghost small" onClick={testVoice}><Icon name="speaker" size={18} />Test the tutor voice</button>
         </div>
         {mic && mic.busy && <p className="hint" role="status">{mic.busy}</p>}
         {mic && mic.error && <p className="error" role="alert">{mic.error}</p>}
@@ -291,7 +294,7 @@ export default function Voice({ cards, code, projectId, onExit }) {
       <p className="muted tiny">The screen stays on while you study. Studying with the screen off is not possible in a web app.</p>
       <p className="hint">Allow the microphone when your phone asks.</p>
       {available === 0 && <p className="hint">Nothing to ask with this selection.</p>}
-      <button className="btn primary bottom" disabled={available === 0} onClick={() => start(chosen)}>Start talking</button>
+      <button className="btn primary bottom" disabled={available === 0} onClick={() => start(chosen)}><Icon name="mic" />Start talking</button>
     </section>
   );
 
@@ -302,19 +305,15 @@ export default function Voice({ cards, code, projectId, onExit }) {
   if (!qd) return null;
   return (
     <section className="play voice">
-      <header className="play-top">
-        <button className="back" onClick={back}><span aria-hidden="true">‹</span> Exit</button>
-        <span className="count" data-testid="counter">{i + 1} / {deck.length}</span>
-        <button className="chip" onClick={() => setShowStats(true)}>Stats</button>
-      </header>
-      <div className="bar" role="progressbar" aria-valuemin="0" aria-valuemax={deck.length} aria-valuenow={i + 1}><span style={{ width: `${((i + 1) / deck.length) * 100}%` }} /></div>
+      <Scenery kind="waves" />
+      <PlayTop onExit={back} index={i} total={deck.length} onStats={() => setShowStats(true)} title="Voice quiz" />
       <div className="question">
         <small>{qd.label}</small>
         <b data-testid="question">{qd.shown}</b>
         {qd.choices && <ul className="qchoices">{qd.choices.map((t, k) => <li key={k}>{String.fromCharCode(65 + k)}. {t}</li>)}</ul>}
       </div>
       <div className="voice-zone">
-        <div className={'orb ' + status} aria-hidden="true"><span /></div>
+        <div className={'orb ' + status} aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /></div>
         <p className="orb-label" role="status" data-testid="voice-status">{err ? '' : STATUS_TEXT[status]}</p>
       </div>
       {heard && <p className="said" data-testid="heard">You said: “{heard}”</p>}
@@ -323,13 +322,13 @@ export default function Voice({ cards, code, projectId, onExit }) {
       {err && <div className="error" role="alert">{err}</div>}
       <div className="row nav">
         {status === 'paused'
-          ? <button className="btn primary" onClick={resume}>Resume</button>
-          : <button className="btn ghost" onClick={pause}>Pause</button>}
-        {status === 'listening' && <button className="btn primary" onClick={() => listener.current && listener.current.stop()}>Done talking</button>}
+          ? <button className="btn primary" onClick={resume}><Icon name="play" />Resume</button>
+          : <button className="btn ghost" onClick={pause}><Icon name="pause" />Pause</button>}
+        {status === 'listening' && <button className="btn primary" onClick={() => listener.current && listener.current.stop()}><Icon name="check" />Done talking</button>}
       </div>
       <div className="row links">
-        <button className="link" onClick={repeatQ}>Repeat question</button>
-        <button className="link" onClick={skipQ}>Skip</button>
+        <button className="link" onClick={repeatQ}><Icon name="repeat" size={18} />Repeat question</button>
+        <button className="link" onClick={skipQ}><Icon name="skip" size={18} />Skip</button>
       </div>
       {showStats && <StatsSheet sum={sum} onClose={() => setShowStats(false)} />}
     </section>

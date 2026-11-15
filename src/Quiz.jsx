@@ -3,7 +3,8 @@ import { backend } from './firebase.js';
 import { shuffle } from './parse.js';
 import { defaultPick, queueFor, isCorrect, normalize } from './stats.js';
 import { isChoiceOnly } from './deck.js';
-import { useStats, StatsSheet, CardPicker, TypePicker, RoundDone } from './Session.jsx';
+import { useStats, StatsSheet, CardPicker, TypePicker, RoundDone, ScreenHead, PlayTop } from './Session.jsx';
+import { Icon, Scenery, TileArt } from './art.jsx';
 import { diagLog } from './diag.js';
 import { useOverlay, back } from './nav.js';
 
@@ -103,8 +104,7 @@ export default function Quiz({ cards, code, projectId, onExit }) {
 
   if (phase === 'setup') return (
     <section>
-      <button className="back" onClick={onExit}><span aria-hidden="true">‹</span> Back</button>
-      <h1>Written quiz</h1>
+      <ScreenHead onBack={onExit} icon={<TileArt kind="quiz" />} title="Written quiz" />
       {hasTerm && (
         <fieldset className="seg" aria-label="Question shows">
           <legend>Question shows (for words)</legend>
@@ -123,24 +123,21 @@ export default function Quiz({ cards, code, projectId, onExit }) {
       <TypePicker deck={cards} value={kind} onChange={setKind} />
       <CardPicker sum={sum} value={chosen} onChange={setPick} />
       <label className="switch">
-        <input type="checkbox" checked={mix} onChange={(e) => setMix(e.target.checked)} />
+        <Icon name="shuffle" />
         <span>Shuffle the questions</span>
+        <input type="checkbox" checked={mix} onChange={(e) => setMix(e.target.checked)} />
       </label>
       {available === 0 && <p className="hint">Nothing to ask with this selection.</p>}
-      <button className="btn primary bottom" disabled={available === 0} onClick={() => begin(chosen)}>Start</button>
+      <button className="btn primary bottom" disabled={available === 0} onClick={() => begin(chosen)}><Icon name="play" />Start</button>
     </section>
   );
 
   if (phase === 'done') return <RoundDone round={round} sum={sum} onPractice={begin} onReset={reset} onExit={onExit} />;
 
   return (
-    <section className="play">
-      <header className="play-top">
-        <button className="back" onClick={back}><span aria-hidden="true">‹</span> Exit</button>
-        <span className="count" data-testid="counter">{i + 1} / {deck.length}</span>
-        <button className="chip" onClick={() => setShowStats(true)}>Stats</button>
-      </header>
-      <div className="bar" role="progressbar" aria-valuemin="0" aria-valuemax={deck.length} aria-valuenow={i + 1}><span style={{ width: `${((i + 1) / deck.length) * 100}%` }} /></div>
+    <section className="play on-scene quiz">
+      <Scenery kind="haze" />
+      <PlayTop onExit={back} index={i} total={deck.length} onStats={() => setShowStats(true)} title="Written quiz" />
       <div className="question">
         <small>{q.label}</small>
         <b data-testid="question">{q.shown}</b>
@@ -160,7 +157,7 @@ export default function Quiz({ cards, code, projectId, onExit }) {
           {q.options.map((o) => {
             const isRight = normalize(o) === normalize(q.expected);
             const cls = !result ? '' : isRight ? ' right' : o === result.given ? ' wrong' : ' dim';
-            return <button key={o} className={'opt' + cls} onClick={() => choose(o)} disabled={!!result && !isRight && o !== result.given}>{o}</button>;
+            return <button key={o} className={'opt' + cls} onClick={() => choose(o)} disabled={!!result && !isRight && o !== result.given}><span className="radio-dot" aria-hidden="true" /><span className="opt-text">{o}</span></button>;
           })}
         </div>
       )}

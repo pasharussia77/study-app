@@ -36,6 +36,10 @@ export function datedName(name, d = new Date()) {
   const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   return `${name.trim()} – ${iso}`;
 }
+// A project's name without the date that was added when it was made. The saved name is not changed.
+export function shortName(name) {
+  return String(name || '').replace(/\s+[–-]\s+\d{4}-\d{2}-\d{2}$/, '') || String(name || '');
+}
 export function niceDate(ms) {
   if (!ms) return '';
   const d = new Date(ms);
