@@ -8,26 +8,10 @@ import { speak, warm, stopSpeaking, startListening, transcribe, beep, VOICES, ge
 import { useStats, StatsSheet, CardPicker, TypePicker, RoundDone } from './Session.jsx';
 import { diagLog } from './diag.js';
 import { useOverlay, back } from './nav.js';
+import { useWakeLock } from './wakelock.js';
 
 const STATUS_TEXT = { asking: 'Reading the question…', listening: 'Listening… speak your answer', thinking: 'Thinking…', speaking: 'Tutor is speaking…', paused: 'Paused', idle: '' };
 const CANNED = ["Correct!", "Yes, that's right!", 'Nice one!', 'Exactly right!', "I didn't catch that. Please say it again.", 'Please say true or false.', 'Please say the letter, or say the answer.'];
-
-// Keeps the screen on while studying by voice.
-function useWakeLock(active) {
-  useEffect(() => {
-    if (!active || !('wakeLock' in navigator)) return undefined;
-    let sentinel = null, dead = false;
-    const get = async () => { try { sentinel = await navigator.wakeLock.request('screen'); } catch { /* not allowed right now */ } };
-    get();
-    const onVis = () => { if (document.visibilityState === 'visible' && !dead) get(); };
-    document.addEventListener('visibilitychange', onVis);
-    return () => {
-      dead = true;
-      document.removeEventListener('visibilitychange', onVis);
-      if (sentinel && sentinel.release) sentinel.release().catch(() => {});
-    };
-  }, [active]);
-}
 
 export default function Voice({ cards, code, projectId, onExit }) {
   const { sum, sumNow } = useStats(code, projectId, cards);

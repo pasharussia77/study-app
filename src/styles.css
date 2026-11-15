@@ -235,3 +235,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .voicepick { display: flex; align-items: center; gap: 10px; }
 .voicepick select { flex: 1; font: inherit; font-weight: 700; padding: 10px 12px; border-radius: 12px; border: 2px solid var(--line); background: #fff; }
+
+/* ---- speech test ---- */
+.stres { background: #fff; border: 2px solid var(--line); border-radius: 16px; padding: 10px 14px; }
+.stres p { margin: 4px 0; }
+.v { font-size: .75rem; font-weight: 800; padding: 2px 8px; border-radius: 999px; background: var(--line); }
+.v-exact { background: #E3F8F1; color: #0E9F7A; } .v-close { background: #FFF6D6; color: #8A5A00; }
+.v-miss, .v-empty { background: #FFECEA; color: var(--danger); }

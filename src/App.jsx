@@ -5,6 +5,7 @@ import { APP_VERSION } from './version.js';
 import Flashcards from './Flashcards.jsx';
 import Quiz from './Quiz.jsx';
 import Voice from './Voice.jsx';
+import SpeechTest from './SpeechTest.jsx';
 import Sources from './Sources.jsx';
 import ReportSheet from './Report.jsx';
 import { diagClear } from './diag.js';
@@ -68,7 +69,7 @@ export default function App() {
   if (screen === 'profiles') return <Shell><Profiles family={family} code={code} onPick={pickProfile} onLeave={leaveFamily} onAddTest={addTest} /></Shell>;
   if (screen === 'home') return (
     <Shell>
-      <Home code={code} profile={profile} onSwitch={goUp}
+      <Home code={code} profile={profile} onSwitch={goUp} onSpeechTest={() => pushScreen({ screen: 'speechtest', profile })}
         onOpen={(p) => pushScreen({ screen: 'project', profile, project: p })} />
     </Shell>
   );
@@ -79,6 +80,7 @@ export default function App() {
         onReview={() => pushScreen({ screen: 'items', profile, project })} />
     </Shell>
   );
+  if (screen === 'speechtest') return <Shell><SpeechTest code={code} onExit={goUp} /></Shell>;
   if (screen === 'items') return <Shell><Items code={code} projectId={project.id} /></Shell>;
   if (screen === 'study') {
     const Mode = view.mode === 'quiz' ? Quiz : view.mode === 'voice' ? Voice : Flashcards;
@@ -237,7 +239,7 @@ function Profiles({ family, code, onPick, onLeave, onAddTest }) {
   );
 }
 
-function Home({ code, profile, onSwitch, onOpen }) {
+function Home({ code, profile, onSwitch, onOpen, onSpeechTest }) {
   const [projects, setProjects] = useState(null);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
@@ -257,6 +259,13 @@ function Home({ code, profile, onSwitch, onOpen }) {
         <button className="avatar sm" style={{ '--c': profile.color }} onClick={onSwitch} aria-label="Switch person">{profile.name[0].toUpperCase()}</button>
         <h1>{profile.name}'s projects</h1>
       </header>
+      {profile.test && (
+        <div className="testtools">
+          <b>Speech recognition test</b>
+          <p className="muted tiny">A scripted test with the trickiest words, about 5 minutes. It ends with a report to send to Claude.</p>
+          <button className="btn ghost" onClick={onSpeechTest}>Run the speech test</button>
+        </div>
+      )}
       {err && <p className="error" role="alert">{err}</p>}
       {projects && projects.length === 0 && !adding && (
         <div className="empty"><p>No projects yet.</p><p className="muted">Create one, paste your notes, and get flashcards.</p></div>
