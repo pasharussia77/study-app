@@ -31,7 +31,7 @@ export function buildReport({ version, device, health, profile, project, text, p
   files.forEach((f, i) => {
     const added = photoEvents.find((e) => e.fileId === f.id);
     const reading = [...events].reverse().find((e) => e.type === 'photo_read' && e.fileId === f.id);
-    L.push(`Photo ${i + 1}: mode "${NAMES[f.ignore] || f.ignore}", status ${f.status}${f.error ? ' (' + f.error + ')' : ''}${f.page ? `, page graded: ${f.page.graded ? 'yes' : 'no'}${f.page.score ? ', score ' + f.page.score : ''}` : ''}${f.made != null ? ', items made: ' + f.made : ''}`);
+    L.push(`Photo ${i + 1}: mode "${NAMES[f.ignore] || f.ignore}", handwriting: ${f.hand === 'student' ? 'student work' : f.hand === 'key' ? 'answer key' : 'not set (answer key)'}, status ${f.status}${f.error ? ' (' + f.error + ')' : ''}${f.page ? `, page graded: ${f.page.graded ? 'yes' : 'no'}${f.page.score ? ', score ' + f.page.score : ''}` : ''}${f.made != null ? ', items made: ' + f.made : ''}`);
     if (added) L.push(`   original ${kb(added.origBytes || 0)} ${added.origType || ''}, stored as ${added.w}x${added.h} (${kb(added.storedChars || 0)})`);
     if (reading) L.push(`   AI reading: ${reading.ok ? 'ok' : 'FAILED'}, ${sec(reading.ms || 0)}, tokens in/out ${reading.usage?.prompt_tokens ?? '?'}/${reading.usage?.completion_tokens ?? '?'}${reading.made != null ? `, ${reading.made} items (${reading.flagged} need a look)` : ''}`);
   });
@@ -49,7 +49,7 @@ export function buildReport({ version, device, health, profile, project, text, p
   if (rawReads.some((x) => x.type === 'photo_read')) L.push('', `Instruction sent with each picture: mode "${NAMES[(rawReads.find((x) => x.type === 'photo_read') || {}).ignore] || ''}", ${String((rawReads.find((x) => x.type === 'photo_read') || {}).prompt || '').length} characters (the full text is built into this app version).`);
 
   h('3. STUDY ITEMS THE APP BUILT (from photos and typed text)');
-  L.push('Rule: the AI only reports what it sees or what is written (handwritten answers, red X marks, circles, printed keys). The app then decides each correct answer with fixed rules: printed key, then a circled choice, then a red X on a true/false (the other choice), then "no red mark = assumed correct" on a graded page. Anything else has no answer and is flagged.');
+  L.push('Rule: the AI only reports what it sees or what is written (handwritten answers, red X marks, circles, printed keys). The app then decides each correct answer with fixed rules: printed key, then a circled choice, then a red X on a true/false (the other choice), then "no red mark = assumed correct" on a graded page, then on a page without grading the handwriting itself when the reader said it is the answer key (T = True; another word on a true/false line = False plus that correction). Anything else has no answer and is flagged.');
   const types = {};
   items.forEach((i) => { types[i.type] = (types[i.type] || 0) + 1; });
   L.push(`Items: ${items.length} (${Object.entries(types).map(([k, v]) => v + ' ' + k).join(', ') || 'none'}); flagged "needs a look": ${items.filter((i) => i.flagged).length}; without an answer: ${items.filter((i) => !i.answer).length}`);
@@ -63,7 +63,7 @@ export function buildReport({ version, device, health, profile, project, text, p
       const ch = it.choices && it.choices.length ? ' | choices: ' + it.choices.map((c) => c.label + '. ' + one(c.text, 40)).join('; ') : '';
       L.push(`${it.number != null ? '#' + it.number + ' ' : ''}[${it.type}] "${one(it.question, 90)}"${ch}`);
       if (it.type === 'term' || it.type === 'qa') L.push(`      answer: ${it.answer ? one(it.answer, 90) : 'NONE'} | source: ${it.source} | confidence: ${it.confidence}${it.flagged ? ' | NEEDS A LOOK' : ''}${it.note ? ' | note: ' + one(it.note, 140) : ''}`);
-      else L.push(`      student: ${it.studentAnswer ?? '-'} | circled: ${it.circled ?? '-'} | printed key: ${it.printed ?? '-'} | marked wrong: ${it.markedWrong === true ? 'yes' : it.markedWrong === false ? 'no' : 'unsure'} | correct: ${it.answer ? (it.correctLabel ? it.correctLabel + '. ' : '') + one(it.answer, 60) : 'NONE'} | source: ${it.source} | confidence: ${it.confidence}${it.flagged ? ' | NEEDS A LOOK' : ''}${it.note ? ' | note: ' + one(it.note, 140) : ''}`);
+      else L.push(`      student: ${it.studentAnswer ?? '-'} | circled: ${it.circled ?? '-'} | printed key: ${it.printed ?? '-'} | marked wrong: ${it.markedWrong === true ? 'yes' : it.markedWrong === false ? 'no' : 'unsure'} | correct: ${it.answer ? (it.correctLabel ? it.correctLabel + '. ' : '') + one(it.answer, 60) : 'NONE'}${it.correction ? ' | correction: ' + one(it.correction, 60) : ''} | source: ${it.source} | confidence: ${it.confidence}${it.flagged ? ' | NEEDS A LOOK' : ''}${it.note ? ' | note: ' + one(it.note, 140) : ''}`);
     });
   });
   if (!items.length) L.push('No study items yet.');

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { backend } from './firebase.js';
-import { TYPE_LABEL, crossCheck } from './items.js';
+import { TYPE_LABEL, crossCheck, reapplyItem, duplicateGroups } from './items.js';
 import { useOverlay, goUp } from './nav.js';
 import { Icon } from './art.jsx';
 import { ScreenHead } from './Session.jsx';
@@ -8,7 +8,7 @@ import { ScreenHead } from './Session.jsx';
 const SOURCE_LABEL = {
   'printed key': 'Answer given in the material', 'circled by teacher': 'Circled by the teacher',
   'inferred from red X': 'Worked out from the red X', 'assumed correct (no red mark)': 'Assumed correct (no red mark)',
-  page: 'Taken from the page', 'set by you': 'Set by you', none: 'No answer yet'
+  'handwritten answer key': 'Handwritten answer key', page: 'Taken from the page', 'set by you': 'Set by you', none: 'No answer yet'
 };
 
 export default function Items({ code, projectId }) {
@@ -19,10 +19,14 @@ export default function Items({ code, projectId }) {
   const [onlyFlagged, setOnlyFlagged] = useState(false);
   const [editing, setEditing] = useState(null);
   const [photo, setPhoto] = useState(null);
+  const [asking, setAsking] = useState(false); // the "re-apply the rules" question
+  const [working, setWorking] = useState('');
+  const [done, setDone] = useState('');
   useEffect(() => backend.watchItems(code, projectId, setItems), [code, projectId]);
   useEffect(() => backend.watchFiles(code, projectId, setFiles), [code, projectId]);
   useOverlay(!!editing, () => setEditing(null));
   useOverlay(!!photo, () => setPhoto(null));
+  useOverlay(asking, () => setAsking(false));
 
   const groups = useMemo(() => {
     const byFile = new Map();
@@ -39,6 +43,38 @@ export default function Items({ code, projectId }) {
 
   const flaggedCount = items.filter((i) => i.flagged).length;
   const check = useMemo(() => crossCheck(files, items), [files, items]);
+  const dups = useMemo(() => duplicateGroups(items), [items]);
+  const dupCount = dups.reduce((n, g) => n + g.drop.length, 0);
+  const fromPhotos = items.filter((i) => i.fileId !== 'text' && i.source !== 'set by you').length;
+
+  // Works out the answers again from what is already stored. No AI is used.
+  const reapply = async (hand) => {
+    setAsking(false); setDone(''); setWorking('Applying the rules…');
+    const fileById = new Map(files.map((f) => [f.id, f]));
+    let changed = 0, gained = 0;
+    try {
+      for (const f of files) if (f.kind === 'photo' && (f.hand || 'key') !== hand) await backend.updateFile(code, projectId, f.id, { hand });
+      for (const it of items) {
+        const f = fileById.get(it.fileId);
+        const patch = reapplyItem(it, { graded: !!(f && f.page && f.page.graded), hand });
+        if (!patch) continue;
+        await backend.updateItem(code, projectId, it.id, patch);
+        changed++; if (!it.answer && patch.answer) gained++;
+      }
+      setDone(changed ? `Rules applied. ${gained} item${gained === 1 ? '' : 's'} got an answer.` : 'Rules applied. Nothing needed to change.');
+    } catch (e) { setDone('Could not finish: ' + e.message); }
+    setWorking('');
+  };
+
+  const mergeDups = async () => {
+    if (!confirm(`${dupCount} question${dupCount === 1 ? ' appears' : 's appear'} more than once. Keep the best copy of each and delete the other${dupCount === 1 ? '' : 's'}?`)) return;
+    setDone(''); setWorking('Merging duplicates…');
+    try {
+      for (const g of dups) for (const it of g.drop) await backend.deleteItem(code, projectId, it.id);
+      setDone(`Merged. ${dupCount} duplicate${dupCount === 1 ? '' : 's'} removed.`);
+    } catch (e) { setDone('Could not finish: ' + e.message); }
+    setWorking('');
+  };
 
   return (
     <section>
@@ -52,6 +88,15 @@ export default function Items({ code, projectId }) {
           {!check.countOk && ` The sheet has ${check.total} questions and ${check.questions} were found; a page may be missing.`}
         </div>
       )}
+      {dupCount > 0 && (
+        <div className="hint" data-testid="dups">
+          {dupCount} question{dupCount === 1 ? ' appears' : 's appear'} more than once (a page may have been photographed twice).
+          <button className="link inline" disabled={!!working} onClick={mergeDups}>Merge duplicates</button>
+        </div>
+      )}
+      {fromPhotos > 0 && <button className="btn ghost small" disabled={!!working} onClick={() => setAsking(true)} data-testid="reapply">Re-apply the rules</button>}
+      {working && <p className="hint" role="status">{working}</p>}
+      {done && <div className="okmsg" role="status" data-testid="reapply-done">{done}</div>}
       {flaggedCount > 0 && (
         <label className="switch"><Icon name="alert" /><span>Only show items that need a look</span><input type="checkbox" checked={onlyFlagged} onChange={(e) => setOnlyFlagged(e.target.checked)} /></label>
       )}
@@ -81,8 +126,9 @@ export default function Items({ code, projectId }) {
                       {it.choices.map((c) => <li key={c.label} className={c.label === it.correctLabel ? 'right' : ''}>{c.label}. {c.text}{c.label === it.correctLabel ? '  ✓' : ''}</li>)}
                     </ul>
                   )}
+                  {it.type === 'tf' && it.correction && <p className="ichoices-answer" data-testid="correction">Correction: <b>{it.correction}</b></p>}
                   {(it.type === 'term' || it.type === 'qa') && <p className="ichoices-answer">Answer: <b>{it.answer || '—'}</b></p>}
-                  {it.studentAnswer && it.type !== 'term' && it.type !== 'qa' && <p className="muted tiny">Student wrote: {it.studentAnswer}{it.markedWrong ? ' (marked wrong)' : ''}</p>}
+                  {it.studentAnswer && it.type !== 'term' && it.type !== 'qa' && <p className="muted tiny">{it.source === 'handwritten answer key' ? 'Written on the page' : 'Student wrote'}: {it.studentAnswer}{it.markedWrong ? ' (marked wrong)' : ''}</p>}
                   {it.flagged && <p className="needs">Needs a look{it.note ? ': ' + it.note : ''}</p>}
                   <button className="btn ghost small" onClick={() => setEditing(it)}>{it.flagged ? 'Check and fix' : 'Edit'}</button>
                 </li>
@@ -100,6 +146,19 @@ export default function Items({ code, projectId }) {
           <div className="viewer-img"><img src={photo.data} alt="The page" /></div>
         </div>
       )}
+      {asking && (
+        <div className="overlay" onClick={() => setAsking(false)}>
+          <div className="stats-sheet" role="dialog" aria-label="Re-apply the rules" onClick={(e) => e.stopPropagation()}>
+            <h2>Handwriting on the pages is</h2>
+            <p className="muted">The answers are worked out again from what was already read. No AI is used and items you edited stay as they are.</p>
+            <div className="stack">
+              <button className="btn primary" onClick={() => reapply('key')}>The answer key</button>
+              <button className="btn ghost" onClick={() => reapply('student')}>A student&rsquo;s work</button>
+              <button className="link" onClick={() => setAsking(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
       {editing && <EditSheet item={editing} onClose={() => setEditing(null)} code={code} projectId={projectId} />}
     </section>
   );
@@ -111,6 +170,8 @@ function EditSheet({ item, onClose, code, projectId }) {
   const [choices, setChoices] = useState(item.choices || []);
   const [correct, setCorrect] = useState(item.correctLabel);
   const [answer, setAnswer] = useState(item.answer || '');
+  const [correction, setCorrection] = useState(item.correction || '');
+  const falseLabel = item.type === 'tf' ? ((item.choices || []).find((c) => c.text.trim().toLowerCase() === 'false') || {}).label : null;
   const canSave = q.trim() && (isChoice ? !!correct : answer.trim());
 
   const save = async () => {
@@ -119,6 +180,7 @@ function EditSheet({ item, onClose, code, projectId }) {
       patch.choices = choices.map((c) => ({ label: c.label, text: c.text.trim() }));
       patch.correctLabel = correct;
       patch.answer = patch.choices.find((c) => c.label === correct).text;
+      if (item.type === 'tf') patch.correction = correct === falseLabel ? correction.trim() : '';
     } else patch.answer = answer.trim();
     await backend.updateItem(code, projectId, item.id, patch);
     onClose();
@@ -144,7 +206,14 @@ function EditSheet({ item, onClose, code, projectId }) {
               </label>
             ))}
           </fieldset>
-        ) : (
+        ) : null}
+        {isChoice && item.type === 'tf' && correct === falseLabel && (
+          <>
+            <label className="muted tiny" htmlFor="ec">Correction (what makes it true, optional)</label>
+            <input id="ec" className="big-input" value={correction} onChange={(e) => setCorrection(e.target.value)} />
+          </>
+        )}
+        {isChoice ? null : (
           <>
             <label className="muted tiny" htmlFor="ea">{item.type === 'term' ? 'Definition' : 'Answer'}</label>
             <textarea id="ea" className="notes" value={answer} onChange={(e) => setAnswer(e.target.value)} />

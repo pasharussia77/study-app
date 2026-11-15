@@ -28,12 +28,15 @@ export default function Sources({ code, projectId, projectName, canSave, onAppen
   const [busy, setBusy] = useState('');
   const [msg, setMsg] = useState(null); // { kind: 'ok' | 'error', text, review? }
   const [lastIgnore, setLastIgnore] = useState('none');
+  const [hand, setHand] = useState('key'); // what handwriting means: 'key' (answer key) or 'student'
+  const [removing, setRemoving] = useState(null); // photo waiting for the "remove its items too?" choice
   const [viewing, setViewing] = useState(null); // index of the photo shown large
   const cam = useRef(null), gallery = useRef(null), doc = useRef(null);
 
   useEffect(() => backend.watchFiles(code, projectId, setFiles), [code, projectId]);
   useOverlay(pending !== null, () => setPending(null));
   useOverlay(viewing !== null, () => setViewing(null));
+  useOverlay(removing !== null, () => setRemoving(null));
 
   const choosePhotos = (e) => {
     const list = [...e.target.files].filter((f) => f.type.startsWith('image/'));
@@ -47,8 +50,8 @@ export default function Sources({ code, projectId, projectName, canSave, onAppen
       for (let i = 0; i < list.length; i++) {
         setBusy(`Saving photo ${i + 1} of ${list.length}…`);
         const { data, width, height } = await compressImage(list[i]);
-        const id = await backend.addFile(code, projectId, { kind: 'photo', data, ignore, status: 'new' });
-        diagLog(projectId, { type: 'photo_added', fileId: id, ignore, name: list[i].name, origBytes: list[i].size, origType: list[i].type, w: width, h: height, storedChars: data.length });
+        const id = await backend.addFile(code, projectId, { kind: 'photo', data, ignore, hand, status: 'new' });
+        diagLog(projectId, { type: 'photo_added', fileId: id, ignore, hand, name: list[i].name, origBytes: list[i].size, origType: list[i].type, w: width, h: height, storedChars: data.length });
       }
     } catch (e) { setMsg({ kind: 'error', text: e.message }); }
     setBusy('');
@@ -66,7 +69,7 @@ export default function Sources({ code, projectId, projectName, canSave, onAppen
       const ctx = before ? (ctxById.get(before.id) || before.ctx) : null;
       setBusy(`Reading photo ${i + 1} of ${todo.length}…`);
       try {
-        const r = await readPhotoItems(code, f.data, f.ignore, ctx, (e) => diagLog(projectId, { ...e, fileId: f.id }));
+        const r = await readPhotoItems(code, f.data, f.ignore, ctx, (e) => diagLog(projectId, { ...e, fileId: f.id }), f.hand || 'key');
         await backend.replaceItemsForFile(code, projectId, f.id, r.items);
         await backend.updateFile(code, projectId, f.id, { status: 'done', error: '', page: r.page, ctx: r.ctx, made: r.items.length });
         ctxById.set(f.id, r.ctx);
@@ -90,8 +93,16 @@ export default function Sources({ code, projectId, projectName, canSave, onAppen
   };
 
   const removePhoto = async (f) => {
-    const note = f.status === 'done' ? ' The study items already made from it stay.' : '';
-    if (confirm('Remove this photo?' + note)) await backend.deleteFile(code, projectId, f.id);
+    if (f.status === 'done' && f.made > 0) { setRemoving(f); return; }
+    if (confirm('Remove this photo?')) await backend.deleteFile(code, projectId, f.id);
+  };
+  const finishRemove = async (withItems) => {
+    const f = removing; setRemoving(null);
+    try {
+      if (withItems) await backend.replaceItemsForFile(code, projectId, f.id, []);
+      await backend.deleteFile(code, projectId, f.id);
+      diagLog(projectId, { type: 'photo_removed', fileId: f.id, withItems });
+    } catch (e) { setMsg({ kind: 'error', text: e.message }); }
   };
 
   const chooseDoc = async (e) => {
@@ -188,11 +199,31 @@ export default function Sources({ code, projectId, projectName, canSave, onAppen
         );
       })()}
 
+      {removing && (
+        <div className="overlay" onClick={() => setRemoving(null)}>
+          <div className="stats-sheet" role="dialog" aria-label="Remove photo" onClick={(e) => e.stopPropagation()}>
+            <h2>Remove this photo?</h2>
+            <p className="muted">{removing.made} study item{removing.made === 1 ? ' was' : 's were'} made from it.</p>
+            <div className="stack">
+              <button className="btn primary" onClick={() => finishRemove(true)}>Remove photo and its items</button>
+              <button className="btn ghost" onClick={() => finishRemove(false)}>Remove photo, keep items</button>
+              <button className="link" onClick={() => setRemoving(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {pending && (
         <div className="overlay" onClick={() => setPending(null)}>
           <div className="stats-sheet" role="dialog" aria-label="What should be read?" onClick={(e) => e.stopPropagation()}>
             <h2>What should be read?</h2>
             <p className="muted">{pending.length} photo{pending.length > 1 ? 's' : ''} selected</p>
+            <fieldset className="seg hand-seg">
+              <legend>Handwriting on the page is</legend>
+              <button type="button" className={hand === 'key' ? 'on' : ''} aria-pressed={hand === 'key'} onClick={() => setHand('key')}>The answer key</button>
+              <button type="button" className={hand === 'student' ? 'on' : ''} aria-pressed={hand === 'student'} onClick={() => setHand('student')}>A student&rsquo;s work</button>
+            </fieldset>
+            <p className="muted tiny">{hand === 'key' ? 'Handwritten answers are used as the correct answers.' : 'Handwritten answers may be wrong, so they are not used unless the page is graded.'} A page with a score or red X marks is always read as graded work.</p>
             <div className="stack">
               {['none', 'handwriting', 'printed'].map((k) => (
                 <button key={k} className={'btn ' + (k === lastIgnore ? 'primary' : 'ghost')} onClick={() => savePhotos(k)}>

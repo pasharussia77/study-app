@@ -34,8 +34,8 @@ export async function compressImage(source) {
 import { buildPrompt, buildTextPrompt, parseAiJson, resolvePage } from './items.js';
 
 // Reads one photo and returns clean study items plus notes for the next page.
-export async function readPhotoItems(code, dataUrl, ignore = 'none', ctx = null, log = () => {}) {
-  const prompt = buildPrompt(ignore, ctx);
+export async function readPhotoItems(code, dataUrl, ignore = 'none', ctx = null, log = () => {}, hand = 'key') {
+  const prompt = buildPrompt(ignore, ctx, hand);
   const t0 = Date.now();
   let res;
   try {
@@ -52,7 +52,7 @@ export async function readPhotoItems(code, dataUrl, ignore = 'none', ctx = null,
     throw e;
   }
   let result;
-  try { result = resolvePage(parseAiJson(res.text), ctx); }
+  try { result = resolvePage(parseAiJson(res.text), ctx, hand); }
   catch (e) {
     log({ type: 'photo_read', ignore, prompt, ok: false, error: e.message, ms: res.ms, usage: res.usage, raw: res.text });
     throw e;
@@ -61,7 +61,7 @@ export async function readPhotoItems(code, dataUrl, ignore = 'none', ctx = null,
     log({ type: 'photo_read', ignore, prompt, ok: false, error: 'No study items found', ms: res.ms, usage: res.usage, raw: res.text });
     throw new Error('No readable questions or words were found in this picture.');
   }
-  log({ type: 'photo_read', ignore, prompt, ok: true, ms: res.ms, usage: res.usage, raw: res.text,
+  log({ type: 'photo_read', ignore, hand, prompt, ok: true, ms: res.ms, usage: res.usage, raw: res.text,
         made: result.items.length, flagged: result.items.filter((i) => i.flagged).length, page: result.page });
   return result;
 }

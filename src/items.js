@@ -10,13 +10,15 @@ const MODE_RULES = {
   printed: 'The reader chose to IGNORE PRINTED TEXT. The study material is the HANDWRITTEN notes on the page. Turn each handwritten note into an item (a handwritten "word - meaning" is a "term", a handwritten question and answer is a "qa"). Ignore printed text, and set student_answer, marked_wrong and circled_choice to null.'
 };
 
-export function buildPrompt(ignore = 'none', ctx = null) {
+const KEY_RULE = ' The reader says the HANDWRITING on this page is the ANSWER KEY: the correct answers were written in by hand, often in red ink. Record each handwritten answer in student_answer exactly as written (for example "T", "F", a letter, or a word or name). Handwritten answers in red ink are NOT teacher grading: set graded to true only if there is a score or there are red X marks, slashes or check marks beside answers.';
+
+export function buildPrompt(ignore = 'none', ctx = null, hand = 'key') {
   const carry = ctx && (ctx.section || ctx.last_number || ctx.graded)
     ? `\nThe previous page ended in the section "${ctx.section || 'unknown'}" (type ${ctx.type || 'unknown'}) at question number ${ctx.last_number ?? 'unknown'}.${ctx.graded ? ' The earlier pages were graded by a teacher.' : ''} If this page continues that section without repeating the instructions, reuse that section and its type.`
     : '';
   return `You are turning a photo of a school page into study material. Reply with ONLY valid JSON (no markdown, no commentary).
 
-${MODE_RULES[ignore] || MODE_RULES.none}
+${MODE_RULES[ignore] || MODE_RULES.none}${(ignore === 'none' || !MODE_RULES[ignore]) && hand !== 'student' ? KEY_RULE : ''}
 
 A page can mix several kinds of material. Decide the type of EACH item separately and keep the order of the page:
 - "mc": a multiple-choice question with labeled choices.
@@ -101,6 +103,30 @@ function labelFor(value, choices) {
   return byText ? byText.label : null;
 }
 
+// What a handwritten mark on a true/false line means: T is True, F is False,
+// and any other word means False with that word as the correction.
+export function readTrueFalse(value, choices) {
+  const v = str(value);
+  if (!v) return null;
+  const T = choices.find((c) => normalize(c.text) === 'true'), F = choices.find((c) => normalize(c.text) === 'false');
+  const byLabel = labelFor(v, choices);
+  if (byLabel) return { label: byLabel, correction: '' };
+  if (!T || !F) return null;
+  const bare = v.replace(/^[\s"'(]+|[\s"').,;:!]+$/g, '');
+  if (/^(t|true|yes|correct|✓|✔)$/i.test(bare)) return { label: T.label, correction: '' };
+  if (/^(f|false|no)$/i.test(bare)) return { label: F.label, correction: '' };
+  const m = /^(?:f|false)\b[\s.,:;()\-–—]+(.+)$/i.exec(bare);
+  return { label: F.label, correction: (m ? m[1] : bare).trim() };
+}
+
+const REASONS = [
+  'No answer is shown on the page.',
+  'The teacher marked this wrong, but the correct choice is not shown.',
+  'The page has no grading, so the student\u2019s answer may be wrong.',
+  'No answer is marked on the page.',
+  'The handwritten answer does not match any choice.'
+];
+
 // Fixed rules that decide the correct answer from what the AI observed.
 export function resolveItem(raw, page = {}, index = 0) {
   let choices = (Array.isArray(raw.choices) ? raw.choices : []).map((c, i) => ({
@@ -113,30 +139,39 @@ export function resolveItem(raw, page = {}, index = 0) {
   if ((type === 'term' || type === 'qa')) choices = [];
 
   const graded = !!page.graded;
+  // On a page without grading, handwriting is the answer key unless the reader said it is a student's work.
+  const isKey = !graded && page.hand !== 'student';
   const confidence = ['high', 'medium', 'low'].includes(raw.confidence) ? raw.confidence : 'medium';
   const markedWrong = raw.marked_wrong === true ? true : raw.marked_wrong === false ? false : null;
   const out = {
     type, section: str(raw.section), number: raw.number == null ? null : raw.number, question: str(raw.question),
     choices, correctLabel: null, answer: null, source: 'none', studentAnswer: str(raw.student_answer) || null,
-    markedWrong, confidence, note: str(raw.note), order: index, circled: null, printed: null
+    markedWrong, confidence, note: str(raw.note), order: index, circled: null, printed: null,
+    correction: '', aiReview: raw.needs_review === true
   };
   let unknownReason = '';
 
   if (type === 'term' || type === 'qa') {
     const ans = str(raw.answer_text) || str(raw.printed_answer);
-    if (ans) { out.answer = ans; out.source = 'page'; } else unknownReason = 'No answer is shown on the page.';
+    if (ans) { out.answer = ans; out.source = 'page'; }
+    else if (isKey && out.studentAnswer) { out.answer = out.studentAnswer; out.source = 'handwritten answer key'; }
+    else unknownReason = 'No answer is shown on the page.';
   } else {
     const printed = labelFor(raw.printed_answer, choices);
     const circled = labelFor(raw.circled_choice, choices);
-    const student = labelFor(raw.student_answer, choices);
+    const read = type === 'tf' ? readTrueFalse(raw.student_answer, choices) : null;
+    const student = read ? read.label : labelFor(raw.student_answer, choices);
+    const correction = read ? read.correction : '';
     out.circled = circled; out.printed = printed;
     if (printed) { out.correctLabel = printed; out.source = 'printed key'; }
     else if (circled) { out.correctLabel = circled; out.source = 'circled by teacher'; }
     else if (markedWrong === true) {
       if (choices.length === 2 && student) { out.correctLabel = choices.find((c) => c.label !== student).label; out.source = 'inferred from red X'; }
       else unknownReason = 'The teacher marked this wrong, but the correct choice is not shown.';
-    } else if (graded && student) { out.correctLabel = student; out.source = 'assumed correct (no red mark)'; }
+    } else if (graded && student) { out.correctLabel = student; out.source = 'assumed correct (no red mark)'; out.correction = correction; }
+    else if (isKey && student) { out.correctLabel = student; out.source = 'handwritten answer key'; out.correction = correction; }
     else if (!graded && student) unknownReason = 'The page has no grading, so the student\u2019s answer may be wrong.';
+    else if (out.studentAnswer) unknownReason = 'The handwritten answer does not match any choice.';
     else unknownReason = 'No answer is marked on the page.';
     if (out.correctLabel) out.answer = choices.find((c) => c.label === out.correctLabel).text;
   }
@@ -145,9 +180,9 @@ export function resolveItem(raw, page = {}, index = 0) {
   return out;
 }
 
-export function resolvePage(data, prevCtx = null) {
+export function resolvePage(data, prevCtx = null, hand = 'key') {
   // A page with no red marks of its own still counts as graded when the pages before it were.
-  const page = { graded: !!(data.page && data.page.graded) || !!(prevCtx && prevCtx.graded), score: str(data.page && data.page.score) || null };
+  const page = { graded: !!(data.page && data.page.graded) || !!(prevCtx && prevCtx.graded), score: str(data.page && data.page.score) || null, hand: hand === 'student' ? 'student' : 'key' };
   const items = data.items.filter((r) => r && (str(r.question) || str(r.answer_text))).map((r, i) => resolveItem(r, page, i));
   const ends = data.ends_with || {};
   const ctx = { section: str(ends.section), type: str(ends.type), last_number: ends.last_number ?? null, graded: page.graded };
@@ -164,4 +199,49 @@ export function crossCheck(files, items) {
   const wrongFound = items.filter((i) => i.markedWrong === true).length;
   const questions = items.filter((i) => i.type !== 'term').length;
   return { score: scored.page.score, expectedWrong: total - got, wrongFound, questions, total, ok: wrongFound === total - got, countOk: questions === total };
+}
+
+// Works out an item again from what is already stored (no AI). Returns the fields to change, or null to leave it alone.
+export function reapplyItem(it, page = {}) {
+  if (!it || it.source === 'set by you' || it.fileId === 'text') return null;
+  let note = str(it.note);
+  REASONS.forEach((r) => { note = note.split(r).join(''); });
+  note = note.replace(/\s+/g, ' ').trim();
+  const isChoice = it.type === 'tf' || it.type === 'mc';
+  let aiReview = it.aiReview;
+  if (aiReview == null) {
+    // Older items did not store the AI's own "please check" flag, so work it out.
+    const byApp = !it.answer || it.confidence === 'low' || (!!page.graded && it.markedWrong == null && isChoice);
+    aiReview = it.answer ? (!!it.flagged && !byApp) : /unclear|unsure|not sure|smudg|cut off|ambiguous|illegible|hard to read|cannot|can\u2019t|can't|partly|faint/i.test(note);
+  }
+  const r = resolveItem({
+    type: it.type, section: it.section, number: it.number, question: it.question, choices: it.choices,
+    student_answer: it.studentAnswer, marked_wrong: it.markedWrong, circled_choice: it.circled, printed_answer: it.printed,
+    answer_text: !isChoice && it.source === 'page' ? it.answer : null, confidence: it.confidence, note, needs_review: aiReview
+  }, page, it.order ?? 0);
+  const patch = { correctLabel: r.correctLabel, answer: r.answer, source: r.source, note: r.note, flagged: r.flagged, correction: r.correction, aiReview: r.aiReview };
+  const cur = (k) => (k === 'correction' ? it.correction || '' : k === 'aiReview' ? it.aiReview : it[k] ?? null);
+  const same = Object.keys(patch).every((k) => (patch[k] ?? null) === cur(k));
+  return same ? null : patch;
+}
+
+// Finds questions that were read twice (for example one page photographed twice).
+// Each group says which copy to keep (the best one) and which to drop.
+export function duplicateGroups(items) {
+  const groups = new Map();
+  for (const it of items) {
+    const q = normalize(it.question);
+    if (q.length < 4) continue;
+    const key = [it.type, it.number ?? '', q, (it.choices || []).map((c) => normalize(c.text)).join('~')].join('|');
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(it);
+  }
+  const rank = (it) => (it.source === 'set by you' ? 3 : it.answer && !it.flagged ? 2 : it.answer ? 1 : 0);
+  const out = [];
+  for (const list of groups.values()) {
+    if (list.length < 2) continue;
+    const sorted = [...list].sort((a, b) => rank(b) - rank(a) || (a.createdAt ?? 0) - (b.createdAt ?? 0));
+    out.push({ keep: sorted[0], drop: sorted.slice(1) });
+  }
+  return out;
 }

@@ -180,6 +180,7 @@ export default function Quiz({ cards, code, projectId, onExit }) {
           <b>{result.selfChecked ? (result.right ? 'Counted as correct' : 'Counted as missed') : result.overridden ? 'Counted as correct' : result.right ? 'Correct' : 'Not quite'}</b>
           {!result.right && mode === 'type' && !result.selfChecked && <p className="given">You wrote: {result.given}</p>}
           {(!result.right || result.given.trim() !== q.expected) && <p className="answer-line">Answer: <b>{q.expected}</b></p>}
+          {c.correction && <p className="answer-line" data-testid="quiz-correction">Correction: <b>{c.correction}</b></p>}
           <div className="row">
             {!result.right && mode === 'type' && !result.selfChecked && <button className="btn ghost" onClick={override}>I was right</button>}
             <button className="btn primary" onClick={next} data-testid="next">{i + 1 < deck.length ? 'Next' : 'Finish'}</button>
