@@ -11,6 +11,7 @@ import ReportSheet from './Report.jsx';
 import { diagClear } from './diag.js';
 import Items from './Items.jsx';
 import Settings from './Settings.jsx';
+import Worn from './Worn.jsx';
 import FamilySettings from './FamilySettings.jsx';
 import PinSheet from './Pin.jsx';
 import { applyTheme, cleanTheme, DEFAULT_THEME } from './theme.js';
@@ -56,8 +57,7 @@ export default function App() {
   const saveTheme = (id, theme) => {
     const next = { profiles: familyRef.current.profiles.map((x) => (x.id === id ? { ...x, theme } : x)) };
     familyRef.current = next; setFamily(next); store.set('family', next);
-    clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => backend.setProfiles(code, familyRef.current.profiles).catch(() => {}), 400);
+    backend.setProfiles(code, next.profiles).catch(() => {}); // the Colors screen already waits for the dot to settle
   };
   useEffect(() => {
     if (view.screen === 'settings') return; // the settings screen shows its own live choice
@@ -127,7 +127,8 @@ function Crumbs({ items }) {
   );
 }
 
-function Shell({ children }) { return <main className="shell">{children}</main>; }
+// The worn-paper layer is inside the page, so it scrolls with the content.
+function Shell({ children }) { return <main className="shell">{children}<Worn /></main>; }
 
 function Back({ onClick, label = 'Back' }) {
   return <button className="back pill" onClick={onClick} aria-label={label}><Icon name="left" size={20} /> {label}</button>;

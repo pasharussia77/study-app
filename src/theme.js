@@ -1,6 +1,7 @@
 // Colour settings for each student: one of five palettes plus a position on the colour pad.
 //   x (left to right): 0 = black and white, 0.5 (the centre) = the original colours, 1 = brightest and most saturated
 //   y (top to bottom): 0 = warm background, 0.5 = neutral, 1 = cold background
+//   crack: 0 = a clean screen ... 1 = a shattered one (a fake crack that stays fixed on the screen)
 // The whole app is coloured from a few CSS variables set here, so changing them recolours every screen at once.
 
 export const PALETTES = [
@@ -10,7 +11,7 @@ export const PALETTES = [
   { id: 'forest', name: 'Forest', hue: -112 },     // greens
   { id: 'ember', name: 'Ember', hue: 122 }         // coral and orange
 ];
-export const DEFAULT_THEME = { palette: 'twilight', x: 0.5, y: 0.5 };
+export const DEFAULT_THEME = { palette: 'twilight', x: 0.5, y: 0.5, crack: 0 };
 export const BASE_HUE = 257; // hue of the original violet, used to draw the palette swatches
 
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
@@ -19,7 +20,7 @@ export const cleanTheme = (t) => {
   const n = (v, d) => (typeof v === 'number' && isFinite(v) ? clamp(v) : d);
   let x = n(t?.x, DEFAULT_THEME.x); const y = n(t?.y, DEFAULT_THEME.y);
   if (x === 0.6 && y === 0.5) x = DEFAULT_THEME.x; // an earlier version used 0.6 as its "original colours" spot
-  return { palette: p, x, y };
+  return { palette: p, x, y, crack: n(t?.crack, 0) };
 };
 
 /* ---------- colour maths ---------- */
@@ -104,7 +105,9 @@ export function applyTheme(input) {
   set('--bg-glow-a', css(bgTone(GLOW.a[0], t), GLOW.a[1]));
   set('--bg-glow-b', css(bgTone(GLOW.b[0], t), GLOW.b[1]));
   set('--bg-waves', wavesImage(t));
+  set('--k', String(+t.crack.toFixed(3)));
   document.documentElement.classList.toggle('is-worn', wornOf(t.x) > 0.01);
+  document.documentElement.classList.toggle('is-cracked', t.crack > 0.004);
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', skyTopHex());
 }

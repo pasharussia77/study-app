@@ -390,8 +390,10 @@ body { background: var(--bg-sky1, #EAE4FF); }
 body::before { content: ''; position: fixed; inset: 0; z-index: -1; background: var(--bg-waves) bottom / 100% 230px no-repeat, radial-gradient(70% 38% at 100% 0%, var(--bg-glow-a), transparent 70%), radial-gradient(80% 40% at 0% 8%, var(--bg-glow-b), transparent 70%), linear-gradient(180deg, var(--bg-sky0) 0%, var(--bg-sky1) 34%, var(--bg-sky2) 66%, var(--bg-sky3) 100%); }
 
 /* ---- worn look (left side of the colour pad): an old, dirty study book ---- */
-.worn { display: none; position: fixed; inset: 0; width: 100%; height: 100%; z-index: 100; pointer-events: none; }
-.is-worn .worn { display: block; }
+.worn-wrap { display: none; position: absolute; inset: 0; z-index: 5; pointer-events: none; overflow: hidden; }
+.is-worn .worn-wrap { display: block; }
+.worn-wrap > * { position: absolute; left: 0; top: 0; }
+.worn-edge, .worn-grain { width: 100%; height: 100%; }
 .worn-mul { mix-blend-mode: multiply; }
 .worn-edge { box-shadow: inset 0 0 calc(30px + var(--g) * 90px) calc(var(--g) * 6px) rgba(74, 52, 26, calc(var(--g) * .34)); }
 .worn-grain { opacity: calc(var(--g) * .42); mix-blend-mode: multiply; background-size: 300px 300px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .16 0 0 0 0 .12 0 0 0 0 .08 0 0 0 1.5 -.62'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
@@ -467,3 +469,25 @@ body::before { content: ''; position: fixed; inset: 0; z-index: -1; background: 
 @media (prefers-reduced-motion: reduce) { .pin-dots.bad span { animation: none; } }
 
 .version-line { margin: 0; text-align: center; font-size: .68rem; font-weight: 600; color: #000; }
+
+/* ---- fake screen crack: fixed to the glass ---- */
+.crack { display: none; position: fixed; inset: 0; width: 100%; height: 100%; z-index: 110; pointer-events: none; filter: drop-shadow(0 0 1px rgba(0, 0, 0, .35)); }
+.is-cracked .crack { display: block; }
+.ck { fill: none; stroke-linecap: butt; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: calc(1 - clamp(0, (var(--k) - var(--th)) / var(--sp), 1)); }
+.ck-d { stroke: rgba(12, 9, 26, .92); }
+.ck-l { stroke: rgba(255, 255, 255, .85); }
+.crack-chips polygon { fill: rgba(255, 255, 255, .22); stroke: rgba(12, 9, 26, .7); stroke-width: .6; }
+.crack-chips { transform: scale(calc(.55 + var(--k) * 1.4)); opacity: clamp(0, calc(var(--k) * 14), 1); }
+.crack-pit { fill: rgba(12, 9, 26, .9); stroke: rgba(255, 255, 255, .8); stroke-width: .8; }
+.crack-haze { opacity: calc(var(--k) * .5); }
+
+/* ---- the crack slider on the Colors screen ---- */
+.crack-box { background: var(--glass); border: var(--edge); border-radius: 24px; box-shadow: var(--shadow); padding: 14px 16px 10px; display: flex; flex-direction: column; gap: 6px; }
+.crack-head { display: flex; justify-content: space-between; align-items: baseline; }
+.crack-box input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 36px; background: transparent; margin: 0; touch-action: pan-y; }
+.crack-box input[type=range]::-webkit-slider-runnable-track { height: 10px; border-radius: 999px; background: linear-gradient(90deg, #E7E2F8, #8C8AA8); box-shadow: inset 0 1px 2px rgba(40, 30, 120, .2); }
+.crack-box input[type=range]::-moz-range-track { height: 10px; border-radius: 999px; background: linear-gradient(90deg, #E7E2F8, #8C8AA8); }
+.crack-box input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 32px; height: 32px; margin-top: -11px; border-radius: 50%; background: #fff; border: 4px solid var(--violet); box-shadow: 0 4px 10px rgba(40, 30, 120, .3); }
+.crack-box input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border-radius: 50%; background: #fff; border: 4px solid var(--violet); box-shadow: 0 4px 10px rgba(40, 30, 120, .3); }
+.crack-ends { display: flex; justify-content: space-between; font-size: .75rem; font-weight: 700; color: var(--muted); }
+.crack-box .link { align-self: center; font-size: .9rem; padding: 6px 8px; }

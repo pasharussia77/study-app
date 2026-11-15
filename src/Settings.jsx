@@ -3,6 +3,7 @@ import { PALETTES, DEFAULT_THEME, BASE_HUE, applyTheme, cleanTheme } from './the
 import { Icon } from './art.jsx';
 import { ScreenHead } from './Session.jsx';
 import { goUp } from './nav.js';
+import { rerollCrack } from './Crack.jsx';
 
 const clamp = (v) => Math.min(1, Math.max(0, v));
 const r3 = (v) => Math.round(v * 1000) / 1000;
@@ -79,6 +80,14 @@ export default function Settings({ profile, theme: initial, onChange }) {
           ))}
         </div>
       </fieldset>
+
+      <div className="crack-box">
+        <div className="crack-head"><b>Cracked screen</b><span className="muted tiny">{t.crack === 0 ? 'None' : Math.round(t.crack * 100) + '%'}</span></div>
+        <input type="range" min="0" max="100" step="1" value={Math.round(t.crack * 100)} aria-label="Cracked screen"
+          onChange={(e) => update({ ...latest.current, crack: r3(Number(e.target.value) / 100) })} />
+        <div className="crack-ends"><span>Clean</span><span>Shattered</span></div>
+        {t.crack > 0 && <button className="link" onClick={rerollCrack}><Icon name="repeat" size={18} />Move the crack to a new spot</button>}
+      </div>
 
       <button className="btn ghost" disabled={atDefault} onClick={() => update({ ...latest.current, x: DEFAULT_THEME.x, y: DEFAULT_THEME.y })}><Icon name="repeat" />Put the dot back</button>
       <p className="muted tiny center">Saved for {profile.name}. Only {profile.name} sees these colors. The family screens always keep the default colors.</p>
