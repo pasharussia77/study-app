@@ -62,6 +62,9 @@ export function buildSpeechReport({ version, device, results, notes, startedAt }
   const mic = done.find((r) => r.stats && r.stats.mic);
   L.push('Microphone: ' + (mic ? mic.stats.mic : 'unknown'));
   L.push('');
+  L.push('=== YOUR NOTES (written first so a cut-off paste cannot lose them) ===');
+  L.push(notes && notes.trim() ? notes.trim() : '(none)');
+  L.push('');
   L.push('=== SUMMARY ===');
   L.push(`Words asked: ${SPEECH_ITEMS.length}; recorded: ${done.length}; skipped: ${results.length - done.length}; not reached: ${SPEECH_ITEMS.length - results.length}`);
   const a = tally(results, 'verdictWith'), b = tally(results, 'verdictWithout');
@@ -93,8 +96,5 @@ export function buildSpeechReport({ version, device, results, notes, startedAt }
     L.push(`     without hints: "${(r.without && r.without.text) || ''}"${lang(r.without)} -> ${MARK[r.verdictWithout]}`);
     L.push(`     recording: ${((s.durationMs || 0) / 1000).toFixed(1)} s, ${Math.round((s.bytes || 0) / 1024)} KB, loudest ${s.peak}, background ${s.floor}, speech detected: ${s.speech ? 'yes' : 'no'}, ended by: ${s.reason}`);
   });
-  L.push('');
-  L.push('=== TESTER NOTES ===');
-  L.push(notes && notes.trim() ? notes.trim() : '(none)');
   return L.join('\n');
 }

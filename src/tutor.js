@@ -5,11 +5,11 @@ const L = (i) => String.fromCharCode(65 + i);
 
 const sentence = (x) => { const t = String(x).trim(); return /[.?!…]$/.test(t) ? t : t + '.'; };
 export const INTRO = {
-  definition: "I'll say a word. Tell me what it means.",
-  word: "I'll give a definition. Tell me the word.",
-  question: 'Here come some questions. Answer in your own words.',
-  'true/false': 'True or false. Say true or false.',
-  'multiple choice': 'Multiple choice. Say the letter, or the answer.'
+  definition: 'What do these words mean?',
+  word: 'Which word fits each definition?',
+  question: 'Questions.',
+  'true/false': 'True or false questions.',
+  'multiple choice': 'Multiple choice questions.'
 };
 
 // `spoken` is just the question; `intro` explains the kind of question and is said once per run of the same kind.

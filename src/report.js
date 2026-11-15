@@ -21,6 +21,9 @@ export function buildReport({ version, device, health, profile, project, text, p
   if (micLine) L.push('Microphone: ' + micLine.stats.mic);
   L.push('AI helper: ' + (health ? `model ${health.model}, key present: ${health.hasKey ? 'yes' : 'NO'}` : 'could not be checked'));
 
+  h('YOUR NOTES (written first so a cut-off paste cannot lose them)');
+  L.push(notes && notes.trim() ? notes.trim() : '(none)');
+
   h('1. WHAT WAS ADDED');
   const photoEvents = events.filter((e) => e.type === 'photo_added');
   const reads = events.filter((e) => e.type === 'photo_read' && !e.label);
@@ -105,7 +108,5 @@ export function buildReport({ version, device, health, profile, project, text, p
     else if (e.type === 'round_done') L.push(`[${time(e.t)}] ROUND DONE (${e.mode}): ${e.right} right, ${e.wrong} wrong`);
   });
 
-  h('7. TESTER NOTES');
-  L.push(notes && notes.trim() ? notes.trim() : '(none)');
   return L.join('\n');
 }
