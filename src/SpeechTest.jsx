@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { transcribe, startListening, beep } from './voice.js';
+import { transcribe, startListening, beep, primeMic } from './voice.js';
 import { SPEECH_ITEMS, scoreHeard, speechHints, tally, buildSpeechReport } from './speechtest.js';
 import { useOverlay, back } from './nav.js';
 import { useWakeLock } from './wakelock.js';
@@ -61,7 +61,7 @@ export default function SpeechTest({ code, onExit }) {
     }
   };
 
-  const start = () => { resultsRef.current = []; setResults([]); startedAt.current = Date.now(); setNotes(''); setCopied(''); setPhase('run'); run(0); };
+  const start = () => { resultsRef.current = []; setResults([]); startedAt.current = Date.now(); setNotes(''); setCopied(''); setPhase('run'); primeMic().then(() => run(0)); };
   const finishNow = () => { stopAll(); setStatus('idle'); setPhase('done'); };
   const skip = () => { skipFlag.current = true; if (listener.current) listener.current.cancel(); };
   const resume = () => run(resultsRef.current.length);

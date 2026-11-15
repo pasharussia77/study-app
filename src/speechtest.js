@@ -1,5 +1,6 @@
 // A scripted speech-recognition test: the hardest words and phrases for a speaker with an accent.
 import { normalize, isCorrect } from './stats.js';
+import { isEnglishSpeech } from './tutor.js';
 
 const letter = (say, accept) => ({ say, accept, letter: true, group: 'Letters and true/false' });
 const word = (say, group, accept = []) => ({ say, accept, group });
@@ -70,6 +71,8 @@ export function buildSpeechReport({ version, device, results, notes, startedAt }
   const rank = { exact: 3, close: 2, miss: 1, empty: 0 };
   const helped = done.filter((r) => rank[r.verdictWith] > rank[r.verdictWithout]).length;
   const hurt = done.filter((r) => rank[r.verdictWith] < rank[r.verdictWithout]).length;
+  const odd = (k) => done.filter((r) => r[k] && r[k].text && !isEnglishSpeech(r[k].text, r[k].languages)).length;
+  L.push(`Heard as another language, alphabet or letters English does not use: with hints ${odd('withHints')}, without ${odd('without')}.`);
   L.push(`Hints helped on ${helped} words, hurt on ${hurt}, made no difference on ${done.length - helped - hurt}.`);
   L.push('');
   L.push('=== BY GROUP (usable = exact or close; with hints / without hints) ===');

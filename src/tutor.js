@@ -48,7 +48,8 @@ function lev(a, b) {
   }
   return prev[b.length];
 }
-const SPOKEN = { a: 0, b: 1, c: 2, d: 3, e: 4, bee: 1, be: 1, see: 2, sea: 2, dee: 3 };
+// How a letter is often written down when it is spoken: the letter A sounds like "hey" to a recognizer.
+const SPOKEN = { a: 0, hey: 0, hay: 0, ay: 0, aye: 0, eh: 0, ey: 0, b: 1, bee: 1, be: 1, c: 2, see: 2, sea: 2, cee: 2, d: 3, dee: 3, e: 4 };
 const ORDINAL = { first: 0, second: 1, third: 2, fourth: 3, fifth: 4 };
 const clean = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9\s']/g, ' ').replace(/\s+/g, ' ').trim();
 
@@ -62,17 +63,7 @@ export function matchChoice(heard, choices) {
     const hasT = /\btrue\b/.test(t), hasF = /\bfalse\b/.test(t);
     if (hasT !== hasF) return hasT ? iT : iF;
   }
-  const m = t.match(/\b(?:option|letter|choice|answer|number)\s+([a-e]|bee|see|sea|dee)\b/);
-  if (m && SPOKEN[m[1]] < choices.length) return SPOKEN[m[1]];
-  const words = t.split(' ');
-  const FILLER = new Set(['um', 'uh', 'er', 'hmm', 'is', 'its', "it's", 'it', 'the', 'ah', 'oh']);
-  if (words.length <= 2) {
-    // a lone "a" is the letter A only when nothing but a filler word comes with it
-    const w = words.find((x) => x in SPOKEN && (x !== 'a' || words.every((y) => y === 'a' || FILLER.has(y))));
-    if (w !== undefined && SPOKEN[w] < choices.length) return SPOKEN[w];
-  }
-  const o = t.match(/\b(first|second|third|fourth|fifth)\b/);
-  if (o && ORDINAL[o[1]] < choices.length) return ORDINAL[o[1]];
+  // 1. Which choice's words were heard?
   const nt = normalize(heard);
   const hits = [];
   norm.forEach((nc, i) => {
@@ -82,7 +73,22 @@ export function matchChoice(heard, choices) {
     const allHeard = cw.every((w) => tw.some((x) => x === w || (w.length >= 6 && x.length >= 6 && (lev(x, w) <= 2 || x.slice(0, 6) === w.slice(0, 6)))));
     if ((nc.length >= 3 && nt.includes(nc)) || (nt.length >= 5 && nt.length / nc.length >= 0.7 && nc.includes(nt)) || isCorrect(heard, choices[i]) || (cw.length >= 1 && nc.length >= 3 && allHeard)) hits.push(i);
   });
-  return hits.length === 1 ? hits[0] : -1;
+  const byWords = hits.length === 1 ? hits[0] : -1;
+  // 2. Which letter was heard?
+  let byLetter = -1;
+  const m = t.match(/\b(?:option|letter|choice|answer|number)\s+([a-e]|hey|ay|eh|bee|see|sea|dee)\b/);
+  if (m && SPOKEN[m[1]] < choices.length) byLetter = SPOKEN[m[1]];
+  const words = t.split(' ');
+  const FILLER = new Set(['um', 'uh', 'er', 'hmm', 'is', 'its', "it's", 'it', 'the', 'ah', 'oh']);
+  if (byLetter === -1 && words.length <= 2) {
+    // a lone "a" is the letter A only when nothing but a filler word comes with it
+    const w = words.find((x) => x in SPOKEN && (x !== 'a' || words.every((y) => y === 'a' || FILLER.has(y))));
+    if (w !== undefined && SPOKEN[w] < choices.length) byLetter = SPOKEN[w];
+  }
+  if (byLetter === -1) { const o = t.match(/\b(first|second|third|fourth|fifth)\b/); if (o && ORDINAL[o[1]] < choices.length) byLetter = ORDINAL[o[1]]; }
+  // 3. If a letter and a different choice's words disagree ("hey mouse"), the words win.
+  if (byLetter !== -1 && byWords !== -1 && byLetter !== byWords) return byWords;
+  return byLetter !== -1 ? byLetter : byWords;
 }
 
 // Short spoken commands. Only short phrases count, so a real answer is never mistaken for a command.
@@ -113,6 +119,7 @@ If final_attempt is true and the answer is not correct or mostly correct, do not
 In mode "hint": the student chose a wrong option from a list. Do NOT say which option is correct. Give ONE short hint that helps them reason toward it.
 Length: for "correct" use at most 8 words (like "Yes, that's right!"); for "mostly" at most 18 words; for hints at most 25 words.
 If the student says they do not know or are not sure, your hint must be clearly different and more specific than every earlier hint (for example give the first letter, a related fact, or a small example). Never repeat an earlier hint.
+This app is English-only: always reply in English. If the student's words are not English or make no sense as an attempt, use verdict "dont_know" and kindly ask them to answer in English.
 Be kind, never sarcastic, and always use plain spoken language.`;
 
 export function buildTutorMessages(p) {
@@ -135,4 +142,11 @@ export function sttContext(c, qd, deck) {
   if (c.type === 'mc') return { prompt: `${base} The question has lettered choices. The student says a letter (A, B, C or D) or the choice itself. Question: ${qd.shown}`.slice(0, 380), keywords: c.choices.map(short) };
   const vocab = [...new Set(deck.filter((x) => x.type === 'term').map((x) => short(x.term)))].slice(0, 40);
   return { prompt: `${base} Short answers, even a single word, are common. Question: ${qd.shown}`.slice(0, 380), keywords: vocab };
+}
+
+// This app is English-only. Anything that comes back in another alphabet, with letters English does not use,
+// or that the recognizer says is another language, is treated as "not understood".
+export function isEnglishSpeech(text, languages) {
+  if (Array.isArray(languages) && languages.length && !languages.some((l) => String((l && l.code) || l).toLowerCase().startsWith('en'))) return false;
+  return !/[^\u0000-\u007F\u2018\u2019\u201C\u201D\u2013\u2014\u2026]/.test(String(text || ''));
 }

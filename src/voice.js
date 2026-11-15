@@ -86,8 +86,13 @@ export async function beep() {
 
 // Starts recording and stops by itself after the student has finished talking.
 // Returns { promise, stop, cancel }. The promise always gives { blob, ext, stats }; blob is null when nothing was said or it was cancelled.
-export function startListening({ maxMs = 60000, silenceMs = 1500, noSpeechMs = 9000 } = {}) {
+export function startListening({ maxMs = 60000, silenceMs = 1500, noSpeechMs = 15000 } = {}) {
   if (isMock) {
+    if (window.__mockSilent > 0) {
+      window.__mockSilent--;
+      const quiet = { blob: null, ext: 'webm', stats: { durationMs: 15000, bytes: 0, peak: 0.01, floor: 0, threshold: 0.012, speech: false, reason: 'nospeech', mic: 'mock' } };
+      return { promise: Promise.resolve(quiet), stop() {}, cancel() {} };
+    }
     let timer, done;
     const stats = (reason, speech) => ({ durationMs: 1200, bytes: 4, peak: 0.2, floor: 0.01, threshold: 0.03, speech, reason, mic: 'mock' });
     const rec = () => ({ blob: new Blob(['mock'], { type: 'audio/webm' }), ext: 'webm', stats: stats('silence', true) });
@@ -130,7 +135,7 @@ export function startListening({ maxMs = 60000, silenceMs = 1500, noSpeechMs = 9
           if (!speaking && el > noSpeechMs) { reason = 'nospeech'; clearInterval(tick); resolve(); return; }
         }
         if (stopFlag) { reason = 'manual'; clearInterval(tick); resolve(); } else if (cancelFlag) { reason = 'cancel'; clearInterval(tick); resolve(); } else if (el > maxMs) { clearInterval(tick); resolve(); }
-      }, 100);
+      }, 50);
     });
     if (rec.state !== 'inactive') rec.stop();
     await stopped;
@@ -158,4 +163,13 @@ export async function transcribe(code, blob, ext = 'webm', hints = {}) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(explain(res, data, 'speech recognition'));
   return { text: String(data.text || '').trim(), model: data.model || '', languages: data.languages || null };
+}
+
+// Asks for the microphone once, up front, so the phone's permission pop-up never appears in the middle of a question.
+export async function primeMic() {
+  if (isMock) { window.__primed = (window.__primed || 0) + 1; return; }
+  try {
+    const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+    s.getTracks().forEach((t) => t.stop());
+  } catch { /* the real error is shown when recording starts */ }
 }
