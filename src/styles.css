@@ -228,3 +228,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .center { text-align: center; }
 .row.links { justify-content: center; }
 .row.links .link { flex: none; }
+
+.micbox { background: #fff; border: 2px solid var(--line); border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.micbox .row .btn { min-height: 44px; }
+.block { display: block; margin-top: 4px; color: var(--muted); }

@@ -80,7 +80,7 @@ export function matchChoice(heard, choices) {
     const cw = nc.split(' '), tw = nt.split(' ');
     // every word of the choice is heard, allowing a one-letter slip in longer words ("conscious" for "conscience")
     const allHeard = cw.every((w) => tw.some((x) => x === w || (w.length >= 6 && x.length >= 6 && (lev(x, w) <= 2 || x.slice(0, 6) === w.slice(0, 6)))));
-    if ((nc.length >= 3 && nt.includes(nc)) || (nt.length >= 4 && nc.includes(nt)) || isCorrect(heard, choices[i]) || (cw.length >= 1 && nc.length >= 3 && allHeard)) hits.push(i);
+    if ((nc.length >= 3 && nt.includes(nc)) || (nt.length >= 5 && nt.length / nc.length >= 0.7 && nc.includes(nt)) || isCorrect(heard, choices[i]) || (cw.length >= 1 && nc.length >= 3 && allHeard)) hits.push(i);
   });
   return hits.length === 1 ? hits[0] : -1;
 }
@@ -102,7 +102,7 @@ export const praise = (r = Math.random()) => PRAISE[Math.floor(r * PRAISE.length
 export function revealCanned(c, qd) {
   if (c.type === 'tf') return `Not quite. The answer is ${qd.expected}.`;
   if (c.type === 'mc') { const i = c.choices.findIndex((x) => x === c.answer); return `Not quite. The correct answer is ${L(i < 0 ? 0 : i)}, ${c.answer}.`; }
-  return `The answer is: ${qd.expected}`;
+  return `Not quite. The answer is: ${qd.expected}`;
 }
 
 export const TUTOR_SYSTEM = `You are a warm, encouraging voice tutor for a teenager. You judge a SPOKEN answer against the expected answer. The transcript comes from speech recognition, so forgive homophones, missing punctuation and small slips. Never read long lists. Keep every spoken reply to at most 2 short sentences (about 25 words).

@@ -10,8 +10,10 @@ const SOURCE_LABEL = {
 };
 
 export default function Items({ code, projectId }) {
-  const [items, setItems] = useState([]);
-  const [files, setFiles] = useState([]);
+  const [itemsRaw, setItems] = useState(null);
+  const [filesRaw, setFiles] = useState(null);
+  const items = itemsRaw || [], files = filesRaw || [];
+  const loaded = itemsRaw !== null && filesRaw !== null;
   const [onlyFlagged, setOnlyFlagged] = useState(false);
   const [editing, setEditing] = useState(null);
   const [photo, setPhoto] = useState(null);
@@ -40,6 +42,8 @@ export default function Items({ code, projectId }) {
     <section>
       <button className="back" onClick={goUp}><span aria-hidden="true">‹</span> Project</button>
       <h1>Study items</h1>
+      {!loaded ? <p className="muted" data-testid="items-loading">Loading…</p> : (
+      <>
       <p className="muted" data-testid="items-summary">{items.length} item{items.length === 1 ? '' : 's'}{flaggedCount ? ` · ${flaggedCount} need a look` : ' · all look fine'}</p>
       {check && (
         <div className={check.ok && check.countOk ? 'okmsg' : 'hint'} data-testid="crosscheck">
@@ -87,6 +91,8 @@ export default function Items({ code, projectId }) {
         );
       })}
 
+      </>
+      )}
       {photo && (
         <div className="viewer" role="dialog" aria-label="Photo">
           <div className="viewer-top"><button className="chip" onClick={() => setPhoto(null)}>Close</button><span>{`Photo ${files.indexOf(photo) + 1}`}</span></div>
