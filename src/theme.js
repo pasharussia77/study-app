@@ -1,5 +1,5 @@
 // Colour settings for each student: one of five palettes plus a position on the colour pad.
-//   x (left to right): 0 = black and white, 0.6 = the original colours, 1 = brightest and most saturated
+//   x (left to right): 0 = black and white, 0.5 (the centre) = the original colours, 1 = brightest and most saturated
 //   y (top to bottom): 0 = warm background, 0.5 = neutral, 1 = cold background
 // The whole app is coloured from a few CSS variables set here, so changing them recolours every screen at once.
 
@@ -10,14 +10,16 @@ export const PALETTES = [
   { id: 'forest', name: 'Forest', hue: -112 },     // greens
   { id: 'ember', name: 'Ember', hue: 122 }         // coral and orange
 ];
-export const DEFAULT_THEME = { palette: 'twilight', x: 0.6, y: 0.5 };
+export const DEFAULT_THEME = { palette: 'twilight', x: 0.5, y: 0.5 };
 export const BASE_HUE = 257; // hue of the original violet, used to draw the palette swatches
 
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 export const cleanTheme = (t) => {
   const p = PALETTES.some((x) => x.id === t?.palette) ? t.palette : DEFAULT_THEME.palette;
   const n = (v, d) => (typeof v === 'number' && isFinite(v) ? clamp(v) : d);
-  return { palette: p, x: n(t?.x, DEFAULT_THEME.x), y: n(t?.y, DEFAULT_THEME.y) };
+  let x = n(t?.x, DEFAULT_THEME.x); const y = n(t?.y, DEFAULT_THEME.y);
+  if (x === 0.6 && y === 0.5) x = DEFAULT_THEME.x; // an earlier version used 0.6 as its "original colours" spot
+  return { palette: p, x, y };
 };
 
 /* ---------- colour maths ---------- */
@@ -53,9 +55,9 @@ export function T(hex) {
 }
 
 /* ---------- the knob ---------- */
-export const saturationOf = (x) => (x < 0.6 ? clamp((x - 0.04) / 0.56) : 1 + ((x - 0.6) / 0.4) * 0.7);
-export const wornOf = (x) => clamp((0.55 - x) / 0.55);  // how worn and dirty the page looks: starts just left of the default, full at the far left
-export const vividOf = (x) => clamp((x - 0.6) / 0.4);       // how far past the original colours
+export const saturationOf = (x) => (x < 0.5 ? clamp((x - 0.04) / 0.46) : 1 + ((x - 0.5) / 0.5) * 0.7);
+export const wornOf = (x) => clamp((0.45 - x) / 0.45);  // how worn and dirty the page looks: starts just left of the centre, full at the far left
+export const vividOf = (x) => clamp((x - 0.5) / 0.5);       // how far past the original colours
 export const warmthOf = (y) => (0.5 - y) * 2;           // +1 warm (top) ... -1 cold (bottom)
 const hueOf = (t) => (PALETTES.find((p) => p.id === t.palette) || PALETTES[0]).hue;
 
@@ -65,7 +67,7 @@ const WAVES = [['#D9D4FF', 0.55], ['#CFDCFF', 0.6], ['#EFE3FB', 0.8]];
 
 // The page background: follows the palette and the colour amount, and takes the warm or cold tint from the pad.
 function bgTone(hex, t) {
-  const sat = saturationOf(t.x), w = warmthOf(t.y), lift = Math.min(0, (t.x - 0.6) * 5), vivid = vividOf(t.x);
+  const sat = saturationOf(t.x), w = warmthOf(t.y), lift = Math.min(0, (t.x - 0.5) * 5), vivid = vividOf(t.x);
   let [h, s, l] = hexToHsl(hex);
   if (followsPalette(h)) h += hueOf(t);
   h = lerpHue(h, w > 0 ? 30 : 208, Math.abs(w));
@@ -95,7 +97,7 @@ export function applyTheme(input) {
   const set = (k, v) => root.setProperty(k, v);
   set('--hue', String(+(hueOf(t) + warmthOf(t.y) * 8).toFixed(2)));
   set('--sat', String(+saturationOf(t.x).toFixed(3)));
-  set('--lift', String(+Math.min(0, (t.x - 0.6) * 5).toFixed(2)));
+  set('--lift', String(+Math.min(0, (t.x - 0.5) * 5).toFixed(2)));
   set('--vivid', String(+vividOf(t.x).toFixed(3)));
   set('--g', String(+wornOf(t.x).toFixed(3)));
   SKY.forEach((c, i) => set('--bg-sky' + i, css(bgTone(c, t))));
@@ -107,8 +109,6 @@ export function applyTheme(input) {
   if (meta) meta.setAttribute('content', skyTopHex());
 }
 
-try {
-  const saved = JSON.parse(localStorage.getItem('theme'));
-  applyTheme(saved || DEFAULT_THEME);
-} catch { applyTheme(DEFAULT_THEME); }
+// Screens that belong to the whole family always start with the default colours; the app then applies a student's own colours inside their area.
+applyTheme(DEFAULT_THEME);
 if (typeof location !== 'undefined' && location.search.includes('mock')) window.__applyTheme = applyTheme;

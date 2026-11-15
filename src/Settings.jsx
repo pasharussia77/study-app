@@ -81,7 +81,7 @@ export default function Settings({ profile, theme: initial, onChange }) {
       </fieldset>
 
       <button className="btn ghost" disabled={atDefault} onClick={() => update({ ...latest.current, x: DEFAULT_THEME.x, y: DEFAULT_THEME.y })}><Icon name="repeat" />Put the dot back</button>
-      <p className="muted tiny center">Saved for {profile.name}. The main page uses the colors of whoever studied last.</p>
+      <p className="muted tiny center">Saved for {profile.name}. Only {profile.name} sees these colors. The family screens always keep the default colors.</p>
     </section>
   );
 }

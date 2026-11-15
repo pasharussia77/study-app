@@ -11,6 +11,8 @@ import ReportSheet from './Report.jsx';
 import { diagClear } from './diag.js';
 import Items from './Items.jsx';
 import Settings from './Settings.jsx';
+import FamilySettings from './FamilySettings.jsx';
+import PinSheet from './Pin.jsx';
 import { applyTheme, cleanTheme, DEFAULT_THEME } from './theme.js';
 import TextItems, { textHash } from './TextItems.jsx';
 import { useStats, StatsStrip } from './Session.jsx';
@@ -34,10 +36,8 @@ export default function App() {
     (async () => {
       try { await backend.init(); } catch {}
       if (code && family) {
-        const savedProfile = store.get('profileId');
-        const p = savedProfile && family.profiles.find((x) => x.id === savedProfile);
-        // Opening straight into a profile still keeps "who's studying" one Back press below it.
-        startNav(p ? [{ screen: 'profiles' }, { screen: 'home', profile: p }] : [{ screen: 'profiles' }], setView);
+        // The app always opens on the family page, where you choose who is studying.
+        startNav([{ screen: 'profiles' }], setView);
       } else startNav([{ screen: 'welcome' }], setView);
     })();
     // eslint-disable-next-line
@@ -55,14 +55,14 @@ export default function App() {
   const saveTimer = useRef(null);
   const saveTheme = (id, theme) => {
     const next = { profiles: familyRef.current.profiles.map((x) => (x.id === id ? { ...x, theme } : x)) };
-    familyRef.current = next; setFamily(next); store.set('family', next); store.set('theme', theme);
+    familyRef.current = next; setFamily(next); store.set('family', next);
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => backend.setProfiles(code, familyRef.current.profiles).catch(() => {}), 400);
   };
   useEffect(() => {
     if (view.screen === 'settings') return; // the settings screen shows its own live choice
-    if (view.profile && family) { const t = themeOf(view.profile.id); applyTheme(t); store.set('theme', t); }
-    else if (!family && view.screen !== 'loading') applyTheme(DEFAULT_THEME);
+    // A student's own colours show only inside that student's area. Family screens always use the default colours.
+    applyTheme(view.profile && family ? themeOf(view.profile.id) : DEFAULT_THEME);
     // eslint-disable-next-line
   }, [view.screen, view.profile?.id, family]);
 
@@ -72,7 +72,7 @@ export default function App() {
   };
   const leaveFamily = () => {
     ['familyCode', 'family', 'profileId'].forEach(store.del);
-    store.del('theme'); applyTheme(DEFAULT_THEME);
+    applyTheme(DEFAULT_THEME);
     setCode(null); setFamily(null); resetTo({ screen: 'welcome' });
   };
   const addTest = async () => {
@@ -86,9 +86,10 @@ export default function App() {
   const { screen, profile, project } = view;
   if (screen === 'loading') return <Shell><p className="muted center-msg">Loading…</p></Shell>;
   if (screen === 'welcome') return <Shell><Welcome onCreate={() => replaceScreen({ screen: 'create' })} onJoin={() => replaceScreen({ screen: 'join' })} /></Shell>;
-  if (screen === 'create') return <Shell><CreateFamily onBack={() => replaceScreen({ screen: 'welcome' })} onDone={enterFamily} /></Shell>;
-  if (screen === 'join') return <Shell><JoinFamily onBack={() => replaceScreen({ screen: 'welcome' })} onDone={enterFamily} /></Shell>;
-  if (screen === 'profiles') return <Shell><Profiles family={family} code={code} onPick={pickProfile} onLeave={leaveFamily} onAddTest={addTest} /></Shell>;
+  if (screen === 'create') return <Shell><CreateFamily onBack={() => (family ? goUp() : replaceScreen({ screen: 'welcome' }))} onDone={enterFamily} /></Shell>;
+  if (screen === 'join') return <Shell><JoinFamily onBack={() => (family ? goUp() : replaceScreen({ screen: 'welcome' }))} onDone={enterFamily} /></Shell>;
+  if (screen === 'profiles') return <Shell><Profiles family={family} onPick={pickProfile} onSettings={() => pushScreen({ screen: 'family' })} /></Shell>;
+  if (screen === 'family') return <Shell><FamilySettings code={code} family={family} version={APP_VERSION + (isMock ? ' (test mode)' : '')} onCreate={() => replaceScreen({ screen: 'create' })} onJoin={() => replaceScreen({ screen: 'join' })} onLeave={leaveFamily} onAddTest={addTest} /></Shell>;
   if (screen === 'home') return (
     <Shell>
       <Home code={code} profile={profile} onSwitch={goUp} onSettings={() => pushScreen({ screen: 'settings', profile })} onSpeechTest={() => pushScreen({ screen: 'speechtest', profile })}
@@ -234,12 +235,14 @@ function JoinFamily({ onBack, onDone }) {
 
 /* ---------- Profiles and projects ---------- */
 
-function Profiles({ family, code, onPick, onLeave, onAddTest }) {
-  const [show, setShow] = useState(false);
+function Profiles({ family, onPick, onSettings }) {
+  const [pinFor, setPinFor] = useState(null); // the testing account asks for its code first
   const lastId = store.get('profileId'); // the person who studied last on this phone
+  const choose = (p) => (p.test ? setPinFor(p) : onPick(p));
   return (
     <section className="who">
       <Scenery kind="lake" />
+      <button className="gear corner" onClick={onSettings} aria-label="Family settings"><Icon name="gear" size={24} /></button>
       <div className="brand small">
         <BookLogo size={84} />
         <div className="famhead"><Icon name="home" size={18} /><b>Our family</b></div>
@@ -248,25 +251,18 @@ function Profiles({ family, code, onPick, onLeave, onAddTest }) {
       <p className="muted">Tap a name to open that person's projects.</p>
       <div className="tiles">
         {family.profiles.map((p, i) => (
-          <button key={p.id} className={'tile' + (p.test ? ' test' : '') + (p.id === lastId ? ' last' : '')} onClick={() => onPick(p)} style={{ '--c': p.color }}>
+          <button key={p.id} className={'tile' + (p.test ? ' test' : '') + (p.id === lastId ? ' last' : '')} onClick={() => choose(p)} style={{ '--c': p.color }}>
             {p.id === lastId && <span className="tick" aria-hidden="true"><Icon name="check" size={16} /></span>}
             <Avatar kind={avatarKind(p, i)} size={78} />
             <span className="tile-name">{p.name}</span>
-            {p.test && <span className="tag">Testing</span>}
+            {p.test && <span className="tag"><Icon name="lock" size={12} /> Testing</span>}
           </button>
         ))}
       </div>
-      <footer className="foot">
-        {show ? (
-          <>
-            <p className="muted">Family code</p>
-            <p className="code-small">{code}</p>
-            <button className="link danger" onClick={() => { if (confirm('Leave this family on this phone? Your projects stay saved.')) onLeave(); }}>Leave family on this phone</button>
-          </>
-        ) : <button className="link" onClick={() => setShow(true)}>Show family code</button>}
-        {!family.profiles.some((p) => p.test) && <button className="link" onClick={onAddTest}>Add a testing account</button>}
+      <footer className="foot plain">
         <p className="muted tiny">Version {APP_VERSION}{isMock ? ' (test mode)' : ''}</p>
       </footer>
+      {pinFor && <PinSheet name={pinFor.name} onCancel={() => setPinFor(null)} onOk={() => { const p = pinFor; setPinFor(null); setTimeout(() => onPick(p), 200); }} />}
     </section>
   );
 }
