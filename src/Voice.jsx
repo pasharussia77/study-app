@@ -3,7 +3,7 @@ import { backend } from './firebase.js';
 import { shuffle } from './parse.js';
 import { defaultPick, queueFor, normalize } from './stats.js';
 import { askAIDetailed } from './ai.js';
-import { describeQuestion, utterance, maxAttempts, countsRight, matchChoice, detectCommand, quickCorrect, praise, revealCanned, buildTutorMessages, parseTutor, sttContext, isEnglishSpeech } from './tutor.js';
+import { describeQuestion, utterance, maxAttempts, countsRight, matchChoice, detectCommand, quickCorrect, praise, revealCanned, answerLine, buildTutorMessages, parseTutor, sttContext, isEnglishSpeech } from './tutor.js';
 import { speak, warm, stopSpeaking, startListening, transcribe, beep, primeMic, VOICES, getVoice, setVoice } from './voice.js';
 import { useStats, StatsSheet, CardPicker, TypePicker, RoundDone } from './Session.jsx';
 import { diagLog } from './diag.js';
@@ -13,7 +13,7 @@ import { useWakeLock } from './wakelock.js';
 const STATUS_TEXT = { asking: 'Reading the question…', listening: 'Listening… speak your answer', thinking: 'Thinking…', speaking: 'Tutor is speaking…', paused: 'Paused', idle: '' };
 const ENGLISH_LINE = 'I can only understand English. Please say your answer in English.';
 const WAIT_LINE = 'Take your time. Say your answer when you are ready.';
-const CANNED = [WAIT_LINE, ENGLISH_LINE, "Correct!", "Yes, that's right!", 'Nice one!', 'Exactly right!', "I didn't catch that. Please say it again.", 'Please say true or false.', 'Please say the letter, or say the answer.'];
+const CANNED = ['Right.', 'Wrong.', WAIT_LINE, ENGLISH_LINE, "I didn't catch that. Please say it again.", 'True or false?', 'Which one?'];
 
 export default function Voice({ cards, code, projectId, onExit }) {
   const { sum, sumNow } = useStats(code, projectId, cards);
@@ -31,6 +31,7 @@ export default function Voice({ cards, code, projectId, onExit }) {
   const [status, setStatus] = useState('idle');
   const [heard, setHeard] = useState('');
   const [tutor, setTutor] = useState('');
+  const [shown, setShown] = useState('');
   const [attempt, setAttempt] = useState(1);
   const [err, setErr] = useState('');
   const [round, setRound] = useState({ right: 0, wrong: 0 });
@@ -80,11 +81,9 @@ export default function Voice({ cards, code, projectId, onExit }) {
     const last = attemptNo >= maxAttempts(c);
     if (c.type === 'tf' || c.type === 'mc') {
       const idx = matchChoice(text, c.choices);
-      if (idx < 0) return { unclear: true, spoken: c.type === 'tf' ? 'Please say true or false.' : 'Please say the letter, or say the answer.' };
+      if (idx < 0) return { unclear: true, spoken: c.type === 'tf' ? 'True or false?' : 'Which one?' };
       if (normalize(c.choices[idx]) === normalize(c.answer)) return { correct: true, spoken: praise(), verdict: 'correct', rule: true };
-      if (last) return { correct: false, final: true, spoken: revealCanned(c, qd), verdict: 'incorrect', rule: true };
-      const r = await tutorAI({ mode: 'hint', kind: qd.kind, question: qd.shown, choices: c.choices, expected_answer: qd.expected, student_chose: c.choices[idx], previous_hints: hints }, turn);
-      return { correct: false, spoken: r.spoken, verdict: r.verdict };
+      return { correct: false, final: true, spoken: revealCanned(c, qd), display: answerLine(c), verdict: 'incorrect', rule: true };
     }
     if (quickCorrect(text, qd.expected)) return { correct: true, spoken: praise(), verdict: 'correct', rule: true };
     const r = await tutorAI({ mode: 'grade', kind: qd.kind, question: qd.shown, expected_answer: qd.expected, student_said: text, attempt: attemptNo, final_attempt: last, previous_hints: hints }, turn);
@@ -92,7 +91,8 @@ export default function Voice({ cards, code, projectId, onExit }) {
     const ok = r.verdict === 'correct' || (r.verdict === 'mostly' && qd.expected.trim().split(/\s+/).length > 3);
     // On the last try the app says the answer itself, so it never depends on the AI remembering to.
     if (!ok && last) return { correct: false, final: true, spoken: revealCanned(c, qd), verdict: r.verdict };
-    return { correct: ok, spoken: r.spoken, verdict: r.verdict };
+    // A plain "correct" is just "Right."; "almost" keeps the tutor's note about what was missing.
+    return { correct: ok, spoken: r.verdict === 'correct' ? praise() : r.spoken, verdict: r.verdict };
   };
 
   const settle = (c, qd, outcome, turn) => {
@@ -116,7 +116,7 @@ export default function Voice({ cards, code, projectId, onExit }) {
     try {
       for (let idx = startIdx; idx < deckRef.current.length; idx++) {
         if (!live()) return;
-        iRef.current = idx; setI(idx); setHeard(''); setTutor(''); setAttempt(1);
+        iRef.current = idx; setI(idx); setHeard(''); setTutor(''); setShown(''); setAttempt(1);
         const c = deckRef.current[idx];
         const qd = describeQuestion(c, cfg.current.ask);
         const turn = newTurn();
@@ -190,7 +190,7 @@ export default function Voice({ cards, code, projectId, onExit }) {
           setStatus('thinking');
           const res = await judge(c, qd, text, attemptNo, hints, turn);
           if (!live()) return;
-          setTutor(res.spoken); setStatus('speaking');
+          setTutor(res.spoken); setShown(res.display || ''); setStatus('speaking');
           await speak(code, res.spoken, cost, onStart);
           if (!live()) return;
           if (!res.unclear) diagLog(projectId, { type: 'voice_turn', question: qd.shown, expected: qd.expected, attempt: attemptNo, heard: text, verdict: res.verdict, tutor: res.spoken, correct: !!res.correct, byRule: !!res.rule, gapMs: turn.m.gap, sttMs: turn.m.stt, aiMs: turn.m.ai, ttsMs: turn.m.tts });
@@ -332,6 +332,7 @@ export default function Voice({ cards, code, projectId, onExit }) {
       </div>
       {heard && <p className="said" data-testid="heard">You said: “{heard}”</p>}
       {tutor && <p className="tutor" data-testid="tutor">{tutor}</p>}
+      {shown && <p className="answer-shown" data-testid="answer-shown">{shown}</p>}
       {attempt > 1 && <p className="muted tiny center">Hint {attempt - 1}</p>}
       {err && <div className="error" role="alert">{err}</div>}
       <div className="row nav">

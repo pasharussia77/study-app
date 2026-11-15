@@ -34,8 +34,8 @@ export function quickCorrect(heard, expected) {
   return eWords.length <= 3 && hWords.length <= 8 && !negated && ` ${h} `.includes(` ${e} `);
 }
 
-// Tries per kind: true/false has one, multiple choice two, spoken answers three.
-export const maxAttempts = (c) => (c.type === 'tf' ? 1 : c.type === 'mc' ? 2 : 3);
+// Tries per kind: choosing (true/false, multiple choice) has one, spoken answers three.
+export const maxAttempts = (c) => (c.type === 'tf' || c.type === 'mc' ? 1 : 3);
 // Counts as "right" (done) only if no real help was needed.
 export const countsRight = (c, attempt) => (c.type === 'tf' || c.type === 'mc' ? attempt === 1 : attempt <= 2);
 
@@ -102,13 +102,21 @@ export function detectCommand(heard) {
   return null;
 }
 
-const PRAISE = ['Correct!', "Yes, that's right!", 'Nice one!', 'Exactly right!'];
-export const praise = (r = Math.random()) => PRAISE[Math.floor(r * PRAISE.length) % PRAISE.length];
+// Short and plain: one word for a right answer, one for a wrong one.
+export const RIGHT = 'Right.';
+export const WRONG = 'Wrong.';
+export const praise = () => RIGHT;
 
 export function revealCanned(c, qd) {
-  if (c.type === 'tf') return `Not quite. The answer is ${qd.expected}.`;
-  if (c.type === 'mc') { const i = c.choices.findIndex((x) => x === c.answer); return `Not quite. The correct answer is ${L(i < 0 ? 0 : i)}, ${c.answer}.`; }
-  return `Not quite. The answer is: ${qd.expected}`;
+  if (c.type === 'tf' || c.type === 'mc') return WRONG;
+  return `${WRONG} The answer is: ${qd.expected}`;
+}
+
+// Shown on screen (not spoken) after a wrong choice.
+export function answerLine(c) {
+  if (c.type === 'tf') return `Answer: ${c.answer}`;
+  const i = c.choices.findIndex((x) => x === c.answer);
+  return `Answer: ${String.fromCharCode(65 + (i < 0 ? 0 : i))}. ${c.answer}`;
 }
 
 export const TUTOR_SYSTEM = `You are a warm, encouraging voice tutor for a teenager. You judge a SPOKEN answer against the expected answer. The transcript comes from speech recognition, so forgive homophones, missing punctuation and small slips. Never read long lists. Keep every spoken reply to at most 2 short sentences (about 25 words).

@@ -242,3 +242,5 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .v { font-size: .75rem; font-weight: 800; padding: 2px 8px; border-radius: 999px; background: var(--line); }
 .v-exact { background: #E3F8F1; color: #0E9F7A; } .v-close { background: #FFF6D6; color: #8A5A00; }
 .v-miss, .v-empty { background: #FFECEA; color: var(--danger); }
+
+.answer-shown { margin: 0; text-align: center; font-weight: 900; color: #0E9F7A; background: #E3F8F1; border-radius: 14px; padding: 10px 14px; }
