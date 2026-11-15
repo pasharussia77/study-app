@@ -3,38 +3,25 @@ import { backend } from './firebase.js';
 import { shuffle } from './parse.js';
 import { defaultPick, queueFor, normalize } from './stats.js';
 import { askAIDetailed } from './ai.js';
-import { describeQuestion, utterance, maxAttempts, countsRight, matchChoice, detectCommand, quickCorrect, praise, revealCanned, buildTutorMessages, parseTutor } from './tutor.js';
-import { speak, warm, stopSpeaking, startListening, transcribe, beep } from './voice.js';
+import { describeQuestion, utterance, maxAttempts, countsRight, matchChoice, detectCommand, quickCorrect, praise, revealCanned, answerLine, buildTutorMessages, parseTutor, sttContext, isEnglishSpeech } from './tutor.js';
+import { speak, warm, stopSpeaking, startListening, transcribe, beep, primeMic, VOICES, getVoice, setVoice } from './voice.js';
 import { useStats, StatsSheet, CardPicker, TypePicker, RoundDone, ScreenHead, PlayTop } from './Session.jsx';
 import { Icon, Scenery, TileArt } from './art.jsx';
 import { diagLog } from './diag.js';
 import { useOverlay, back } from './nav.js';
+import { useWakeLock } from './wakelock.js';
 
 const STATUS_TEXT = { asking: 'Reading the question…', listening: 'Listening… speak your answer', thinking: 'Thinking…', speaking: 'Tutor is speaking…', paused: 'Paused', idle: '' };
-const CANNED = ["Correct!", "Yes, that's right!", 'Nice one!', 'Exactly right!', "I didn't catch that. Please say it again.", 'Please say true or false.', 'Please say the letter, or say the answer.'];
-
-// Keeps the screen on while studying by voice.
-function useWakeLock(active) {
-  useEffect(() => {
-    if (!active || !('wakeLock' in navigator)) return undefined;
-    let sentinel = null, dead = false;
-    const get = async () => { try { sentinel = await navigator.wakeLock.request('screen'); } catch { /* not allowed right now */ } };
-    get();
-    const onVis = () => { if (document.visibilityState === 'visible' && !dead) get(); };
-    document.addEventListener('visibilitychange', onVis);
-    return () => {
-      dead = true;
-      document.removeEventListener('visibilitychange', onVis);
-      if (sentinel && sentinel.release) sentinel.release().catch(() => {});
-    };
-  }, [active]);
-}
+const ENGLISH_LINE = 'I can only understand English. Please say your answer in English.';
+const WAIT_LINE = 'Take your time. Say your answer when you are ready.';
+const CANNED = ['Right.', 'Wrong.', WAIT_LINE, ENGLISH_LINE, "I didn't catch that. Please say it again.", 'True or false?', 'Which one?'];
 
 export default function Voice({ cards, code, projectId, onExit }) {
   const { sum, sumNow } = useStats(code, projectId, cards);
   const [phase, setPhase] = useState('setup');
   const [ask, setAsk] = useState('term');
   const [readAloud, setReadAloud] = useState(true);
+  const [voice, setVoiceState] = useState(getVoice());
   const [mic, setMic] = useState(null);       // result of the microphone test
   const [voiceTest, setVoiceTest] = useState('');
   const [mix, setMix] = useState(true);
@@ -45,6 +32,7 @@ export default function Voice({ cards, code, projectId, onExit }) {
   const [status, setStatus] = useState('idle');
   const [heard, setHeard] = useState('');
   const [tutor, setTutor] = useState('');
+  const [shown, setShown] = useState('');
   const [attempt, setAttempt] = useState(1);
   const [err, setErr] = useState('');
   const [round, setRound] = useState({ right: 0, wrong: 0 });
@@ -94,18 +82,18 @@ export default function Voice({ cards, code, projectId, onExit }) {
     const last = attemptNo >= maxAttempts(c);
     if (c.type === 'tf' || c.type === 'mc') {
       const idx = matchChoice(text, c.choices);
-      if (idx < 0) return { unclear: true, spoken: c.type === 'tf' ? 'Please say true or false.' : 'Please say the letter, or say the answer.' };
+      if (idx < 0) return { unclear: true, spoken: c.type === 'tf' ? 'True or false?' : 'Which one?' };
       if (normalize(c.choices[idx]) === normalize(c.answer)) return { correct: true, spoken: praise(), verdict: 'correct', rule: true };
-      if (last) return { correct: false, final: true, spoken: revealCanned(c, qd), verdict: 'incorrect', rule: true };
-      const r = await tutorAI({ mode: 'hint', kind: qd.kind, question: qd.shown, choices: c.choices, expected_answer: qd.expected, student_chose: c.choices[idx], previous_hints: hints }, turn);
-      return { correct: false, spoken: r.spoken, verdict: r.verdict };
+      return { correct: false, final: true, spoken: revealCanned(c, qd), display: answerLine(c), verdict: 'incorrect', rule: true };
     }
     if (quickCorrect(text, qd.expected)) return { correct: true, spoken: praise(), verdict: 'correct', rule: true };
     const r = await tutorAI({ mode: 'grade', kind: qd.kind, question: qd.shown, expected_answer: qd.expected, student_said: text, attempt: attemptNo, final_attempt: last, previous_hints: hints }, turn);
-    const ok = r.verdict === 'correct' || r.verdict === 'mostly';
+    // "Almost" only counts for longer answers; a one-word answer is either right or it needs a hint.
+    const ok = r.verdict === 'correct' || (r.verdict === 'mostly' && qd.expected.trim().split(/\s+/).length > 3);
     // On the last try the app says the answer itself, so it never depends on the AI remembering to.
     if (!ok && last) return { correct: false, final: true, spoken: revealCanned(c, qd), verdict: r.verdict };
-    return { correct: ok, spoken: r.spoken, verdict: r.verdict };
+    // A plain "correct" is just "Right."; "almost" keeps the tutor's note about what was missing.
+    return { correct: ok, spoken: r.verdict === 'correct' ? praise() : r.spoken, verdict: r.verdict };
   };
 
   const settle = (c, qd, outcome, turn) => {
@@ -129,7 +117,7 @@ export default function Voice({ cards, code, projectId, onExit }) {
     try {
       for (let idx = startIdx; idx < deckRef.current.length; idx++) {
         if (!live()) return;
-        iRef.current = idx; setI(idx); setHeard(''); setTutor(''); setAttempt(1);
+        iRef.current = idx; setI(idx); setHeard(''); setTutor(''); setShown(''); setAttempt(1);
         const c = deckRef.current[idx];
         const qd = describeQuestion(c, cfg.current.ask);
         const turn = newTurn();
@@ -145,7 +133,7 @@ export default function Voice({ cards, code, projectId, onExit }) {
         // While the student answers, get the next question's audio ready.
         const next = deckRef.current[idx + 1];
         if (next && cfg.current.readAloud) { const nq = describeQuestion(next, cfg.current.ask); warm(code, utterance(nq, nq.kind !== qd.kind)); }
-        let attemptNo = 1, unclear = 0, outcome = null;
+        let attemptNo = 1, unclear = 0, silent = 0, outcome = null;
         const hints = [];
         while (live()) {
           turn.m = { stt: 0, ai: 0, tts: 0, gap: null };
@@ -158,23 +146,41 @@ export default function Voice({ cards, code, projectId, onExit }) {
           listener.current = null;
           if (!live()) return;
           const tEnd = Date.now();
-          let text = '';
+          let text = '', heardInfo = {};
+          const stt = sttContext(c, qd, deckRef.current);
           if (rec.blob) {
             setStatus('thinking');
             turn.recordings++;
-            text = await transcribe(code, rec.blob, rec.ext);
+            heardInfo = await transcribe(code, rec.blob, rec.ext, stt);
+            text = heardInfo.text;
             turn.m.stt = Date.now() - tEnd; turn.sttMs += turn.m.stt;
             if (!live()) return;
           }
           setHeard(text);
           const onStart = () => { if (turn.m.gap === null) turn.m.gap = Date.now() - tEnd; };
-          const logHeard = (outcome) => diagLog(projectId, { type: 'voice_heard', text, outcome, sttMs: turn.m.stt, stats: rec.stats });
+          const logHeard = (outcome) => diagLog(projectId, { type: 'voice_heard', text, outcome, sttMs: turn.m.stt, stats: rec.stats, sttModel: heardInfo.model, languages: heardInfo.languages, hints: stt.keywords.length });
           if (!text) {
-            logHeard(rec.blob ? 'the recording was transcribed as empty' : 'no speech detected');
+            if (!rec.blob) {
+              // Nothing was said at all: the student is probably thinking, so wait kindly instead of complaining.
+              logHeard('no speech detected');
+              silent++;
+              if (silent >= 4) throw new Error('I could not hear you. Check the microphone, then tap Resume.');
+              setTutor(WAIT_LINE); setStatus('speaking'); await speak(code, WAIT_LINE, cost, onStart); if (!live()) return;
+              continue;
+            }
+            logHeard('the recording was transcribed as empty');
             unclear++;
             if (unclear >= 2) throw new Error('I could not hear you. Check the microphone, then tap Resume.');
             const m = "I didn't catch that. Please say it again.";
             setTutor(m); setStatus('speaking'); await speak(code, m, cost, onStart); if (!live()) return;
+            continue;
+          }
+          silent = 0;
+          if (!isEnglishSpeech(text, heardInfo.languages)) {
+            logHeard('not English (other alphabet, other letters, or another language)');
+            unclear++;
+            if (unclear >= 3) throw new Error('I could not understand you in English. Check the microphone, then tap Resume.');
+            setTutor(ENGLISH_LINE); setStatus('speaking'); await speak(code, ENGLISH_LINE, cost, onStart); if (!live()) return;
             continue;
           }
           const cmd = detectCommand(text);
@@ -185,7 +191,7 @@ export default function Voice({ cards, code, projectId, onExit }) {
           setStatus('thinking');
           const res = await judge(c, qd, text, attemptNo, hints, turn);
           if (!live()) return;
-          setTutor(res.spoken); setStatus('speaking');
+          setTutor(res.spoken); setShown(res.display || ''); setStatus('speaking');
           await speak(code, res.spoken, cost, onStart);
           if (!live()) return;
           if (!res.unclear) diagLog(projectId, { type: 'voice_turn', question: qd.shown, expected: qd.expected, attempt: attemptNo, heard: text, verdict: res.verdict, tutor: res.spoken, correct: !!res.correct, byRule: !!res.rule, gapMs: turn.m.gap, sttMs: turn.m.stt, aiMs: turn.m.ai, ttsMs: turn.m.tts });
@@ -230,22 +236,22 @@ export default function Voice({ cards, code, projectId, onExit }) {
     // Get the standard replies ready so they play without a wait.
     CANNED.forEach((t) => warm(code, t));
     setPhase('play');
-    run(0);
+    primeMic().then(() => run(0));
   };
   const testMic = async () => {
     setMic({ busy: 'Say a sentence, like: "The quick brown fox jumps over the lazy dog."' });
     try {
       await beep();
       const rec = await startListening().promise;
-      let text = '';
-      if (rec.blob) { setMic({ busy: 'Hearing you…' }); text = await transcribe(code, rec.blob, rec.ext); }
-      diagLog(projectId, { type: 'voice_heard', text, outcome: 'microphone test', stats: rec.stats });
-      setMic({ text, stats: rec.stats });
+      let text = '', info = {};
+      if (rec.blob) { setMic({ busy: 'Hearing you…' }); info = await transcribe(code, rec.blob, rec.ext, { prompt: 'A student is testing a microphone by saying a sentence in English.' }); text = info.text; }
+      diagLog(projectId, { type: 'voice_heard', text, outcome: 'microphone test', stats: rec.stats, sttModel: info.model, languages: info.languages, hints: 0 });
+      setMic({ text, stats: rec.stats, languages: info.languages });
     } catch (e) { setMic({ error: e.message }); }
   };
   const testVoice = async () => {
     setVoiceTest('Speaking…');
-    try { await speak(code, 'Hello! This is how your tutor sounds. Can you understand me clearly?'); setVoiceTest('If the voice was clear and easy to understand, you are ready.'); }
+    try { await speak(code, 'Hello! This is how your tutor sounds. Can you understand me clearly?'); setVoiceTest('If this voice sounds friendly and clear, you are ready. If not, pick another voice above and test again.'); }
     catch (e) { setVoiceTest(e.message); }
   };
   const reset = async () => { await backend.resetStats(code, projectId); setKind('all'); start('all'); };
@@ -277,6 +283,12 @@ export default function Voice({ cards, code, projectId, onExit }) {
       </label>
       <div className="micbox">
         <b>Check the sound first</b>
+        <label className="voicepick">
+          <span className="muted tiny">Tutor voice</span>
+          <select value={voice} aria-label="Tutor voice" onChange={(e) => { setVoice(e.target.value); setVoiceState(e.target.value); }}>
+            {VOICES.map((n) => <option key={n} value={n}>{n[0].toUpperCase() + n.slice(1)}</option>)}
+          </select>
+        </label>
         <div className="row">
           <button className="btn ghost small" onClick={testMic} disabled={!!(mic && mic.busy)}><Icon name="mic" size={18} />Test my microphone</button>
           <button className="btn ghost small" onClick={testVoice}><Icon name="speaker" size={18} />Test the tutor voice</button>
@@ -286,6 +298,7 @@ export default function Voice({ cards, code, projectId, onExit }) {
         {mic && !mic.busy && !mic.error && (
           <p className="okmsg" data-testid="mictest">
             {mic.text ? <>I heard: “{mic.text}”</> : 'I heard nothing.'}
+            {mic.text && !isEnglishSpeech(mic.text, mic.languages) && <span className="tiny block">That does not look like English, so the app would ask you to repeat it.</span>}
             <span className="tiny block">Recording {(mic.stats.durationMs / 1000).toFixed(1)} s · loudest {mic.stats.peak} · background {mic.stats.floor} · {mic.stats.speech ? 'speech detected' : 'no speech detected'}</span>
           </p>
         )}
@@ -318,6 +331,7 @@ export default function Voice({ cards, code, projectId, onExit }) {
       </div>
       {heard && <p className="said" data-testid="heard">You said: “{heard}”</p>}
       {tutor && <p className="tutor" data-testid="tutor">{tutor}</p>}
+      {shown && <p className="answer-shown" data-testid="answer-shown">{shown}</p>}
       {attempt > 1 && <p className="muted tiny center">Hint {attempt - 1}</p>}
       {err && <div className="error" role="alert">{err}</div>}
       <div className="row nav">
@@ -325,6 +339,8 @@ export default function Voice({ cards, code, projectId, onExit }) {
           ? <button className="btn primary" onClick={resume}><Icon name="play" />Resume</button>
           : <button className="btn ghost" onClick={pause}><Icon name="pause" />Pause</button>}
         {status === 'listening' && <button className="btn primary" onClick={() => listener.current && listener.current.stop()}><Icon name="check" />Done talking</button>}
+        {status === 'asking' && <button className="btn primary" onClick={() => stopSpeaking()}><Icon name="mic" />Answer now</button>}
+        {status === 'speaking' && <button className="btn ghost" onClick={() => stopSpeaking()}><Icon name="skip" />Skip talking</button>}
       </div>
       <div className="row links">
         <button className="link" onClick={repeatQ}><Icon name="repeat" size={18} />Repeat question</button>

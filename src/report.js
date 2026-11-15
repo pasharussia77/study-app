@@ -17,7 +17,12 @@ export function buildReport({ version, device, health, profile, project, text, p
   L.push('Account: ' + profile.name + (profile.test ? ' (testing account)' : ''));
   L.push(`Project: ${project.name}`);
   L.push('Device: ' + device);
+  const micLine = [...events].reverse().find((e) => e.type === 'voice_heard' && e.stats && e.stats.mic);
+  if (micLine) L.push('Microphone: ' + micLine.stats.mic);
   L.push('AI helper: ' + (health ? `model ${health.model}, key present: ${health.hasKey ? 'yes' : 'NO'}` : 'could not be checked'));
+
+  h('YOUR NOTES (written first so a cut-off paste cannot lose them)');
+  L.push(notes && notes.trim() ? notes.trim() : '(none)');
 
   h('1. WHAT WAS ADDED');
   const photoEvents = events.filter((e) => e.type === 'photo_added');
@@ -79,20 +84,29 @@ export function buildReport({ version, device, health, profile, project, text, p
     const sum = (k) => voiceRes.reduce((a, e) => a + (e[k] || 0), 0);
     L.push(`Voice usage in this log: ${sum('recordings')} recordings (${(sum('sttMs') / 1000).toFixed(0)} s waiting on transcription), ${sum('ttsChars')} characters spoken by the tutor voice, AI tokens in/out ${sum('aiIn')}/${sum('aiOut')}.`);
   }
-  const study = events.filter((e) => ['session_start', 'answer', 'override', 'round_done', 'voice_turn', 'voice_result', 'voice_visibility', 'voice_heard'].includes(e.type)).slice(-90);
+  const study = events.filter((e) => ['session_start', 'answer', 'override', 'round_done', 'voice_turn', 'voice_result', 'voice_visibility', 'voice_heard'].includes(e.type)).slice(-70);
+  const rec = (s) => (s ? `${(s.durationMs / 1000).toFixed(1)} s, loudest ${s.peak}, background ${s.floor}, speech: ${s.speech ? 'yes' : 'no'}, ended: ${s.reason}` : '');
+  const reco = (e) => (e.sttModel ? ` | recognizer: ${e.sttModel}${e.languages && e.languages.length ? ' (heard as ' + e.languages.map((l) => l.code).join(',') + ')' : ''}, ${e.hints} hint words` : '');
   if (!study.length) L.push('No flashcard or quiz activity recorded yet.');
-  study.forEach((e) => {
+  study.forEach((e, k) => {
     if (e.type === 'session_start') L.push(`[${time(e.t)}] START ${e.mode}: shows ${e.shows}${e.how ? ', answers by ' + e.how : ''}, cards: ${e.pick}, shuffle ${e.shuffle ? 'on' : 'off'}, ${e.deckSize} in this round`);
     else if (e.type === 'answer') L.push(`[${time(e.t)}] ${e.mode} | Q: "${one(e.question, 90)}" | correct answer: "${one(e.expected, 90)}"${e.given != null ? ' | given: "' + one(e.given, 90) + '"' : ''} | ${e.correct ? 'RIGHT' : 'WRONG'}`);
-    else if (e.type === 'voice_turn') L.push(`[${time(e.t)}] voice | Q: "${one(e.question, 80)}" | expected: "${one(e.expected, 80)}" | try ${e.attempt} | heard: "${one(e.heard, 120)}" | ${e.byRule ? 'rule' : 'AI'} verdict: ${e.verdict} | tutor said: "${one(e.tutor, 140)}"${e.gapMs != null ? ` | pause after you stopped talking: ${(e.gapMs / 1000).toFixed(1)} s (hearing ${(e.sttMs / 1000).toFixed(1)}, AI ${(e.aiMs / 1000).toFixed(1)}, voice ${(e.ttsMs / 1000).toFixed(1)})` : ''}`);
+    else if (e.type === 'voice_turn') {
+      // The recording line that follows a judged answer is folded into this one.
+      const next = study[k + 1];
+      const folded = next && next.type === 'voice_heard' && next.outcome === 'judged' && next.text === e.heard ? next : null;
+      L.push(`[${time(e.t)}] voice | Q: "${one(e.question, 80)}" | expected: "${one(e.expected, 80)}" | try ${e.attempt} | heard: "${one(e.heard, 120)}" | ${e.byRule ? 'rule' : 'AI'} verdict: ${e.verdict} | tutor said: "${one(e.tutor, 140)}"${e.gapMs != null ? ` | pause after you stopped talking: ${(e.gapMs / 1000).toFixed(1)} s (hearing ${(e.sttMs / 1000).toFixed(1)}, AI ${(e.aiMs / 1000).toFixed(1)}, voice ${(e.ttsMs / 1000).toFixed(1)})` : ''}${folded ? ` | recording ${rec(folded.stats)}${reco(folded)}` : ''}`);
+    }
+    else if (e.type === 'voice_heard') {
+      const prev = study[k - 1];
+      if (e.outcome === 'judged' && prev && prev.type === 'voice_turn' && prev.heard === e.text) return;
+      L.push(`[${time(e.t)}] recording (${e.outcome}) | heard: "${one(e.text, 100)}"${e.stats ? ' | ' + rec(e.stats) : ''}${reco(e)}`);
+    }
     else if (e.type === 'voice_result') L.push(`[${time(e.t)}] voice result | "${one(e.question, 80)}" -> ${e.right ? 'RIGHT' : 'WRONG'} after ${e.attempts} ${e.attempts === 1 ? 'try' : 'tries'}${e.skipped ? ' (skipped)' : ''}`);
-    else if (e.type === 'voice_heard') L.push(`[${time(e.t)}] recording (${e.outcome}) | heard: "${one(e.text, 100)}"${e.stats ? ` | ${(e.stats.durationMs / 1000).toFixed(1)} s, ${Math.round((e.stats.bytes || 0) / 1024)} KB, loudest ${e.stats.peak}, background ${e.stats.floor}, speech detected: ${e.stats.speech ? 'yes' : 'no'}, ended by: ${e.stats.reason}, mic: ${e.stats.mic}` : ''}`);
     else if (e.type === 'voice_visibility') L.push(`[${time(e.t)}] the app became ${e.state === 'hidden' ? 'HIDDEN (screen off or app left)' : 'visible again'} while the tutor was: ${e.status}`);
     else if (e.type === 'override') L.push(`[${time(e.t)}] marked "I was right" for: "${one(e.question, 90)}"`);
     else if (e.type === 'round_done') L.push(`[${time(e.t)}] ROUND DONE (${e.mode}): ${e.right} right, ${e.wrong} wrong`);
   });
 
-  h('7. TESTER NOTES');
-  L.push(notes && notes.trim() ? notes.trim() : '(none)');
   return L.join('\n');
 }

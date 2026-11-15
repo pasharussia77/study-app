@@ -5,6 +5,7 @@ import { APP_VERSION } from './version.js';
 import Flashcards from './Flashcards.jsx';
 import Quiz from './Quiz.jsx';
 import Voice from './Voice.jsx';
+import SpeechTest from './SpeechTest.jsx';
 import Sources from './Sources.jsx';
 import ReportSheet from './Report.jsx';
 import { diagClear } from './diag.js';
@@ -90,7 +91,7 @@ export default function App() {
   if (screen === 'profiles') return <Shell><Profiles family={family} code={code} onPick={pickProfile} onLeave={leaveFamily} onAddTest={addTest} /></Shell>;
   if (screen === 'home') return (
     <Shell>
-      <Home code={code} profile={profile} onSwitch={goUp} onSettings={() => pushScreen({ screen: 'settings', profile })}
+      <Home code={code} profile={profile} onSwitch={goUp} onSettings={() => pushScreen({ screen: 'settings', profile })} onSpeechTest={() => pushScreen({ screen: 'speechtest', profile })}
         onOpen={(p) => pushScreen({ screen: 'project', profile, project: p })} />
     </Shell>
   );
@@ -102,6 +103,7 @@ export default function App() {
     </Shell>
   );
   if (screen === 'settings') return <Shell><Settings profile={profile} theme={themeOf(profile.id)} onChange={(t) => saveTheme(profile.id, t)} /></Shell>;
+  if (screen === 'speechtest') return <Shell><SpeechTest code={code} onExit={goUp} /></Shell>;
   if (screen === 'items') return <Shell><Items code={code} projectId={project.id} /></Shell>;
   if (screen === 'study') {
     const Mode = view.mode === 'quiz' ? Quiz : view.mode === 'voice' ? Voice : Flashcards;
@@ -269,7 +271,7 @@ function Profiles({ family, code, onPick, onLeave, onAddTest }) {
   );
 }
 
-function Home({ code, profile, onSwitch, onOpen, onSettings }) {
+function Home({ code, profile, onSwitch, onOpen, onSettings, onSpeechTest }) {
   const [projects, setProjects] = useState(null);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
@@ -297,6 +299,13 @@ function Home({ code, profile, onSwitch, onOpen, onSettings }) {
         <TileArt kind="folder" />
         <h1>{profile.name}'s projects</h1>
       </header>
+      {profile.test && (
+        <div className="testtools">
+          <b><Icon name="flask" size={18} /> Speech recognition test</b>
+          <p className="muted tiny">A scripted test with the trickiest words, about 5 minutes. It ends with a report to send to Claude.</p>
+          <button className="btn ghost" onClick={onSpeechTest}><Icon name="mic" />Run the speech test</button>
+        </div>
+      )}
       {err && <p className="error" role="alert">{err}</p>}
       {projects && projects.length === 0 && !adding && (
         <div className="empty"><TileArt kind="folder" /><p>No projects yet.</p><p className="muted">Create one, paste your notes, and get flashcards.</p></div>

@@ -1,7 +1,8 @@
 // Family Study API: keeps the OpenAI key off the phones.
 // Secrets/variables are set in the Cloudflare dashboard, never in this file:
 //   OPENAI_API_KEY (secret)  BRAIN_MODEL (optional, default gpt-5.6-luna)  REASONING_EFFORT (optional, default low)
-//   TTS_MODEL (optional, default gpt-4o-mini-tts)  TTS_VOICE (optional, default coral)  STT_MODEL (optional, default gpt-4o-mini-transcribe)
+//   TTS_MODEL (optional, default gpt-4o-mini-tts)  TTS_VOICE (optional, default sage)  TTS_STYLE (optional)
+//   STT_MODEL (optional, default gpt-transcribe)  STT_FALLBACK_MODEL (optional, default gpt-4o-mini-transcribe)
 
 const ALLOWED_ORIGINS = ['https://pasharussia77.github.io'];
 const FIREBASE_PROJECT = 'family-study-94e10';
@@ -80,6 +81,9 @@ async function handleChat(request, env, origin) {
   return json({ text: data.choices?.[0]?.message?.content ?? '', usage: data.usage || null }, 200, origin);
 }
 
+const VOICES = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer', 'verse', 'marin', 'cedar'];
+const DEFAULT_STYLE = 'Speak in a calm, gentle, warm and patient tone, like a kind teacher who has all the time in the world. Use a soft, friendly intonation and a relaxed, unhurried rhythm with natural pauses. Questions should sound curious and inviting, never like a demand. Never sound stern, strict, rushed or impatient.';
+
 // Text to speech: returns an mp3 of what the tutor says.
 async function handleTts(request, env, origin) {
   let body;
@@ -87,8 +91,11 @@ async function handleTts(request, env, origin) {
   const text = String((body && body.text) || '').trim();
   if (!text || text.length > MAX_TTS_CHARS) return json({ error: 'Invalid text.' }, 400, origin);
   const model = env.TTS_MODEL || 'gpt-4o-mini-tts';
-  const payload = { model, voice: env.TTS_VOICE || 'coral', input: text, response_format: 'mp3' };
-  if (model.startsWith('gpt-4o')) payload.instructions = 'Speak clearly and warmly, like a friendly tutor talking to a teenager. Keep a natural, unhurried pace.';
+  const voice = VOICES.includes(body.voice) ? body.voice : (env.TTS_VOICE || 'sage');
+  const payload = { model, voice, input: text, response_format: 'mp3' };
+  const speed = Number(body.speed);
+  if (speed >= 0.8 && speed <= 1.1 && speed !== 1) payload.speed = speed;
+  if (model.startsWith('gpt-4o')) payload.instructions = env.TTS_STYLE || DEFAULT_STYLE;
   const res = await fetch('https://api.openai.com/v1/audio/speech', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + env.OPENAI_API_KEY },
@@ -101,23 +108,46 @@ async function handleTts(request, env, origin) {
   return new Response(res.body, { status: 200, headers: { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'no-store', ...cors(origin) } });
 }
 
-// Speech to text: takes a short recording, returns what was said.
+const hint = (s, max) => String(s == null ? '' : s).replace(/[<>\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+
+async function transcribeOnce(env, model, file, keywords, prompt) {
+  const out = new FormData();
+  out.append('file', file, file.name || 'answer.webm');
+  out.append('model', model);
+  if (model.startsWith('gpt-transcribe')) {
+    out.append('languages[]', 'en');
+    keywords.forEach((k) => out.append('keywords[]', k));
+  } else {
+    out.append('language', 'en');
+    out.append('response_format', 'json');
+  }
+  if (prompt) out.append('prompt', prompt);
+  const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    method: 'POST', headers: { Authorization: 'Bearer ' + env.OPENAI_API_KEY }, body: out
+  });
+  return { res, data: await res.json().catch(() => ({})) };
+}
+
+// Speech to text: takes a short recording (and hints about the words to expect), returns what was said.
 async function handleStt(request, env, origin) {
   let form;
   try { form = await request.formData(); } catch { return json({ error: 'Invalid upload.' }, 400, origin); }
   const file = form.get('file');
   if (!file || typeof file === 'string' || !file.size || file.size > MAX_AUDIO_BYTES) return json({ error: 'Invalid audio.' }, 400, origin);
-  const out = new FormData();
-  out.append('file', file, file.name || 'answer.webm');
-  out.append('model', env.STT_MODEL || 'gpt-4o-mini-transcribe');
-  out.append('language', 'en');
-  out.append('response_format', 'json');
-  const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-    method: 'POST', headers: { Authorization: 'Bearer ' + env.OPENAI_API_KEY }, body: out
-  });
-  const data = await res.json().catch(() => ({}));
+  let keywords = [];
+  try { keywords = JSON.parse(String(form.get('keywords') || '[]')); } catch { keywords = []; }
+  keywords = (Array.isArray(keywords) ? keywords : []).map((k) => hint(k, 40)).filter(Boolean).slice(0, 50);
+  const prompt = hint(form.get('prompt'), 400);
+  let model = env.STT_MODEL || 'gpt-transcribe';
+  let { res, data } = await transcribeOnce(env, model, file, keywords, prompt);
+  // If the newer model is not available to this account, fall back to the older one once.
+  const message = (data && data.error && data.error.message) || '';
+  if (!res.ok && (res.status === 400 || res.status === 404) && model.startsWith('gpt-transcribe') && /model|not found|access|unsupported|parameter/i.test(message)) {
+    model = env.STT_FALLBACK_MODEL || 'gpt-4o-mini-transcribe';
+    ({ res, data } = await transcribeOnce(env, model, file, keywords, prompt));
+  }
   if (!res.ok) return json({ error: (data && data.error && data.error.message) || 'The speech service returned an error.' }, 502, origin);
-  return json({ text: (data && data.text) || '' }, 200, origin);
+  return json({ text: (data && data.text) || '', model, languages: (data && data.languages) || null }, 200, origin);
 }
 
 export default {

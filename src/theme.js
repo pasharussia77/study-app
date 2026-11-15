@@ -43,10 +43,12 @@ export function hslToHex(h, s, l) {
 export const followsPalette = (h) => h >= 190 && h <= 350;
 const lerpHue = (a, b, k) => { const d = ((b - a + 540) % 360) - 180; return (a + d * k + 360) % 360; };
 
+// Older browsers cannot do relative colours; they keep the plain colours (the original look).
+export const RELATIVE_COLORS = typeof CSS !== 'undefined' && !!CSS.supports && CSS.supports('color', 'hsl(from red h s l)');
 // A colour written into the stylesheet or the artwork: it reads the live variables, so it changes with the knob.
 export function T(hex) {
   const [h, s] = hexToHsl(hex);
-  if (s < 0.05) return hex;
+  if (s < 0.05 || !RELATIVE_COLORS) return hex;
   return `hsl(from ${hex} ${followsPalette(h) ? 'calc(h + var(--hue))' : 'h'} calc(s * var(--sat)) calc(l + var(--lift) - var(--vivid) * 11 * clamp(0, (l - 70) / 25, 1)))`;
 }
 
