@@ -4,6 +4,11 @@ import { workerFetch, explain } from './ai.js';
 
 const cache = new Map();
 const inflight = new Map();
+
+// The tutor voices OpenAI offers. The choice is remembered on this phone.
+export const VOICES = ['sage', 'marin', 'cedar', 'shimmer', 'ballad', 'nova', 'coral', 'alloy', 'verse', 'ash', 'echo', 'fable', 'onyx'];
+export function getVoice() { try { const v = localStorage.getItem('ttsVoice'); return VOICES.includes(v) ? v : 'sage'; } catch { return 'sage'; } }
+export function setVoice(v) { try { localStorage.setItem('ttsVoice', v); } catch { /* not saved */ } }
 let currentAudio = null;
 let currentResolve = null;
 
@@ -14,18 +19,20 @@ export function stopSpeaking() {
 
 // Fetches the audio for a sentence once; sentences already fetched (or being fetched) are reused.
 async function getAudio(code, text) {
-  if (cache.has(text)) return { blob: cache.get(text), cached: true };
-  let p = inflight.get(text);
+  const voice = getVoice();
+  const key = voice + '|' + text;
+  if (cache.has(key)) return { blob: cache.get(key), cached: true };
+  let p = inflight.get(key);
   if (!p) {
     p = (async () => {
-      const res = await workerFetch(code, '/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
+      const res = await workerFetch(code, '/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, voice }) });
       if (!res.ok) throw new Error(explain(res, await res.json().catch(() => ({})), 'voice'));
       const blob = await res.blob();
       if (cache.size > 80) cache.clear();
-      cache.set(text, blob);
+      cache.set(key, blob);
       return blob;
-    })().finally(() => inflight.delete(text));
-    inflight.set(text, p);
+    })().finally(() => inflight.delete(key));
+    inflight.set(key, p);
   }
   return { blob: await p, cached: false };
 }
@@ -36,13 +43,15 @@ export function warm(code, text) {
   getAudio(code, text).catch(() => {});
 }
 
-// Speaks the text with the tutor voice and waits until it has finished.
+// Speaks the text with the tutor voice and waits until it has finished (or until stopSpeaking is called).
 export async function speak(code, text, onCost = () => {}, onStart = () => {}) {
   if (isMock) {
     (window.__spoken ||= []).push(text);
+    (window.__voices ||= []).push(getVoice());
     onCost({ chars: text.length, cached: false, ms: 0 });
     onStart();
-    await new Promise((r) => setTimeout(r, 10));
+    const d = window.__speakDelay || 10;
+    await new Promise((res) => { currentResolve = res; setTimeout(() => { if (currentResolve === res) currentResolve = null; res(); }, d); });
     return;
   }
   const t0 = Date.now();
@@ -134,12 +143,19 @@ export function startListening({ maxMs = 60000, silenceMs = 1500, noSpeechMs = 9
   return { promise, stop() { stopFlag = true; }, cancel() { cancelFlag = true; } };
 }
 
-export async function transcribe(code, blob, ext = 'webm') {
-  if (isMock) { const q = window.__mockSpeech; return q && q.length ? String(q.shift()) : ''; }
+// Turns a recording into text. `hints` carries a short description and the words to expect, which helps with accents and single words.
+export async function transcribe(code, blob, ext = 'webm', hints = {}) {
+  if (isMock) {
+    (window.__sttContext ||= []).push(hints);
+    const q = window.__mockSpeech;
+    return { text: q && q.length ? String(q.shift()) : '', model: 'mock-stt', languages: [{ code: 'en' }] };
+  }
   const form = new FormData();
   form.append('file', new File([blob], `answer.${ext}`, { type: blob.type }));
+  if (hints.prompt) form.append('prompt', hints.prompt);
+  if (hints.keywords && hints.keywords.length) form.append('keywords', JSON.stringify(hints.keywords));
   const res = await workerFetch(code, '/stt', { method: 'POST', body: form });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(explain(res, data, 'speech recognition'));
-  return String(data.text || '').trim();
+  return { text: String(data.text || '').trim(), model: data.model || '', languages: data.languages || null };
 }

@@ -126,3 +126,13 @@ export function parseTutor(text) {
   if (!d || typeof d.spoken !== 'string' || !d.spoken.trim() || !d.verdict) throw Object.assign(new Error('The tutor answer was not understood.'), { parse: true });
   return { verdict: String(d.verdict), spoken: d.spoken.trim(), gotRight: d.got_right || '', missing: d.missing || '' };
 }
+
+// What the speech recognizer is told to expect. It never gets the correct answer on its own: only the whole project's vocabulary or all the choices.
+export function sttContext(c, qd, deck) {
+  const base = 'A student is answering study questions out loud in English.';
+  const short = (x) => { const s = String(x).trim(); return s.length <= 40 ? s : s.split(/\s+/).slice(0, 4).join(' '); };
+  if (c.type === 'tf') return { prompt: `${base} The question is a true or false statement, and the answer is the word true or the word false.`, keywords: ['true', 'false'] };
+  if (c.type === 'mc') return { prompt: `${base} The question has lettered choices. The student says a letter (A, B, C or D) or the choice itself. Question: ${qd.shown}`.slice(0, 380), keywords: c.choices.map(short) };
+  const vocab = [...new Set(deck.filter((x) => x.type === 'term').map((x) => short(x.term)))].slice(0, 40);
+  return { prompt: `${base} Short answers, even a single word, are common. Question: ${qd.shown}`.slice(0, 380), keywords: vocab };
+}

@@ -9,7 +9,11 @@ globalThis.fetch = async (url, init) => {
     return new Response('{}', { status: ok ? 200 : 403 });
   }
   if (String(url).includes('/audio/speech')) return new Response(new Uint8Array([1, 2, 3, 4]), { status: 200, headers: { 'content-type': 'audio/mpeg' } });
-  if (String(url).includes('/audio/transcriptions')) return new Response(JSON.stringify({ text: 'it is a small furry pet' }), { status: 200 });
+  if (String(url).includes('/audio/transcriptions')) {
+    const m = init.body.get('model');
+    if (globalThis.__sttFailPrimary && m === 'gpt-transcribe') return new Response(JSON.stringify({ error: { message: 'The model `gpt-transcribe` does not exist or you do not have access to it.' } }), { status: 404 });
+    return new Response(JSON.stringify({ text: 'it is a small furry pet', languages: [{ code: 'en' }] }), { status: 200 });
+  }
   if (String(url).includes('api.openai.com')) return new Response(JSON.stringify({ choices: [{ message: { content: 'hi there' } }], usage: { total_tokens: 5 } }), { status: 200 });
   throw new Error('unexpected ' + url);
 };
@@ -61,23 +65,46 @@ r = await worker.fetch(req('/tts', { headers: good, body: { text: 'Hello there, 
 check('tts 200 audio', r.status === 200 && r.headers.get('content-type') === 'audio/mpeg' && (await r.arrayBuffer()).byteLength === 4);
 let sp = JSON.parse(calls.find((c) => c.url.includes('/audio/speech')).init.body);
 check('tts uses key', calls.find((c) => c.url.includes('/audio/speech')).init.headers.Authorization === 'Bearer sk-test-123');
-check('tts defaults', sp.model === 'gpt-4o-mini-tts' && sp.voice === 'coral' && sp.response_format === 'mp3' && sp.input === 'Hello there, nice work!' && !!sp.instructions);
-r = await worker.fetch(req('/tts', { headers: good, body: { text: 'Hi' } }), { ...env, TTS_MODEL: 'tts-1', TTS_VOICE: 'nova' });
-sp = JSON.parse(calls.filter((c) => c.url.includes('/audio/speech')).pop().init.body);
-check('tts env overrides, no instructions on older model', sp.model === 'tts-1' && sp.voice === 'nova' && sp.instructions === undefined);
+check('tts defaults: calm voice and gentle style', sp.model === 'gpt-4o-mini-tts' && sp.voice === 'sage' && sp.response_format === 'mp3' && sp.input === 'Hello there, nice work!' && /calm, gentle, warm and patient/.test(sp.instructions) && /Never sound stern/.test(sp.instructions) && sp.speed === undefined);
+const lastSpeech = () => JSON.parse(calls.filter((c) => c.url.includes('/audio/speech')).pop().init.body);
+r = await worker.fetch(req('/tts', { headers: good, body: { text: 'Hi', voice: 'marin', speed: 0.9 } }), env); sp = lastSpeech();
+check('tts accepts a listed voice and a gentle speed', sp.voice === 'marin' && sp.speed === 0.9);
+r = await worker.fetch(req('/tts', { headers: good, body: { text: 'Hi', voice: 'evil-voice', speed: 3 } }), env); sp = lastSpeech();
+check('tts ignores unknown voice and extreme speed', sp.voice === 'sage' && sp.speed === undefined);
+r = await worker.fetch(req('/tts', { headers: good, body: { text: 'Hi' } }), { ...env, TTS_VOICE: 'cedar', TTS_STYLE: 'Be brief.' }); sp = lastSpeech();
+check('tts env overrides', sp.voice === 'cedar' && sp.instructions === 'Be brief.');
+r = await worker.fetch(req('/tts', { headers: good, body: { text: 'Hi' } }), { ...env, TTS_MODEL: 'tts-1', TTS_VOICE: 'nova' }); sp = lastSpeech();
+check('tts older model: no instructions', sp.model === 'tts-1' && sp.voice === 'nova' && sp.instructions === undefined);
 check('tts audio keys not leaked', !(await r.clone().text()).includes('sk-test'));
 r = await worker.fetch(req('/tts', { headers: good, body: { text: '' } }), env); check('tts rejects empty', r.status === 400);
 r = await worker.fetch(req('/tts', { headers: good, body: { text: 'x'.repeat(1501) } }), env); check('tts rejects long', r.status === 400);
 r = await worker.fetch(req('/tts', { origin: 'https://evil.example', headers: good, body: { text: 'Hi' } }), env); check('tts blocks other origin', r.status === 403);
 r = await worker.fetch(req('/tts', { headers: { ...good, 'X-Family-Code': 'wrong-code-999' }, body: { text: 'Hi' } }), env); check('tts needs family', r.status === 401);
 
-const audioReq = (headers, file) => { const f = new FormData(); if (file !== null) f.append('file', file, 'answer.webm'); return new Request('https://api.test/stt', { method: 'POST', headers: { Origin: ORIGIN, ...headers }, body: f }); };
+const audioReq = (headers, file, extra = {}) => { const f = new FormData(); if (file !== null) f.append('file', file, 'answer.webm'); Object.entries(extra).forEach(([k, v]) => f.append(k, v)); return new Request('https://api.test/stt', { method: 'POST', headers: { Origin: ORIGIN, ...headers }, body: f }); };
 const { 'Content-Type': _ct, ...goodNoType } = good;
+const sttCall = () => calls.filter((c) => c.url.includes('/audio/transcriptions')).pop();
+const audio = () => new Blob([new Uint8Array(200)], { type: 'audio/webm' });
 calls = [];
-r = await worker.fetch(audioReq(goodNoType, new Blob([new Uint8Array(200)], { type: 'audio/webm' })), env); j = await r.json();
-check('stt 200 text', r.status === 200 && j.text === 'it is a small furry pet');
-const stt = calls.find((c) => c.url.includes('/audio/transcriptions'));
-check('stt forwards file and model', stt.init.headers.Authorization === 'Bearer sk-test-123' && stt.init.body.get('model') === 'gpt-4o-mini-transcribe' && stt.init.body.get('language') === 'en' && stt.init.body.get('file').size === 200);
+r = await worker.fetch(audioReq(goodNoType, audio(), { keywords: JSON.stringify(['giraffe', 'elephant', '<b>penguin</b>', 'line\nbreak', '']), prompt: 'A student is answering study questions out loud in English.' }), env); j = await r.json();
+check('stt 200 text, model and languages', r.status === 200 && j.text === 'it is a small furry pet' && j.model === 'gpt-transcribe' && j.languages[0].code === 'en');
+let body = sttCall().init.body;
+check('stt uses key and the newer model', sttCall().init.headers.Authorization === 'Bearer sk-test-123' && body.get('model') === 'gpt-transcribe' && body.get('file').size === 200);
+check('stt sends languages[] (never the old language field) and no response_format', body.getAll('languages[]').join() === 'en' && body.get('language') === null && body.get('response_format') === null);
+check('stt sends cleaned keywords', body.getAll('keywords[]').join('|') === 'giraffe|elephant|b penguin /b|line break');
+check('stt keywords hold no angle brackets or line breaks', body.getAll('keywords[]').every((k) => !/[<>\r\n]/.test(k)));
+check('stt sends the prompt', body.get('prompt') === 'A student is answering study questions out loud in English.');
+r = await worker.fetch(audioReq(goodNoType, audio(), { keywords: JSON.stringify(Array.from({ length: 80 }, (_, i) => 'word' + i)) }), env); body = sttCall().init.body;
+check('stt caps the keyword list', body.getAll('keywords[]').length === 50);
+r = await worker.fetch(audioReq(goodNoType, audio(), { keywords: 'not json', prompt: 'x'.repeat(900) }), env); body = sttCall().init.body;
+check('stt survives bad keywords and trims a long prompt', r.status === 200 && body.getAll('keywords[]').length === 0 && body.get('prompt').length === 400);
+globalThis.__sttFailPrimary = true; calls = [];
+r = await worker.fetch(audioReq(goodNoType, audio(), { keywords: JSON.stringify(['giraffe']) }), env); j = await r.json();
+const sttCalls = calls.filter((c) => c.url.includes('/audio/transcriptions'));
+check('stt falls back to the older model when the new one is not available', r.status === 200 && j.model === 'gpt-4o-mini-transcribe' && sttCalls.length === 2 && sttCalls[1].init.body.get('language') === 'en' && sttCalls[1].init.body.get('languages[]') === null && sttCalls[1].init.body.get('response_format') === 'json');
+globalThis.__sttFailPrimary = false; calls = [];
+r = await worker.fetch(audioReq(goodNoType, audio()), { ...env, STT_MODEL: 'gpt-4o-mini-transcribe' }); j = await r.json(); body = sttCall().init.body;
+check('stt env model override uses the old-style language field', j.model === 'gpt-4o-mini-transcribe' && body.get('language') === 'en' && body.get('languages[]') === null);
 r = await worker.fetch(audioReq(goodNoType, null), env); check('stt rejects no file', r.status === 400);
 r = await worker.fetch(audioReq(goodNoType, new Blob([])), env); check('stt rejects empty file', r.status === 400);
 r = await worker.fetch(audioReq(goodNoType, new Blob([new Uint8Array(6_000_001)])), env); check('stt rejects huge file', r.status === 400);

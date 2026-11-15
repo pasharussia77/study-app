@@ -3,8 +3,8 @@ import { backend } from './firebase.js';
 import { shuffle } from './parse.js';
 import { defaultPick, queueFor, normalize } from './stats.js';
 import { askAIDetailed } from './ai.js';
-import { describeQuestion, utterance, maxAttempts, countsRight, matchChoice, detectCommand, quickCorrect, praise, revealCanned, buildTutorMessages, parseTutor } from './tutor.js';
-import { speak, warm, stopSpeaking, startListening, transcribe, beep } from './voice.js';
+import { describeQuestion, utterance, maxAttempts, countsRight, matchChoice, detectCommand, quickCorrect, praise, revealCanned, buildTutorMessages, parseTutor, sttContext } from './tutor.js';
+import { speak, warm, stopSpeaking, startListening, transcribe, beep, VOICES, getVoice, setVoice } from './voice.js';
 import { useStats, StatsSheet, CardPicker, TypePicker, RoundDone } from './Session.jsx';
 import { diagLog } from './diag.js';
 import { useOverlay, back } from './nav.js';
@@ -34,6 +34,7 @@ export default function Voice({ cards, code, projectId, onExit }) {
   const [phase, setPhase] = useState('setup');
   const [ask, setAsk] = useState('term');
   const [readAloud, setReadAloud] = useState(true);
+  const [voice, setVoiceState] = useState(getVoice());
   const [mic, setMic] = useState(null);       // result of the microphone test
   const [voiceTest, setVoiceTest] = useState('');
   const [mix, setMix] = useState(true);
@@ -157,17 +158,19 @@ export default function Voice({ cards, code, projectId, onExit }) {
           listener.current = null;
           if (!live()) return;
           const tEnd = Date.now();
-          let text = '';
+          let text = '', heardInfo = {};
+          const stt = sttContext(c, qd, deckRef.current);
           if (rec.blob) {
             setStatus('thinking');
             turn.recordings++;
-            text = await transcribe(code, rec.blob, rec.ext);
+            heardInfo = await transcribe(code, rec.blob, rec.ext, stt);
+            text = heardInfo.text;
             turn.m.stt = Date.now() - tEnd; turn.sttMs += turn.m.stt;
             if (!live()) return;
           }
           setHeard(text);
           const onStart = () => { if (turn.m.gap === null) turn.m.gap = Date.now() - tEnd; };
-          const logHeard = (outcome) => diagLog(projectId, { type: 'voice_heard', text, outcome, sttMs: turn.m.stt, stats: rec.stats });
+          const logHeard = (outcome) => diagLog(projectId, { type: 'voice_heard', text, outcome, sttMs: turn.m.stt, stats: rec.stats, sttModel: heardInfo.model, languages: heardInfo.languages, hints: stt.keywords.length });
           if (!text) {
             logHeard(rec.blob ? 'the recording was transcribed as empty' : 'no speech detected');
             unclear++;
@@ -236,15 +239,15 @@ export default function Voice({ cards, code, projectId, onExit }) {
     try {
       await beep();
       const rec = await startListening().promise;
-      let text = '';
-      if (rec.blob) { setMic({ busy: 'Hearing you…' }); text = await transcribe(code, rec.blob, rec.ext); }
-      diagLog(projectId, { type: 'voice_heard', text, outcome: 'microphone test', stats: rec.stats });
+      let text = '', info = {};
+      if (rec.blob) { setMic({ busy: 'Hearing you…' }); info = await transcribe(code, rec.blob, rec.ext, { prompt: 'A student is testing a microphone by saying a sentence in English.' }); text = info.text; }
+      diagLog(projectId, { type: 'voice_heard', text, outcome: 'microphone test', stats: rec.stats, sttModel: info.model, languages: info.languages, hints: 0 });
       setMic({ text, stats: rec.stats });
     } catch (e) { setMic({ error: e.message }); }
   };
   const testVoice = async () => {
     setVoiceTest('Speaking…');
-    try { await speak(code, 'Hello! This is how your tutor sounds. Can you understand me clearly?'); setVoiceTest('If the voice was clear and easy to understand, you are ready.'); }
+    try { await speak(code, 'Hello! This is how your tutor sounds. Can you understand me clearly?'); setVoiceTest('If this voice sounds friendly and clear, you are ready. If not, pick another voice above and test again.'); }
     catch (e) { setVoiceTest(e.message); }
   };
   const reset = async () => { await backend.resetStats(code, projectId); setKind('all'); start('all'); };
@@ -274,6 +277,12 @@ export default function Voice({ cards, code, projectId, onExit }) {
       </label>
       <div className="micbox">
         <b>Check the sound first</b>
+        <label className="voicepick">
+          <span className="muted tiny">Tutor voice</span>
+          <select value={voice} aria-label="Tutor voice" onChange={(e) => { setVoice(e.target.value); setVoiceState(e.target.value); }}>
+            {VOICES.map((n) => <option key={n} value={n}>{n[0].toUpperCase() + n.slice(1)}</option>)}
+          </select>
+        </label>
         <div className="row">
           <button className="btn ghost small" onClick={testMic} disabled={!!(mic && mic.busy)}>Test my microphone</button>
           <button className="btn ghost small" onClick={testVoice}>Test the tutor voice</button>
@@ -326,6 +335,8 @@ export default function Voice({ cards, code, projectId, onExit }) {
           ? <button className="btn primary" onClick={resume}>Resume</button>
           : <button className="btn ghost" onClick={pause}>Pause</button>}
         {status === 'listening' && <button className="btn primary" onClick={() => listener.current && listener.current.stop()}>Done talking</button>}
+        {status === 'asking' && <button className="btn primary" onClick={() => stopSpeaking()}>Answer now</button>}
+        {status === 'speaking' && <button className="btn ghost" onClick={() => stopSpeaking()}>Skip talking</button>}
       </div>
       <div className="row links">
         <button className="link" onClick={repeatQ}>Repeat question</button>
