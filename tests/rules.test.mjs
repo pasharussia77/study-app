@@ -1,7 +1,10 @@
 // Rule tests built on the "Chapter 5 Review" fixture (six photos, answers handwritten in red).
 // Run with: npm test
-import { resolvePage, resolveItem, reapplyItem, readTrueFalse, duplicateGroups, buildPrompt, buildTextPrompt, parseLabels } from '../src/items.js';
-import { buildDeck, cardFaces, answerLetters } from '../src/deck.js';
+import { resolvePage, resolveItem, reapplyItem, readTrueFalse, duplicateGroups, buildPrompt, buildTextPrompt, parseLabels, fixNumbers } from '../src/items.js';
+import { buildDeck, cardFaces, answerLetters, withNumber, inPageOrder } from '../src/deck.js';
+import { parseCards, shorterIsTerm } from '../src/parse.js';
+import { buildReport, splitReport } from '../src/report.js';
+import { cardKey } from '../src/stats.js';
 import { matchLetters, judgeLetters, describeQuestion, answerLine, maxAttempts, matchChoice } from '../src/tutor.js';
 import { enhancePixels } from '../src/enhance.js';
 
@@ -240,6 +243,92 @@ ok(!enhancePixels(dark).applied && dark.every((v, i) => v === darkCopy[i]), 'cle
 const pink = picture([240, 150, 170], [[0.1, [30, 20, 25]]]);
 const pinkInfo = enhancePixels(pink), pinkAfter = avg(pink, zone(0.1, 1));
 ok(pinkInfo.applied && !pinkInfo.whiteBalance && pinkAfter[0] - pinkAfter[1] >= 70, 'clean-up: coloured paper keeps its colour (got ' + pinkAfter + ')');
+
+
+// --- 0.15: the term is always the shorter side ---
+ok(shorterIsTerm('Congress', 'the legislative branch that makes laws'), 'short before long: first is the term');
+ok(!shorterIsTerm('the legislative branch that makes laws', 'Congress'), 'long before short: second is the term');
+ok(shorterIsTerm('cat', 'dog'), 'same length: keep the order');
+eq(shorterIsTerm('big cat', 'tiny'), false, 'fewer words wins over fewer letters');
+eq(shorterIsTerm('ox', 'a very long animal name'), true, 'one word vs many words');
+const pc = parseCards('Congress - the part of government that makes laws\nthe part of government that makes laws for the country - Senate\n12. Veto - to reject a bill\n13) to reject a bill and send it back - Veto\nnot a card');
+eq(pc.cards.map((c) => c.term), ['Congress', 'Senate', 'Veto', 'Veto'], 'parseCards: the shorter side is the term');
+eq(pc.cards.map((c) => c.swapped), [false, true, false, true], 'parseCards: swapped flag');
+eq(pc.cards.map((c) => c.number), [null, null, 12, 13], 'parseCards: leading numbers are kept as numbers');
+eq(pc.cards[2].rawTerm, '12. Veto', 'parseCards: the saved key still uses the original line');
+eq(pc.skipped, 1, 'parseCards: a line with no separator is skipped');
+eq(cardKey({ term: pc.cards[0].rawTerm, definition: pc.cards[0].rawDefinition }), cardKey({ term: 'Congress', definition: 'the part of government that makes laws' }), 'progress key is unchanged for a card that did not change');
+const tdeck = buildDeck(pc.cards, [], []).deck;
+eq(tdeck.map((c) => withNumber(c, c.prompt)), ['Congress', 'Senate', '12. Veto', '13. Veto'], 'typed cards show their numbers');
+
+// AI-made word items: swapped when the question side is longer
+const termRaw = (q, a) => ({ ...base, type: 'term', number: 3, question: q, answer_text: a });
+const t1 = resolveItem(termRaw('the branch of government that makes laws', 'Congress'), {});
+eq([t1.question, t1.answer, t1.swapped], ['Congress', 'the branch of government that makes laws', true], 'photo term: long side is moved to the definition');
+const t2 = resolveItem(termRaw('Congress', 'the branch of government that makes laws'), {});
+eq([t2.question, t2.answer, !!t2.swapped], ['Congress', 'the branch of government that makes laws', false], 'photo term: already right is left alone');
+const storedTerm = { id: 't1', fileId: 'f1', type: 'term', number: 3, question: 'the branch of government that makes laws', answer: 'Congress', source: 'page', studentAnswer: null, markedWrong: false, confidence: 'high', note: '', order: 0, flagged: false, choices: [] };
+const tp = reapplyItem(storedTerm, {});
+eq([tp.question, tp.answer], ['Congress', 'the branch of government that makes laws'], 're-apply swaps a stored word that is the wrong way round');
+eq(reapplyItem({ ...storedTerm, ...tp }, {}), null, 're-apply: swapped word is stable');
+const qaStored = { ...storedTerm, id: 'q1', type: 'qa', question: 'Who wrote the Declaration of Independence?', answer: 'Jefferson' };
+const qp = reapplyItem(qaStored, {});
+ok(!qp || (qp.question === undefined && qp.answer === 'Jefferson'), 're-apply never swaps a question and its answer');
+
+// --- 0.15: question numbers keep counting up ---
+const seq1 = [{ number: 45, type: 'order', question: 'Number the events' }, { number: 47, type: 'multi', question: 'What is true' }];
+eq(fixNumbers(seq1, { last_number: 45, type: 'multi' }), [0], 'photo 6: 45 after a page that ended at 45 becomes 46');
+eq(seq1.map((x) => x.number), [46, 47], 'photo 6 numbers are 46, 47');
+const seq2 = [{ number: 44, type: 'multi', question: 'a' }, { number: 45, type: 'multi', question: 'b' }, { number: 45, type: 'order', question: 'c' }, { number: 47, type: 'multi', question: 'd' }];
+fixNumbers(seq2);
+eq(seq2.map((x) => x.number), [44, 45, 46, 47], 'a repeated number inside a list is corrected when there is a gap');
+const seq3 = [{ number: 45, type: 'multi', question: 'same question' }];
+eq(fixNumbers(seq3, { last_number: 45, type: 'multi' }), [], 'the same kind of question continuing from the last page keeps its number');
+const seq4 = [{ number: 5, type: 'qa', question: 'x' }, { number: 5, type: 'qa', question: 'y' }];
+eq(fixNumbers(seq4), [1], 'a repeat at the very end is renumbered');
+const seq5 = [{ number: 5, type: 'qa', question: 'x' }, { number: 5, type: 'qa', question: 'y' }, { number: 6, type: 'qa', question: 'z' }];
+eq(fixNumbers(seq5), [], 'a repeat with no gap after it is left alone');
+const seq6 = [{ number: null, type: 'qa', question: 'x' }, { number: null, type: 'qa', question: 'y' }];
+eq(fixNumbers(seq6, { last_number: null }), [], 'no numbers, nothing to fix');
+const p6 = resolvePage({ page: { graded: false }, ends_with: { last_number: 47 }, items: [{ ...rawOrder, number: 45 }, { ...rawSel[5], number: 47 }] }, { last_number: 45, type: 'multi' }).items;
+eq(p6.map((i) => i.number), [46, 47], 'resolvePage applies the number rule using the page before');
+
+// --- 0.15: original order, numbers on cards ---
+const files3 = [{ id: 'fA', createdAt: 100 }, { id: 'fB', createdAt: 200 }, { id: 'fC', createdAt: 300 }];
+const mk = (id, fileId, order, number) => ({ id, fileId, order, number, type: 'qa', question: 'Q ' + id, answer: 'A', source: 'page', createdAt: 1000 - order });
+const jumbled = [mk('c2', 'fC', 1, 12), mk('a2', 'fA', 1, 2), mk('b1', 'fB', 0, 5), mk('a1', 'fA', 0, 1), mk('c1', 'fC', 0, 11), mk('b2', 'fB', 1, 6)];
+eq(inPageOrder(jumbled, files3).map((i) => i.id), ['a1', 'a2', 'b1', 'b2', 'c1', 'c2'], 'photos in the order added, then the order on each page');
+const gone = [mk('g1', 'fGone', 0, 8), mk('a1', 'fA', 0, 1), mk('b1', 'fB', 0, 5)];
+gone[0].createdAt = 150;
+eq(inPageOrder(gone, files3).map((i) => i.id), ['a1', 'g1', 'b1'], 'items of a removed photo stay in place by when they were made');
+const withText = [{ ...mk('t1', 'text', 1, 2), createdAt: 5 }, { ...mk('t0', 'text', 0, 1), createdAt: 5 }, mk('a1', 'fA', 0, 1)];
+eq(inPageOrder(withText, files3).map((i) => i.id), ['t0', 't1', 'a1'], 'typed-text items come first, in order');
+const dk = buildDeck([], jumbled, files3).deck;
+eq(dk.map((c) => c.number), [1, 2, 5, 6, 11, 12], 'the deck follows the pages');
+eq(withNumber(dk[2], dk[2].prompt), '5. Q b1', 'number shown before the question');
+eq(cardFaces(dk[0]).ft, '1. Q a1', 'flashcard front shows the number');
+eq(withNumber({ number: null }, 'Q'), 'Q', 'no number, nothing added');
+eq(describeQuestion({ ...dk[0], type: 'qa' }).shown, '1. Q a1', 'voice and quiz show the number');
+ok(!describeQuestion({ ...dk[0], type: 'qa' }).spoken.startsWith('1.'), 'voice does not read the number aloud');
+
+// --- 0.15: the report is short enough and comes in parts ---
+const photoFiles = [1, 2, 3, 4, 5, 6].map((n) => ({ id: 'f' + n, ignore: 'none', hand: 'key', status: 'done', page: { graded: false }, made: 8, createdAt: n }));
+const all = all47.map((it, i) => ({ ...it, id: 'r' + i, fileId: 'f' + (1 + Math.floor(i / 8)) }));
+const longRaw = 'x'.repeat(4000);
+const evs = photoFiles.map((f) => ({ t: Date.now(), type: 'photo_read', fileId: f.id, ignore: 'none', ok: true, raw: longRaw, ms: 9000, usage: { prompt_tokens: 3400, completion_tokens: 1500 }, made: 8 }));
+const rep = buildReport({ version: '0.15.0', device: 'test', health: { model: 'm', hasKey: true }, profile: { name: 'Test', test: true }, project: { name: 'Ch5' }, text: '', parsed: { cards: [], skipped: 0, skippedLines: [] }, sum: { total: 47, covered: 0, remainingCount: 47, correct: 0, incorrect: 0 }, files: photoFiles, items: all, check: null, events: evs, notes: '' });
+ok(rep.length < 16000, 'report for 47 items is short (' + rep.length + ' characters)');
+ok(rep.includes('#10 tf') && rep.includes('fix: George Washington'), 'report: a true/false line carries its correction');
+ok(rep.includes('#46 order') && rep.includes('#41 multi'), 'report: new types are in it');
+ok(!rep.includes('xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'), 'report: raw AI text is cut short');
+const parts = splitReport(rep, 10000);
+ok(parts.length >= 2 && parts.every((p) => p.length <= 10300), 'report splits into parts of at most about 10,000 characters (' + parts.map((p) => p.length) + ')');
+ok(parts[0].startsWith('PART 1 of ' + parts.length) && parts[0].includes('more follows'), 'first part says it is first and that more follows');
+ok(parts[parts.length - 1].endsWith('END OF REPORT (part ' + parts.length + ' of ' + parts.length + ')'), 'last part says it is the end');
+const joined = parts.map((p) => p.split('\n').slice(1, -1).join('\n')).join('\n');
+ok(rep.split('\n').every((line) => joined.includes(line)), 'no line of the report is lost by splitting');
+eq(splitReport('short\nreport', 10000), ['short\nreport\nEND OF REPORT'], 'a short report stays one part');
+ok(splitReport('a'.repeat(25000), 10000).every((p) => p.length < 10400), 'one huge line is still cut into pieces');
 
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

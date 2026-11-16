@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { backend } from './firebase.js';
-import { TYPE_LABEL, crossCheck, reapplyItem, duplicateGroups } from './items.js';
+import { TYPE_LABEL, crossCheck, reapplyItem, duplicateGroups, fixNumbers } from './items.js';
+import { inPageOrder } from './deck.js';
 import { useOverlay, goUp } from './nav.js';
 import { Icon } from './art.jsx';
 import { ScreenHead } from './Session.jsx';
@@ -51,17 +52,24 @@ export default function Items({ code, projectId }) {
   const reapply = async (hand) => {
     setAsking(false); setDone(''); setWorking('Applying the rules…');
     const fileById = new Map(files.map((f) => [f.id, f]));
-    let changed = 0, gained = 0;
+    let changed = 0, gained = 0, swapped = 0, renumbered = 0;
+    // question numbers keep counting up (45, 45, 47 becomes 45, 46, 47)
+    const seq = inPageOrder(items, files).map((x) => ({ id: x.id, number: x.number, type: x.type, question: x.question }));
+    const newNumber = new Map(fixNumbers(seq).map((i) => [seq[i].id, seq[i].number]));
     try {
       for (const f of files) if (f.kind === 'photo' && (f.hand || 'key') !== hand) await backend.updateFile(code, projectId, f.id, { hand });
       for (const it of items) {
         const f = fileById.get(it.fileId);
-        const patch = reapplyItem(it, { graded: !!(f && f.page && f.page.graded), hand });
+        const base = reapplyItem(it, { graded: !!(f && f.page && f.page.graded), hand });
+        const patch = newNumber.has(it.id) ? { ...(base || {}), number: newNumber.get(it.id) } : base;
         if (!patch) continue;
         await backend.updateItem(code, projectId, it.id, patch);
         changed++; if (!it.answer && patch.answer) gained++;
+        if (patch.question && patch.question !== it.question) swapped++;
+        if (newNumber.has(it.id)) renumbered++;
       }
-      setDone(changed ? `Rules applied. ${gained} item${gained === 1 ? '' : 's'} got an answer.` : 'Rules applied. Nothing needed to change.');
+      const extra = [swapped ? `${swapped} word${swapped === 1 ? '' : 's'} and meanings swapped.` : '', renumbered ? `${renumbered} number${renumbered === 1 ? '' : 's'} corrected.` : ''].filter(Boolean).join(' ');
+      setDone(changed ? `Rules applied. ${gained} item${gained === 1 ? '' : 's'} got an answer. ${extra}`.trim() : 'Rules applied. Nothing needed to change.');
     } catch (e) { setDone('Could not finish: ' + e.message); }
     setWorking('');
   };
@@ -266,6 +274,7 @@ function EditSheet({ item, onClose, code, projectId }) {
           <>
             <label className="muted tiny" htmlFor="ea">{item.type === 'term' ? 'Definition' : 'Answer'}</label>
             <textarea id="ea" className="notes" value={answer} onChange={(e) => setAnswer(e.target.value)} />
+            {item.type === 'term' && <button type="button" className="link" data-testid="swap-term" onClick={() => { const t = q; setQ(answer); setAnswer(t); }}>Swap word and definition</button>}
           </>
         )}
         <button className="btn primary" disabled={!canSave} onClick={save}>Save</button>

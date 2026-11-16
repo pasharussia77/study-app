@@ -366,7 +366,7 @@ function Project({ code, projectId, profile, onBack, onStudy, onReview }) {
   useEffect(() => backend.watchFiles(code, projectId, setFiles), [code, projectId]);
   useOverlay(reporting, () => setReporting(false));
   const itemList = items || [], fileList = files || [];
-  const { deck, notReady } = useMemo(() => buildDeck(cards, itemList), [cards, items]); // eslint-disable-line
+  const { deck, notReady } = useMemo(() => buildDeck(cards, itemList, fileList), [cards, items, files]); // eslint-disable-line
   const flagged = itemList.filter((i) => i.flagged).length;
   const textMade = itemList.some((i) => i.fileId === 'text');
   const textChanged = textMade && itemList.find((i) => i.fileId === 'text').srcHash !== textHash(text);

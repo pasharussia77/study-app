@@ -39,12 +39,12 @@ export function buildReport({ version, device, health, profile, project, text, p
   docs.forEach((d) => L.push(`File "${d.name}" (${kb(d.size || 0)}): ${d.ok === false ? 'FAILED: ' + d.error : d.method + ', ' + (d.pages ? d.pages + ' page(s), ' : '') + d.chars + ' characters, ' + sec(d.ms || 0)}${d.note ? '. ' + d.note : ''}`));
   if (!files.length && !docs.length) L.push('No photos or files were added (text may have been typed or pasted).');
 
-  h('2. THE AI\'S RAW ANSWER FOR EACH READING (first 1500 characters)');
+  h('2. THE AI\'S RAW ANSWER FOR EACH READING (first 350 characters)');
   const rawReads = events.filter((e) => e.type === 'photo_read' || e.type === 'text_read');
   if (!rawReads.length) L.push('No AI readings recorded.');
   rawReads.forEach((r, i) => {
     L.push(`--- Reading ${i + 1}${r.label ? ' (' + r.label + ')' : ''} at ${time(r.t)}: ${r.type === 'text_read' ? `typed/pasted text, part ${r.part}, ${r.chars} characters` : (NAMES[r.ignore] || r.ignore)}${r.usage ? `, ${sec(r.ms || 0)}, tokens in/out ${r.usage.prompt_tokens}/${r.usage.completion_tokens}` : ''} ---`);
-    L.push(r.ok ? clip(r.raw || '', 1500) : 'FAILED: ' + r.error + (r.raw ? '\nRaw answer:\n' + clip(r.raw, 2500) : ''));
+    L.push(r.ok ? clip(r.raw || '', 350) : 'FAILED: ' + r.error + (r.raw ? '\nRaw answer:\n' + clip(r.raw, 1200) : ''));
   });
   if (rawReads.some((x) => x.type === 'photo_read')) L.push('', `Instruction sent with each picture: mode "${NAMES[(rawReads.find((x) => x.type === 'photo_read') || {}).ignore] || ''}", ${String((rawReads.find((x) => x.type === 'photo_read') || {}).prompt || '').length} characters (the full text is built into this app version).`);
 
@@ -57,24 +57,28 @@ export function buildReport({ version, device, health, profile, project, text, p
   const byFile = files.map((f, i) => ({ f, n: i + 1, list: items.filter((x) => x.fileId === f.id).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)) })).filter((g) => g.list.length);
   const textItems = items.filter((x) => x.fileId === 'text').sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   if (textItems.length) byFile.unshift({ f: null, n: 'typed or pasted text', list: textItems });
+  L.push('Legend: key = handwritten answer key, printed = printed key, assumed = no red mark on a graded page, page = answer on the page. ch = number of choices.');
+  const SRC = { 'handwritten answer key': 'key', 'printed key': 'printed', 'assumed correct (no red mark)': 'assumed', page: 'page', 'set by you': 'edited', none: 'none' };
+  const lbl = (it, l) => { const c = (it.choices || []).find((x) => x.label === l); return c ? `${l}. ${one(c.text, 24)}` : l; };
   byFile.forEach((g) => {
     L.push(`--- from ${typeof g.n === 'number' ? 'Photo ' + g.n : g.n} ---`);
     g.list.forEach((it) => {
-      const ch = it.choices && it.choices.length ? ' | choices: ' + it.choices.map((c) => c.label + '. ' + one(c.text, 40)).join('; ') : '';
-      L.push(`${it.number != null ? '#' + it.number + ' ' : ''}[${it.type}] "${one(it.question, 90)}"${ch}`);
-      if (it.type === 'term' || it.type === 'qa') L.push(`      answer: ${it.answer ? one(it.answer, 90) : 'NONE'} | source: ${it.source} | confidence: ${it.confidence}${it.flagged ? ' | NEEDS A LOOK' : ''}${it.note ? ' | note: ' + one(it.note, 140) : ''}`);
-      else if (it.type === 'multi') L.push(`      filled circles: ${(it.selected || []).join(', ') || '-'}${it.unclear && it.unclear.length ? ' | unclear: ' + it.unclear.join(', ') : ''} | printed key: ${(it.printedList || []).join(', ') || '-'} | marked wrong: ${it.markedWrong === true ? 'yes' : it.markedWrong === false ? 'no' : 'unsure'} | correct: ${(it.correctLabels || []).join(', ') || 'NONE'} | source: ${it.source} | confidence: ${it.confidence}${it.flagged ? ' | NEEDS A LOOK' : ''}${it.note ? ' | note: ' + one(it.note, 140) : ''}`);
-      else if (it.type === 'order') L.push(`      numbers written (top to bottom): ${(it.orderNumbers || []).map((n) => n ?? '-').join(', ') || '-'} | printed key: ${(it.printedList || []).join(', ') || '-'} | correct order: ${(it.correctOrder || []).join(', ') || 'NONE'} | source: ${it.source} | confidence: ${it.confidence}${it.flagged ? ' | NEEDS A LOOK' : ''}${it.note ? ' | note: ' + one(it.note, 140) : ''}`);
-      else L.push(`      student: ${it.studentAnswer ?? '-'} | circled: ${it.circled ?? '-'} | printed key: ${it.printed ?? '-'} | marked wrong: ${it.markedWrong === true ? 'yes' : it.markedWrong === false ? 'no' : 'unsure'} | correct: ${it.answer ? (it.correctLabel ? it.correctLabel + '. ' : '') + one(it.answer, 60) : 'NONE'}${it.correction ? ' | correction: ' + one(it.correction, 60) : ''} | source: ${it.source} | confidence: ${it.confidence}${it.flagged ? ' | NEEDS A LOOK' : ''}${it.note ? ' | note: ' + one(it.note, 140) : ''}`);
+      let ans;
+      if (it.type === 'term' || it.type === 'qa') ans = it.answer ? one(it.answer, 45) : 'NONE';
+      else if (it.type === 'multi') ans = `${(it.correctLabels || []).join(',') || 'NONE'} (filled: ${(it.selected || []).join(',') || '-'}${it.unclear && it.unclear.length ? '; unclear: ' + it.unclear.join(',') : ''})`;
+      else if (it.type === 'order') ans = `${(it.correctOrder || []).join(',') || 'NONE'} (numbers: ${(it.orderNumbers || []).map((n) => n ?? '-').join(',') || '-'})`;
+      else ans = `${it.correctLabel ? lbl(it, it.correctLabel) : 'NONE'}${it.correction ? ' | fix: ' + one(it.correction, 30) : ''} (written: ${one(it.studentAnswer ?? '-', 24)}${it.markedWrong === true ? '; red X' : ''})`;
+      const tags = [it.flagged ? 'NEEDS A LOOK' : '', it.confidence && it.confidence !== 'high' ? 'conf ' + it.confidence : '', it.note ? 'note: ' + one(it.note, 90) : ''].filter(Boolean).join(' | ');
+      L.push(`${it.number != null ? '#' + it.number + ' ' : ''}${it.type}${it.choices && it.choices.length > 2 ? ' ' + it.choices.length + 'ch' : ''} "${one(it.question, 45)}" -> ${ans} [${SRC[it.source] || it.source}]${tags ? ' | ' + tags : ''}`);
     });
   });
   if (!items.length) L.push('No study items yet.');
 
   h(`4. TYPED, PASTED AND FILE TEXT (${text.length} characters)`);
-  L.push(text ? clip(text, 3000) : '(empty)');
+  L.push(text ? clip(text, 1500) : '(empty)');
   L.push('Rule: one line becomes one word card only if it has a separator: " - ", " – ", " — ", a tab, " = " or ": ".');
   L.push(`Word cards made from this text: ${parsed.cards.length}; lines skipped: ${parsed.skipped}${textItems.length ? ' (NOT USED: the AI made ' + textItems.length + ' study items from this text, which replace these simple cards)' : ''}`);
-  parsed.cards.slice(0, 40).forEach((c, i) => L.push(`  ${i + 1}. "${one(c.term, 80)}"  ->  "${one(c.definition, 120)}"`));
+  parsed.cards.slice(0, 25).forEach((c, i) => L.push(`  ${i + 1}. "${one(c.term, 80)}"  ->  "${one(c.definition, 120)}"`));
   parsed.skippedLines.slice(0, 25).forEach((s) => L.push('  - skipped: ' + one(s, 130)));
 
   h('5. PROGRESS NOW');
@@ -86,7 +90,7 @@ export function buildReport({ version, device, health, profile, project, text, p
     const sum = (k) => voiceRes.reduce((a, e) => a + (e[k] || 0), 0);
     L.push(`Voice usage in this log: ${sum('recordings')} recordings (${(sum('sttMs') / 1000).toFixed(0)} s waiting on transcription), ${sum('ttsChars')} characters spoken by the tutor voice, AI tokens in/out ${sum('aiIn')}/${sum('aiOut')}.`);
   }
-  const study = events.filter((e) => ['session_start', 'answer', 'override', 'round_done', 'voice_turn', 'voice_result', 'voice_visibility', 'voice_heard'].includes(e.type)).slice(-70);
+  const study = events.filter((e) => ['session_start', 'answer', 'override', 'round_done', 'voice_turn', 'voice_result', 'voice_visibility', 'voice_heard'].includes(e.type)).slice(-40);
   const rec = (s) => (s ? `${(s.durationMs / 1000).toFixed(1)} s, loudest ${s.peak}, background ${s.floor}, speech: ${s.speech ? 'yes' : 'no'}, ended: ${s.reason}` : '');
   const reco = (e) => (e.sttModel ? ` | recognizer: ${e.sttModel}${e.languages && e.languages.length ? ' (heard as ' + e.languages.map((l) => l.code).join(',') + ')' : ''}, ${e.hints} hint words` : '');
   if (!study.length) L.push('No flashcard or quiz activity recorded yet.');
@@ -111,4 +115,24 @@ export function buildReport({ version, device, health, profile, project, text, p
   });
 
   return L.join('\n');
+}
+
+// Cuts a long report into parts that are short enough to paste into a chat one at a time.
+// Every part says which one it is and ends with a marker, so a cut-off paste is easy to spot.
+export function splitReport(text, max = 10000) {
+  const lines = String(text).split('\n');
+  const head = lines.slice(0, 3).join(' | ').slice(0, 160);
+  const parts = [];
+  let cur = [], len = 0;
+  for (const line of lines) {
+    // a section header starts a new part when the current part is already more than half full
+    const starts = /^=== /.test(line) && len > max * 0.5;
+    if (cur.length && (len + line.length + 1 > max || starts)) { parts.push(cur.join('\n')); cur = []; len = 0; }
+    // one very long line is cut into pieces
+    for (let i = 0; i < Math.max(1, Math.ceil(line.length / max)); i++) { const piece = line.slice(i * max, (i + 1) * max); if (i > 0 && cur.length) { parts.push(cur.join('\n')); cur = []; len = 0; } cur.push(piece); len += piece.length + 1; }
+  }
+  if (cur.length) parts.push(cur.join('\n'));
+  const n = parts.length;
+  if (n === 1) return [parts[0] + '\nEND OF REPORT'];
+  return parts.map((p, i) => `PART ${i + 1} of ${n}${i ? ' (continued) | ' + head : ''}\n${p}\n${i + 1 === n ? 'END OF REPORT (part ' + n + ' of ' + n + ')' : 'END OF PART ' + (i + 1) + ' of ' + n + ' - more follows'}`);
 }

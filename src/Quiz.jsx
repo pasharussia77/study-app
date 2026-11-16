@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { backend } from './firebase.js';
 import { shuffle } from './parse.js';
 import { defaultPick, queueFor, isCorrect, normalize } from './stats.js';
-import { isChoiceOnly } from './deck.js';
+import { isChoiceOnly, withNumber } from './deck.js';
 import { useStats, StatsSheet, CardPicker, TypePicker, RoundDone, ScreenHead, PlayTop } from './Session.jsx';
 import { Icon, Scenery, TileArt } from './art.jsx';
 import { diagLog } from './diag.js';
@@ -10,17 +10,17 @@ import { useOverlay, back } from './nav.js';
 
 // How one question is asked: what is shown, what counts as right, and the choices if any.
 function plan(c, cards, ask, how) {
-  if (c.type === 'multi') return { mode: 'multi', shown: c.prompt, expected: c.answers.join('; '), label: 'Select all that apply', options: shuffle(c.choices), answers: c.answers };
+  if (c.type === 'multi') return { mode: 'multi', shown: withNumber(c, c.prompt), expected: c.answers.join('; '), label: 'Select all that apply', options: shuffle(c.choices), answers: c.answers };
   if (c.type === 'order') {
     let options = shuffle(c.choices);
     if (options.every((o, k) => o === c.sequence[k])) options = [...options.slice(1), options[0]]; // never start already in order
-    return { mode: 'order', shown: c.prompt, expected: c.sequence.map((t, k) => `${k + 1}. ${t}`).join('; '), label: 'Put these in order', options, sequence: c.sequence };
+    return { mode: 'order', shown: withNumber(c, c.prompt), expected: c.sequence.map((t, k) => `${k + 1}. ${t}`).join('; '), label: 'Put these in order', options, sequence: c.sequence };
   }
   if (isChoiceOnly(c)) {
-    return { mode: 'choice', shown: c.prompt, expected: c.answer, label: c.type === 'tf' ? 'True or false?' : 'Choose the correct answer', options: c.type === 'tf' ? c.choices : shuffle(c.choices) };
+    return { mode: 'choice', shown: withNumber(c, c.prompt), expected: c.answer, label: c.type === 'tf' ? 'True or false?' : 'Choose the correct answer', options: c.type === 'tf' ? c.choices : shuffle(c.choices) };
   }
   const reversed = c.type === 'term' && ask === 'definition';
-  const shown = reversed ? c.definition : c.prompt;
+  const shown = withNumber(c, reversed ? c.definition : c.prompt);
   const expected = reversed ? c.term : c.answer;
   const label = c.type === 'qa' ? 'Answer this question' : reversed ? 'Which word matches this definition?' : 'What is the definition of…';
   let mode = 'type', options = [];

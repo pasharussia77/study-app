@@ -93,7 +93,7 @@ function createFirebaseBackend() {
       let unsub = () => {};
       signedIn().then(() => {
         unsub = onSnapshot(collection(db, 'families', code, 'projects', pid, 'items'), (snap) => {
-          cb(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+          cb(snap.docs.map((d) => ({ id: d.id, ...d.data(), createdAt: ms(d.data().createdAt) })));
         }, () => cb([]));
       });
       return () => unsub();

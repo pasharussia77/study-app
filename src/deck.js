@@ -1,15 +1,28 @@
 // The deck is everything studyable: typed "word - definition" lines plus the AI-made items.
 import { cardKey } from './stats.js';
 
-export function buildDeck(textCards, items) {
+// Everything shown to the student carries the question's number from the page, when it has one.
+export const withNumber = (c, text) => (c && c.number != null && c.number !== '' && text ? `${c.number}. ${text}` : text);
+
+// Items in the order of the pages: the photos in the order they were added, then the order on each page.
+export function inPageOrder(items, files = []) {
+  const fileTime = new Map(files.map((f) => [f.id, f.createdAt ?? 0]));
+  const firstSeen = new Map();
+  for (const it of items) if (it.fileId !== 'text') firstSeen.set(it.fileId, Math.min(firstSeen.get(it.fileId) ?? Infinity, it.createdAt ?? 0));
+  const rank = (it) => (it.fileId === 'text' ? -1 : fileTime.has(it.fileId) ? fileTime.get(it.fileId) : firstSeen.get(it.fileId) ?? 0);
+  return [...items].sort((a, b) => rank(a) - rank(b) || (a.order ?? 0) - (b.order ?? 0) || String(a.id).localeCompare(String(b.id)));
+}
+
+export function buildDeck(textCards, items, files = []) {
   const deck = [];
   // Once the AI has made study items from the typed text, those replace the simple typed cards.
   const textMade = items.some((i) => i.fileId === 'text');
   for (const c of textMade ? [] : textCards) {
-    deck.push({ key: cardKey(c), type: 'term', prompt: c.term, answer: c.definition, term: c.term, definition: c.definition });
+    // progress is saved under what the line said at first, so it is not lost when the rules change
+    deck.push({ key: cardKey({ term: c.rawTerm ?? c.term, definition: c.rawDefinition ?? c.definition }), type: 'term', prompt: c.term, answer: c.definition, term: c.term, definition: c.definition, number: c.number ?? null });
   }
   let notReady = 0;
-  for (const it of items) {
+  for (const it of inPageOrder(items, files)) {
     if (!it.answer || !it.question) { notReady++; continue; }
     const key = 'i' + cardKey({ term: it.id, definition: it.answer });
     const base = { key, type: it.type, prompt: it.question, answer: it.answer, itemId: it.id, number: it.number, section: it.section, correction: it.type === 'tf' && it.correction ? it.correction : '' };
@@ -36,16 +49,16 @@ export const answerLetters = (c) => (c.type === 'multi' ? c.answers : c.sequence
 export function cardFaces(c, first) {
   if (c.type === 'term') {
     const t = first === 'term';
-    return { fl: t ? 'word' : 'definition', ft: t ? c.term : c.definition, bl: t ? 'definition' : 'word', bt: t ? c.definition : c.term, extra: null };
+    return { fl: t ? 'word' : 'definition', ft: withNumber(c, t ? c.term : c.definition), bl: t ? 'definition' : 'word', bt: t ? c.definition : c.term, extra: null };
   }
-  if (c.type === 'qa') return { fl: 'question', ft: c.prompt, bl: 'answer', bt: c.answer, extra: null };
-  if (c.type === 'tf') return { fl: 'true or false?', ft: c.prompt, bl: 'answer', bt: c.correction ? `${c.answer} (correct: ${c.correction})` : c.answer, extra: null };
+  if (c.type === 'qa') return { fl: 'question', ft: withNumber(c, c.prompt), bl: 'answer', bt: c.answer, extra: null };
+  if (c.type === 'tf') return { fl: 'true or false?', ft: withNumber(c, c.prompt), bl: 'answer', bt: c.correction ? `${c.answer} (correct: ${c.correction})` : c.answer, extra: null };
   const L = LETTER;
   const lettered = c.choices.map((x, i) => `${L(i)}. ${x}`);
-  if (c.type === 'multi') return { fl: 'select all that apply', ft: c.prompt, bl: 'answers', bt: c.answers.map((t) => `${L(c.choices.indexOf(t))}. ${t}`).join('\n'), extra: lettered };
-  if (c.type === 'order') return { fl: 'put in order', ft: c.prompt, bl: 'correct order', bt: c.sequence.map((t, i) => `${i + 1}. ${t}`).join('\n'), extra: lettered };
+  if (c.type === 'multi') return { fl: 'select all that apply', ft: withNumber(c, c.prompt), bl: 'answers', bt: c.answers.map((t) => `${L(c.choices.indexOf(t))}. ${t}`).join('\n'), extra: lettered };
+  if (c.type === 'order') return { fl: 'put in order', ft: withNumber(c, c.prompt), bl: 'correct order', bt: c.sequence.map((t, i) => `${i + 1}. ${t}`).join('\n'), extra: lettered };
   const idx = c.choices.findIndex((x) => x === c.answer);
-  return { fl: 'multiple choice', ft: c.prompt, bl: 'answer', bt: `${L(idx < 0 ? 0 : idx)}. ${c.answer}`, extra: c.choices.map((x, i) => `${L(i)}. ${x}`) };
+  return { fl: 'multiple choice', ft: withNumber(c, c.prompt), bl: 'answer', bt: `${L(idx < 0 ? 0 : idx)}. ${c.answer}`, extra: c.choices.map((x, i) => `${L(i)}. ${x}`) };
 }
 
 export function deckTypes(deck) {

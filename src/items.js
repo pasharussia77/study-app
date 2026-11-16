@@ -2,6 +2,8 @@
 // the app works out the correct answers with fixed rules, so the logic can be checked.
 import { normalize } from './stats.js';
 
+import { shorterIsTerm } from './parse.js';
+
 export const TYPE_LABEL = { term: 'Word', qa: 'Question', tf: 'True/False', mc: 'Multiple choice', multi: 'Select all', order: 'Put in order' };
 
 const MODE_RULES = {
@@ -178,7 +180,11 @@ export function resolveItem(raw, page = {}, index = 0) {
 
   if (type === 'term' || type === 'qa') {
     const ans = str(raw.answer_text) || str(raw.printed_answer);
-    if (ans) { out.answer = ans; out.source = 'page'; }
+    if (ans) {
+      out.answer = ans; out.source = 'page';
+      // The term is always the shorter side: if the "question" is longer than its answer, swap them.
+      if (type === 'term' && out.question && !shorterIsTerm(out.question, ans)) { out.answer = out.question; out.question = ans; out.swapped = true; }
+    }
     else if (isKey && out.studentAnswer) { out.answer = out.studentAnswer; out.source = 'handwritten answer key'; }
     else unknownReason = 'No answer is shown on the page.';
   } else if (type === 'multi' || type === 'order') {
@@ -240,9 +246,28 @@ export function resolvePage(data, prevCtx = null, hand = 'key') {
   // A page with no red marks of its own still counts as graded when the pages before it were.
   const page = { graded: !!(data.page && data.page.graded) || !!(prevCtx && prevCtx.graded), score: str(data.page && data.page.score) || null, hand: hand === 'student' ? 'student' : 'key' };
   const items = data.items.filter((r) => r && (str(r.question) || str(r.answer_text))).map((r, i) => resolveItem(r, page, i));
+  fixNumbers(items, prevCtx);
   const ends = data.ends_with || {};
   const ctx = { section: str(ends.section), type: str(ends.type), last_number: ends.last_number ?? null, graded: page.graded };
   return { page, items, ctx };
+}
+
+// Question numbers keep counting up. When a number repeats for a different question and the next number
+// shows there is a gap (45, 45, 47), the repeat is the next number (46). `ctx` is how the page before ended.
+// Changes the list in place and returns the positions it changed.
+export function fixNumbers(seq, ctx = null) {
+  let prev = ctx && ctx.last_number != null && Number.isFinite(+ctx.last_number) ? { number: +ctx.last_number, type: ctx.type, question: null, fromCtx: true } : null;
+  const changed = [];
+  seq.forEach((cur, i) => {
+    const n = cur.number == null || !Number.isFinite(+cur.number) ? null : +cur.number;
+    if (n != null && prev && prev.number === n) {
+      const differs = prev.fromCtx ? cur.type !== prev.type : normalize(cur.question) !== normalize(prev.question);
+      const next = seq.slice(i + 1).find((x) => x.number != null && Number.isFinite(+x.number));
+      if (differs && (!next || +next.number > n + 1)) { cur.number = n + 1; changed.push(i); }
+    }
+    prev = { number: cur.number == null ? null : +cur.number, type: cur.type, question: cur.question };
+  });
+  return changed;
 }
 
 // Compares the score written on the sheet with the red X marks found.
@@ -277,8 +302,8 @@ export function reapplyItem(it, page = {}) {
     selected_choices: it.selected, unclear_choices: it.unclear, order_numbers: it.orderNumbers,
     answer_text: !isChoice && it.source === 'page' ? it.answer : null, confidence: it.confidence, note, needs_review: aiReview
   }, page, it.order ?? 0);
-  const patch = { correctLabel: r.correctLabel, ...(it.type === 'multi' ? { correctLabels: r.correctLabels ?? null } : {}), ...(it.type === 'order' ? { correctOrder: r.correctOrder ?? null } : {}), answer: r.answer, source: r.source, note: r.note, flagged: r.flagged, correction: r.correction, aiReview: r.aiReview };
-  const cur = (k) => (k === 'correction' ? it.correction || '' : k === 'aiReview' ? it.aiReview : it[k] ?? null);
+  const patch = { ...(it.type === 'term' ? { question: r.question } : {}), correctLabel: r.correctLabel, ...(it.type === 'multi' ? { correctLabels: r.correctLabels ?? null } : {}), ...(it.type === 'order' ? { correctOrder: r.correctOrder ?? null } : {}), answer: r.answer, source: r.source, note: r.note, flagged: r.flagged, correction: r.correction, aiReview: r.aiReview };
+  const cur = (k) => (k === 'question' ? it.question : k === 'correction' ? it.correction || '' : k === 'aiReview' ? it.aiReview : it[k] ?? null);
   const same = Object.keys(patch).every((k) => JSON.stringify(patch[k] ?? null) === JSON.stringify(cur(k) ?? null));
   return same ? null : patch;
 }

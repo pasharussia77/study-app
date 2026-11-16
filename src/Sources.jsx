@@ -24,6 +24,9 @@ async function downloadPhoto(dataUrl, name) {
 
 export default function Sources({ code, projectId, projectName, canSave, onAppend, onReview }) {
   const [files, setFiles] = useState([]);
+  const [allItems, setAllItems] = useState([]);
+  const [rereading, setRereading] = useState(false); // the "read all photos again" question
+  const [rereadHand, setRereadHand] = useState('key');
   const [pending, setPending] = useState(null); // photos waiting for the "what to read" choice
   const [busy, setBusy] = useState('');
   const [msg, setMsg] = useState(null); // { kind: 'ok' | 'error', text, review? }
@@ -34,6 +37,8 @@ export default function Sources({ code, projectId, projectName, canSave, onAppen
   const cam = useRef(null), gallery = useRef(null), doc = useRef(null);
 
   useEffect(() => backend.watchFiles(code, projectId, setFiles), [code, projectId]);
+  useEffect(() => backend.watchItems(code, projectId, setAllItems), [code, projectId]);
+  useOverlay(rereading, () => setRereading(false));
   useOverlay(pending !== null, () => setPending(null));
   useOverlay(viewing !== null, () => setViewing(null));
   useOverlay(removing !== null, () => setRemoving(null));
@@ -58,7 +63,7 @@ export default function Sources({ code, projectId, projectName, canSave, onAppen
   };
 
   // Reads the given photos in page order; each page is told how the previous page ended.
-  const readList = async (todo) => {
+  const readList = async (todo, { keepEdits = false } = {}) => {
     setMsg(null);
     const ctxById = new Map();
     let made = 0, flagged = 0, failed = 0, lastErr = '';
@@ -70,7 +75,10 @@ export default function Sources({ code, projectId, projectName, canSave, onAppen
       setBusy(`Reading photo ${i + 1} of ${todo.length}…`);
       try {
         const r = await readPhotoItems(code, f.data, f.ignore, ctx, (e) => diagLog(projectId, { ...e, fileId: f.id }), f.hand || 'key');
-        await backend.replaceItemsForFile(code, projectId, f.id, r.items);
+        // Items you changed by hand stay (the new reading of the same question is dropped).
+        const kept = keepEdits ? allItems.filter((x) => x.fileId === f.id && x.source === 'set by you').map(({ id, createdAt, fileId, ...rest }) => rest) : [];
+        const fresh = r.items.filter((n) => !kept.some((k) => k.number != null && k.number === n.number && k.type === n.type));
+        await backend.replaceItemsForFile(code, projectId, f.id, [...fresh, ...kept]);
         await backend.updateFile(code, projectId, f.id, { status: 'done', error: '', page: r.page, ctx: r.ctx, made: r.items.length });
         ctxById.set(f.id, r.ctx);
         made += r.items.length; flagged += r.items.filter((x) => x.flagged).length;
@@ -85,6 +93,15 @@ export default function Sources({ code, projectId, projectName, canSave, onAppen
   };
 
   const readPhotos = () => readList(files.filter((f) => f.status !== 'done'));
+
+  const readAllAgain = async () => {
+    const hand = rereadHand;
+    setRereading(false);
+    const todo = files.map((f) => ({ ...f, hand }));
+    for (const f of todo) await backend.updateFile(code, projectId, f.id, { hand }).catch(() => {});
+    diagLog(projectId, { type: 'reread_all', photos: todo.length, hand });
+    readList(todo, { keepEdits: true });
+  };
 
   const readAgain = (f) => {
     if (!confirm('Read this photo again? This replaces the study items made from it, including any changes you made.')) return;
@@ -162,6 +179,9 @@ export default function Sources({ code, projectId, projectName, canSave, onAppen
         </ul>
       )}
       {unread > 0 && <button className="btn primary" disabled={!!busy} onClick={readPhotos}><Icon name="sparkle" />{`Read ${unread} photo${unread > 1 ? 's' : ''}`}</button>}
+      {files.some((f) => f.status === 'done' || f.status === 'error') && unread === 0 && (
+        <button className="btn ghost" disabled={!!busy} onClick={() => setRereading(true)} data-testid="reread-all"><Icon name="sparkle" />Re-read all photos</button>
+      )}
       {busy && <p className="hint" role="status">{busy}</p>}
       {msg && (
         <div className={msg.kind === 'ok' ? 'okmsg' : 'error'} role={msg.kind === 'ok' ? 'status' : 'alert'}>
@@ -198,6 +218,25 @@ export default function Sources({ code, projectId, projectName, canSave, onAppen
           </div>
         );
       })()}
+
+      {rereading && (
+        <div className="overlay" onClick={() => setRereading(false)}>
+          <div className="stats-sheet" role="dialog" aria-label="Re-read all photos" onClick={(e) => e.stopPropagation()}>
+            <h2>Re-read all photos?</h2>
+            <p className="muted">Handwriting on the pages is</p>
+            <fieldset className="seg hand-seg">
+              <legend className="sr">Handwriting on the pages is</legend>
+              <button type="button" className={rereadHand === 'key' ? 'on' : ''} aria-pressed={rereadHand === 'key'} onClick={() => setRereadHand('key')}>The answer key</button>
+              <button type="button" className={rereadHand === 'student' ? 'on' : ''} aria-pressed={rereadHand === 'student'} onClick={() => setRereadHand('student')}>A student&rsquo;s work</button>
+            </fieldset>
+            <p className="muted tiny">The AI reads all {files.length} photo{files.length === 1 ? '' : 's'} again, one by one. This uses the AI and takes about {Math.max(1, Math.round(files.length * 12 / 60))} minute{Math.round(files.length * 12 / 60) > 1 ? 's' : ''}. Items you edited by hand stay. If a photo cannot be read, its old items stay.</p>
+            <div className="stack">
+              <button className="btn primary" onClick={readAllAgain}>Read all {files.length} again</button>
+              <button className="link" onClick={() => setRereading(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {removing && (
         <div className="overlay" onClick={() => setRemoving(null)}>
