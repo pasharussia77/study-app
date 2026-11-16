@@ -3,7 +3,7 @@ import { backend } from './firebase.js';
 import { shuffle } from './parse.js';
 import { defaultPick, queueFor, normalize } from './stats.js';
 import { askAIDetailed } from './ai.js';
-import { describeQuestion, utterance, maxAttempts, countsRight, matchChoice, detectCommand, quickCorrect, praise, revealCanned, answerLine, buildTutorMessages, parseTutor, sttContext, isEnglishSpeech } from './tutor.js';
+import { describeQuestion, utterance, maxAttempts, countsRight, matchChoice, detectCommand, quickCorrect, praise, revealCanned, answerLine, buildTutorMessages, parseTutor, sttContext, isEnglishSpeech, isLetters, judgeLetters } from './tutor.js';
 import { speak, warm, stopSpeaking, startListening, transcribe, beep, primeMic, VOICES, getVoice, setVoice } from './voice.js';
 import { useStats, StatsSheet, CardPicker, TypePicker, RoundDone, ScreenHead, PlayTop } from './Session.jsx';
 import { Icon, Scenery, TileArt } from './art.jsx';
@@ -80,6 +80,12 @@ export default function Voice({ cards, code, projectId, onExit }) {
 
   const judge = async (c, qd, text, attemptNo, hints, turn) => {
     const last = attemptNo >= maxAttempts(c);
+    if (isLetters(c)) {
+      const ok = judgeLetters(c, text);
+      if (ok === null) return { unclear: true, spoken: 'Which letters?' };
+      if (ok) return { correct: true, spoken: praise(), verdict: 'correct', rule: true };
+      return { correct: false, final: true, spoken: revealCanned(c, qd), display: answerLine(c), verdict: 'incorrect', rule: true };
+    }
     if (c.type === 'tf' || c.type === 'mc') {
       const idx = matchChoice(text, c.choices);
       if (idx < 0) return { unclear: true, spoken: c.type === 'tf' ? 'True or false?' : 'Which one?' };

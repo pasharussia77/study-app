@@ -49,9 +49,9 @@ export default function Sources({ code, projectId, projectName, canSave, onAppen
     try {
       for (let i = 0; i < list.length; i++) {
         setBusy(`Saving photo ${i + 1} of ${list.length}…`);
-        const { data, width, height } = await compressImage(list[i]);
+        const { data, width, height, enh } = await compressImage(list[i]);
         const id = await backend.addFile(code, projectId, { kind: 'photo', data, ignore, hand, status: 'new' });
-        diagLog(projectId, { type: 'photo_added', fileId: id, ignore, hand, name: list[i].name, origBytes: list[i].size, origType: list[i].type, w: width, h: height, storedChars: data.length });
+        diagLog(projectId, { type: 'photo_added', fileId: id, ignore, hand, name: list[i].name, origBytes: list[i].size, origType: list[i].type, w: width, h: height, storedChars: data.length, enh });
       }
     } catch (e) { setMsg({ kind: 'error', text: e.message }); }
     setBusy('');

@@ -1,5 +1,6 @@
 // The voice tutor's rules: how a question is spoken, how a spoken choice is understood, and what the AI is asked.
 import { normalize, isCorrect } from './stats.js';
+import { answerLetters } from './deck.js';
 
 const L = (i) => String.fromCharCode(65 + i);
 
@@ -9,7 +10,9 @@ export const INTRO = {
   word: 'Which word fits each definition?',
   question: 'Questions.',
   'true/false': 'True or false questions.',
-  'multiple choice': 'Multiple choice questions.'
+  'multiple choice': 'Multiple choice questions.',
+  'select all': 'Select all that apply. Say the letters.',
+  order: 'Put these in order. Say the letters in order.'
 };
 
 // `spoken` is just the question; `intro` explains the kind of question and is said once per run of the same kind.
@@ -17,6 +20,9 @@ export function describeQuestion(c, ask = 'term') {
   const base = (kind, label, shown, spoken, expected, choices) => ({ kind, label, shown, spoken, expected, choices, intro: INTRO[kind] });
   if (c.type === 'tf') return base('true/false', 'True or false?', c.prompt, sentence(c.prompt), c.answer, c.choices);
   if (c.type === 'mc') return base('multiple choice', 'Choose the correct answer', c.prompt, `${c.prompt} ${c.choices.map((t, i) => `${L(i)}, ${t}.`).join(' ')}`, c.answer, c.choices);
+  const lettered = () => `${c.prompt} ${c.choices.map((t, i) => `${L(i)}, ${t}.`).join(' ')}`;
+  if (c.type === 'multi') return base('select all', 'Select all that apply', c.prompt, lettered(), sayLetters(answerLetters(c), 'and'), c.choices);
+  if (c.type === 'order') return base('order', 'Put these in order', c.prompt, lettered(), answerLetters(c).join(', '), c.choices);
   if (c.type === 'qa') return base('question', 'Answer this question', c.prompt, sentence(c.prompt), c.answer, null);
   return ask === 'definition'
     ? base('word', 'Which word matches this definition?', c.definition, sentence(c.definition), c.term, null)
@@ -34,10 +40,15 @@ export function quickCorrect(heard, expected) {
   return eWords.length <= 3 && hWords.length <= 8 && !negated && ` ${h} `.includes(` ${e} `);
 }
 
-// Tries per kind: choosing (true/false, multiple choice) has one, spoken answers three.
-export const maxAttempts = (c) => (c.type === 'tf' || c.type === 'mc' ? 1 : 3);
+// "A, B and D"
+export const sayLetters = (letters, word = 'and') => (letters.length < 2 ? letters.join('') : `${letters.slice(0, -1).join(', ')} ${word} ${letters[letters.length - 1]}`);
+export const isPick = (c) => c.type === 'tf' || c.type === 'mc' || c.type === 'multi' || c.type === 'order';
+export const isLetters = (c) => c.type === 'multi' || c.type === 'order';
+
+// Tries per kind: choosing (true/false, multiple choice, select all, put in order) has one, spoken answers three.
+export const maxAttempts = (c) => (isPick(c) ? 1 : 3);
 // Counts as "right" (done) only if no real help was needed.
-export const countsRight = (c, attempt) => (c.type === 'tf' || c.type === 'mc' ? attempt === 1 : attempt <= 2);
+export const countsRight = (c, attempt) => (isPick(c) ? attempt === 1 : attempt <= 2);
 
 function lev(a, b) {
   let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
@@ -91,6 +102,37 @@ export function matchChoice(heard, choices) {
   return byLetter !== -1 ? byLetter : byWords;
 }
 
+// Several spoken letters ("A and C", "hey, see, dee", "B then A then C"). Returns the choice positions in the order said,
+// or null if anything else was heard. Numbers and "first, second" count as positions only when `numbers` is on.
+const LETTERS = { ...SPOKEN, ee: 4, f: 5, ef: 5, eff: 5, g: 6, gee: 6, jee: 6, h: 7, aitch: 7 };
+const NUMBER = { 1: 0, one: 0, 2: 1, two: 1, 3: 2, three: 2, 4: 3, four: 3, 5: 4, five: 4, 6: 5, six: 5, 7: 6, seven: 6, 8: 7, eight: 7, ...ORDINAL };
+const SKIP = new Set(['and', 'then', 'um', 'uh', 'er', 'hmm', 'the', 'letter', 'letters', 'option', 'options', 'choice', 'choices', 'answer', 'answers', 'is', 'are', 'its', "it's", 'it', 'i', 'think', 'say', 'plus', 'also', 'next', 'comes', 'number']);
+export function matchLetters(heard, count, numbers = false) {
+  const t = clean(heard);
+  if (!t) return null;
+  if (numbers && /^(all|all of them|all of the above|every one|everything|all (?:four|five|three|six))$/.test(t)) return Array.from({ length: count }, (_, i) => i);
+  const out = [];
+  for (const w of t.split(' ')) {
+    let found = null;
+    if (w in LETTERS) found = [LETTERS[w]];
+    else if (numbers && w in NUMBER) found = [NUMBER[w]];
+    else if (SKIP.has(w)) continue;
+    else if (/^[a-h]{2,8}$/.test(w) && new Set(w).size === w.length) found = [...w].map((ch) => ch.charCodeAt(0) - 97); // "acd" run together
+    if (!found || found.some((i) => i >= count)) return null;
+    out.push(...found);
+  }
+  if (!out.length || new Set(out).size !== out.length) return null;
+  return out;
+}
+// Judges spoken letters for "select all" (any order) and "put in order" (exact order). Null means unclear.
+export function judgeLetters(c, heard) {
+  const said = matchLetters(heard, c.choices.length, c.type === 'multi');
+  if (!said) return null;
+  const want = answerLetters(c).map((l) => l.charCodeAt(0) - 65);
+  if (c.type === 'multi') return said.length === want.length && want.every((i) => said.includes(i));
+  return said.length === want.length && said.every((i, k) => i === want[k]);
+}
+
 // Short spoken commands. Only short phrases count, so a real answer is never mistaken for a command.
 export function detectCommand(heard) {
   const t = clean(heard);
@@ -108,13 +150,15 @@ export const WRONG = 'Wrong.';
 export const praise = () => RIGHT;
 
 export function revealCanned(c, qd) {
-  if (c.type === 'tf' || c.type === 'mc') return WRONG;
+  if (isPick(c)) return WRONG;
   return `${WRONG} The answer is: ${qd.expected}`;
 }
 
 // Shown on screen (not spoken) after a wrong choice.
 export function answerLine(c) {
   if (c.type === 'tf') return `Answer: ${c.answer}`;
+  if (c.type === 'multi') return `Answer: ${sayLetters(answerLetters(c))}`;
+  if (c.type === 'order') return `Answer: ${answerLetters(c).join(', ')}`;
   const i = c.choices.findIndex((x) => x === c.answer);
   return `Answer: ${String.fromCharCode(65 + (i < 0 ? 0 : i))}. ${c.answer}`;
 }
@@ -148,6 +192,7 @@ export function sttContext(c, qd, deck) {
   const short = (x) => { const s = String(x).trim(); return s.length <= 40 ? s : s.split(/\s+/).slice(0, 4).join(' '); };
   if (c.type === 'tf') return { prompt: `${base} The question is a true or false statement, and the answer is the word true or the word false.`, keywords: ['true', 'false'] };
   if (c.type === 'mc') return { prompt: `${base} The question has lettered choices. The student says a letter (A, B, C or D) or the choice itself. Question: ${qd.shown}`.slice(0, 380), keywords: c.choices.map(short) };
+  if (isLetters(c)) return { prompt: `${base} The question has lettered choices. The student says several letters, for example "A, C and D". Question: ${qd.shown}`.slice(0, 380), keywords: c.choices.map(short) };
   const vocab = [...new Set(deck.filter((x) => x.type === 'term').map((x) => short(x.term)))].slice(0, 40);
   return { prompt: `${base} Short answers, even a single word, are common. Question: ${qd.shown}`.slice(0, 380), keywords: vocab };
 }

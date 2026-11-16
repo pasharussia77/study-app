@@ -121,9 +121,20 @@ export default function Items({ code, projectId }) {
                     <span className="src">{SOURCE_LABEL[it.source] || it.source}</span>
                   </div>
                   <p className="item-q">{it.question}</p>
-                  {it.choices && it.choices.length > 0 && (
+                  {it.choices && it.choices.length > 0 && it.type !== 'order' && (
                     <ul className="ichoices">
-                      {it.choices.map((c) => <li key={c.label} className={c.label === it.correctLabel ? 'right' : ''}>{c.label}. {c.text}{c.label === it.correctLabel ? '  ✓' : ''}</li>)}
+                      {it.choices.map((c) => {
+                        const on = it.type === 'multi' ? (it.correctLabels || []).includes(c.label) : c.label === it.correctLabel;
+                        return <li key={c.label} className={on ? 'right' : ''}>{c.label}. {c.text}{on ? '  ✓' : ''}</li>;
+                      })}
+                    </ul>
+                  )}
+                  {it.type === 'order' && (
+                    <ul className="ichoices ordered" data-testid="order-list">
+                      {it.choices.map((c) => {
+                        const at = (it.correctOrder || []).indexOf(c.label);
+                        return <li key={c.label} className={at >= 0 ? 'right' : ''}>{at >= 0 ? `${at + 1}` : '?'} · {c.text}</li>;
+                      })}
                     </ul>
                   )}
                   {it.type === 'tf' && it.correction && <p className="ichoices-answer" data-testid="correction">Correction: <b>{it.correction}</b></p>}
@@ -166,13 +177,17 @@ export default function Items({ code, projectId }) {
 
 function EditSheet({ item, onClose, code, projectId }) {
   const isChoice = item.type === 'tf' || item.type === 'mc';
+  const isMulti = item.type === 'multi', isOrder = item.type === 'order';
+  const [many, setMany] = useState(item.correctLabels || []);
+  const [nums, setNums] = useState(() => (item.choices || []).map((c) => { const at = (item.correctOrder || []).indexOf(c.label); return at >= 0 ? String(at + 1) : ''; }));
+  const numsOk = isOrder && [...nums].map(Number).sort((a, b) => a - b).every((n, i) => n === i + 1);
   const [q, setQ] = useState(item.question);
   const [choices, setChoices] = useState(item.choices || []);
   const [correct, setCorrect] = useState(item.correctLabel);
   const [answer, setAnswer] = useState(item.answer || '');
   const [correction, setCorrection] = useState(item.correction || '');
   const falseLabel = item.type === 'tf' ? ((item.choices || []).find((c) => c.text.trim().toLowerCase() === 'false') || {}).label : null;
-  const canSave = q.trim() && (isChoice ? !!correct : answer.trim());
+  const canSave = q.trim() && (isChoice ? !!correct : isMulti ? many.length > 0 : isOrder ? numsOk : answer.trim());
 
   const save = async () => {
     const patch = { question: q.trim(), flagged: false, source: 'set by you', note: '' };
@@ -181,6 +196,16 @@ function EditSheet({ item, onClose, code, projectId }) {
       patch.correctLabel = correct;
       patch.answer = patch.choices.find((c) => c.label === correct).text;
       if (item.type === 'tf') patch.correction = correct === falseLabel ? correction.trim() : '';
+    } else if (isMulti || isOrder) {
+      patch.choices = choices.map((c) => ({ label: c.label, text: c.text.trim() }));
+      if (isMulti) {
+        patch.correctLabels = patch.choices.filter((c) => many.includes(c.label)).map((c) => c.label);
+        patch.answer = patch.choices.filter((c) => many.includes(c.label)).map((c) => c.text).join('; ');
+      } else {
+        const sorted = patch.choices.map((c, i) => ({ c, n: +nums[i] })).sort((a, b) => a.n - b.n);
+        patch.correctOrder = sorted.map((x) => x.c.label);
+        patch.answer = sorted.map((x, i) => `${i + 1}. ${x.c.text}`).join('; ');
+      }
     } else patch.answer = answer.trim();
     await backend.updateItem(code, projectId, item.id, patch);
     onClose();
@@ -213,7 +238,31 @@ function EditSheet({ item, onClose, code, projectId }) {
             <input id="ec" className="big-input" value={correction} onChange={(e) => setCorrection(e.target.value)} />
           </>
         )}
-        {isChoice ? null : (
+        {isMulti && (
+          <fieldset className="radios">
+            <legend className="muted tiny">Tick every correct choice</legend>
+            {choices.map((c, i) => (
+              <label key={c.label} className={'radio' + (many.includes(c.label) ? ' on' : '')}>
+                <input type="checkbox" checked={many.includes(c.label)} aria-label={`Choice ${c.label} is correct`} onChange={() => setMany(many.includes(c.label) ? many.filter((x) => x !== c.label) : [...many, c.label])} />
+                <span className="rl">{c.label}</span>
+                <input className="rt" value={c.text} aria-label={`Choice ${c.label}`} onChange={(e) => setChoices(choices.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))} />
+              </label>
+            ))}
+          </fieldset>
+        )}
+        {isOrder && (
+          <fieldset className="radios">
+            <legend className="muted tiny">Number each event: 1 for the first, {choices.length} for the last</legend>
+            {choices.map((c, i) => (
+              <label key={c.label} className="radio">
+                <input className="numin" inputMode="numeric" value={nums[i]} aria-label={`Position of event ${c.label}`} onChange={(e) => setNums(nums.map((x, j) => (j === i ? e.target.value.replace(/\D/g, '').slice(0, 2) : x)))} />
+                <input className="rt" value={c.text} aria-label={`Event ${c.label}`} onChange={(e) => setChoices(choices.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))} />
+              </label>
+            ))}
+            {!numsOk && <p className="muted tiny">Use each number from 1 to {choices.length} once.</p>}
+          </fieldset>
+        )}
+        {isChoice || isMulti || isOrder ? null : (
           <>
             <label className="muted tiny" htmlFor="ea">{item.type === 'term' ? 'Definition' : 'Answer'}</label>
             <textarea id="ea" className="notes" value={answer} onChange={(e) => setAnswer(e.target.value)} />

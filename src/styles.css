@@ -491,3 +491,15 @@ body::before { content: ''; position: fixed; inset: 0; z-index: -1; background: 
 .crack-box input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border-radius: 50%; background: #fff; border: 4px solid var(--violet); box-shadow: 0 4px 10px rgba(40, 30, 120, .3); }
 .crack-ends { display: flex; justify-content: space-between; font-size: .75rem; font-weight: 700; color: var(--muted); }
 .crack-box .link { align-self: center; font-size: .9rem; padding: 6px 8px; }
+
+/* Select all and put in order (v0.14) */
+.opt.on { border-color: var(--violet); }
+.opt.on .radio-dot { border-color: var(--violet); background: var(--violet); color: #fff; }
+.radio-dot.box { border-radius: 8px; }
+.radio-dot.box, .radio-dot.num { display: grid; place-items: center; font-size: .85rem; font-weight: 800; line-height: 1; }
+.opt.right .radio-dot.num, .opt.wrong .radio-dot.num { background: #fff; color: var(--ink); }
+.opt.right .radio-dot.box { background: var(--good); }
+.opt.wrong .radio-dot.box { background: var(--bad); }
+.face-back b { white-space: pre-line; }
+.ichoices.ordered li { font-weight: 600; }
+.numin { width: 3.2em; text-align: center; border: 1.5px solid var(--line); border-radius: 12px; padding: 6px 4px; font: inherit; font-weight: 700; background: #fff; color: var(--ink); }

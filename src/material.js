@@ -1,4 +1,5 @@
 import { askAIDetailed } from './ai.js';
+import { enhanceCanvas } from './enhance.js';
 
 const MAX_DATA_CHARS = 850000; // Firestore documents must stay under 1 MiB
 
@@ -13,7 +14,8 @@ export function fileToImage(file) {
 }
 
 // Shrinks a photo so it fits in the database: longest side 1600 px, JPEG.
-export async function compressImage(source) {
+// Page photos are also cleaned up lightly (lamp-light colour cast removed, paper whitened); see enhance.js.
+export async function compressImage(source, { enhance = true } = {}) {
   const img = source instanceof HTMLCanvasElement ? source : await fileToImage(source);
   const w0 = img.naturalWidth || img.width, h0 = img.naturalHeight || img.height;
   let max = 1600, quality = 0.78;
@@ -24,8 +26,9 @@ export async function compressImage(source) {
     const ctx = c.getContext('2d');
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
     ctx.drawImage(img, 0, 0, c.width, c.height);
+    const enh = enhance ? enhanceCanvas(c) : { applied: false, why: 'off' };
     const data = c.toDataURL('image/jpeg', quality);
-    if (data.length <= MAX_DATA_CHARS) return { data, width: c.width, height: c.height };
+    if (data.length <= MAX_DATA_CHARS) return { data, width: c.width, height: c.height, enh };
     quality = Math.max(0.5, quality - 0.1); max = Math.round(max * 0.8);
   }
   throw new Error('That picture is too large to store.');

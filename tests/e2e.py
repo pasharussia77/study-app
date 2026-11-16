@@ -17,6 +17,12 @@ PAGE = {'page': {'graded': False, 'score': None}, 'ends_with': {}, 'items': [
     {**base, 'type': 'mc', 'number': 18, 'question': 'Amendment', 'choices': BANK, 'student_answer': 'B'},
 ]}
 
+five = lambda texts: [{'label': '', 'text': t} for t in texts]
+PAGE6 = {'page': {'graded': False, 'score': None}, 'ends_with': {}, 'items': [
+    {**base, 'type': 'multi', 'number': 41, 'question': 'Which rights are in the First Amendment?', 'choices': five(['Free speech', 'Free press', 'Quartering', 'Fair trial', 'Bear arms']), 'selected_choices': ['A', 'B', 'D', 'E'], 'unclear_choices': []},
+    {**base, 'type': 'order', 'number': 46, 'question': 'Number the events in order', 'choices': five(['Declaration', 'Constitution', 'Revolution won', 'Bill of Rights', 'Articles']), 'order_numbers': [1, 4, 2, 5, 3]},
+]}
+
 passed = failed = 0
 def ok(cond, name):
     global passed, failed
@@ -39,15 +45,15 @@ try:
         def open_fold():
             pg.locator('button.fold').wait_for()
             if pg.locator('#material-body').get_attribute('hidden') is not None: pg.locator('button.fold').click()
-        def add_photo(hand_label):
+        def add_photo(hand_label, page=PAGE, made=5):
             open_fold()
-            pg.evaluate('(d) => { window.__mockAI = [d]; }', PAGE)
+            pg.evaluate('(d) => { window.__mockAI = [d]; }', page)
             pg.set_input_files('[data-testid=in-photos]', {'name': 'page.png', 'mimeType': 'image/png', 'buffer': PNG})
             pg.get_by_role('dialog', name='What should be read?').wait_for()
             btn(hand_label).click()
             btn('Read everything').click()
             btn('Read 1 photo').click()
-            pg.get_by_text('Made 5 study items').wait_for()
+            pg.get_by_text(f'Made {made} study items').wait_for()
 
         pg.goto(URL)
         btn('Start a new family').click()
@@ -137,6 +143,73 @@ try:
         btn('Remove photo and its items').click()
         pg.wait_for_timeout(200)
         ok('Review study items (5)' in text() and pg.locator('.thumb').count() == 0, 'remove with items: 5 left, no photos')
+
+        # C and D. Select all that apply, and number the events.
+        pg.evaluate('localStorage.clear()'); pg.goto(URL)
+        btn('Start a new family').click()
+        for i, n in enumerate(['Anna', 'Ben', 'Cleo']): pg.get_by_placeholder(f'Name {i + 1}').fill(n)
+        btn('Create family').click(); btn('Continue').click()
+        btn('Anna').click(); btn('New project').click()
+        pg.get_by_label('Project name').fill('Page six'); btn('Create project').click()
+        add_photo('The answer key', PAGE6, 2)
+        ok('need a look' not in pg.locator('.okmsg').inner_text(), 'new types: nothing needs a look')
+        btn('Review study items').click()
+        ok('2 items · all look fine' in pg.inner_text('[data-testid=items-summary]'), 'new types: 2 items, all fine')
+        ok(pg.locator('.ichoices li.right').all_inner_texts()[:4] == ['A. Free speech ✓', 'B. Free press ✓', 'D. Fair trial ✓', 'E. Bear arms ✓'] or len(pg.locator('.ichoices:not(.ordered) li.right').all_inner_texts()) == 4, 'review: four filled choices ticked')
+        ok(pg.locator('[data-testid=order-list] li').all_inner_texts() == ['1 · Declaration', '4 · Constitution', '2 · Revolution won', '5 · Bill of Rights', '3 · Articles'], 'review: events show their numbers')
+        # edit the select-all item: untick one, save
+        pg.locator('[data-testid=item]', has_text='Which rights').get_by_role('button', name='Edit').click()
+        pg.get_by_label('Choice E is correct').uncheck(); btn('Save').click()
+        ok(len(pg.locator('.ichoices:not(.ordered) li.right').all_inner_texts()) == 3, 'edit: select all saved with three choices')
+        pg.locator('[data-testid=item]', has_text='Number the events').get_by_role('button', name='Edit').click()
+        pg.get_by_label('Position of event A').fill('2')
+        ok(btn('Save').is_disabled(), 'edit: order with a repeated number cannot be saved')
+        pg.get_by_label('Position of event C').fill('1'); btn('Save').click()
+        ok(pg.locator('[data-testid=order-list] li').all_inner_texts()[:3] == ['2 · Declaration', '4 · Constitution', '1 · Revolution won'], 'edit: new order saved')
+        pg.go_back()
+
+        # Voice quiz: several letters are understood ("A, B and D"), and letters in order.
+        pg.evaluate("window.__mockSpeech = ['A and B', 'A, B, C, D, E']")
+        btn('Voice quiz').click(); pg.get_by_text('Shuffle', exact=False).first.click(); btn('Start talking').click()
+        pg.get_by_text('Round complete').wait_for()
+        ok('0 right, 2 missed' in text(), 'voice: wrong letters are marked wrong')
+        pg.evaluate("window.__mockSpeech = ['A, B and D', 'C, A, E, B, D']")
+        btn('Practice missed').click()
+        pg.get_by_text('You got all 2 cards right').wait_for()
+        ok('2 Correct' in text().replace('\n', ' ') or 'All mastered' in text(), 'voice: right letters answered right, in any order for select all')
+        pg.go_back(); pg.get_by_role('button', name='Start talking').wait_for(); pg.go_back()
+
+        # Written quiz, not shuffled: select all first, then put in order.
+        btn('Written quiz').click()
+        pg.get_by_text('Shuffle the questions').click(); btn('Start').click()
+        ok('Select all that apply' in text(), 'quiz: select-all label')
+        for t in ['Free speech', 'Free press', 'Fair trial']: pg.locator('button.opt', has_text=t).click()
+        btn('Check').click()
+        ok('Correct' in pg.inner_text('[data-testid=feedback]'), 'quiz: select all answered right')
+        pg.locator('[data-testid=next]').click()
+        ok('Put these in order' in text(), 'quiz: put-in-order label')
+        ok(btn('Check').is_disabled(), 'quiz: order cannot be checked until all are tapped')
+        for t in ['Revolution won', 'Declaration', 'Articles', 'Constitution', 'Bill of Rights']: pg.locator('button.opt', has_text=t).click()
+        btn('Check').click()
+        ok('Correct' in pg.inner_text('[data-testid=feedback]'), 'quiz: order answered right')
+        pg.locator('[data-testid=next]').click()
+        # again, wrong this time
+        pg.go_back(); btn('Start').click()
+        pg.locator('button.opt', has_text='Free speech').click(); btn('Check').click()
+        fb = pg.inner_text('[data-testid=feedback]')
+        ok('Not quite' in fb and 'Free speech; Free press; Fair trial' in fb, 'quiz: wrong select all shows the answers')
+        pg.locator('[data-testid=next]').click()
+        for t in ['Declaration', 'Revolution won', 'Articles', 'Constitution', 'Bill of Rights']: pg.locator('button.opt', has_text=t).click()
+        btn('Check').click()
+        fb = pg.inner_text('[data-testid=feedback]')
+        ok('Not quite' in fb and '1. Revolution won' in fb, 'quiz: wrong order shows the right order')
+        pg.locator('[data-testid=next]').click(); pg.go_back(); pg.get_by_role('button', name='Start').wait_for(); pg.go_back()
+
+        # Flashcards show the new types.
+        btn('Flashcards').click(); pg.get_by_text('Shuffle the cards').click(); btn('Start').click()
+        ok('SELECT ALL THAT APPLY' in text().upper() and 'E. Bear arms' in text(), 'flashcards: select all front lists the choices')
+        pg.locator('[data-testid=card]').click()
+        ok('C. Fair trial' not in pg.locator('.face-back b').inner_text() and 'D. Fair trial' in pg.locator('.face-back b').inner_text(), 'flashcards: select all back lists the answers')
         ok(not errors, 'no page errors: ' + '; '.join(errors))
         b.close()
 finally:
