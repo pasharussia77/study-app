@@ -33,6 +33,21 @@ export function PageScrollBar() {
   );
 }
 
+// Text on a card: a steady reading size. If it does not fit it goes one size smaller; if it still does not fit it scrolls.
+export function FitBody({ children, hasList, dep }) {
+  const ref = useRef(null);
+  const [step, setStep] = useState(0);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el && step === 0 && el.scrollHeight > el.clientHeight + 1) setStep(1);
+  }, [step, dep, children]);
+  return (
+    <Scroller innerRef={ref} dep={step + ':' + dep} className={'fit-' + step + (hasList ? ' has-list' : '')}>
+      <div className="face-inner">{children}</div>
+    </Scroller>
+  );
+}
+
 // An area that scrolls inside a card, with its own always-visible bar.
 export function Scroller({ className = '', children, innerRef, dep }) {
   const own = useRef(null);

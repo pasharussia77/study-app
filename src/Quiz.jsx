@@ -3,7 +3,7 @@ import { backend } from './firebase.js';
 import { shuffle } from './parse.js';
 import { defaultPick, queueFor, isCorrect, normalize } from './stats.js';
 import { isChoiceOnly, withNumber } from './deck.js';
-import { useStats, StatsSheet, CardPicker, TypePicker, RoundDone, ScreenHead, PlayTop } from './Session.jsx';
+import { useStats, StatsSheet, CardPicker, TypePicker, RoundDone, ScreenHead, PlayTop, StartFab } from './Session.jsx';
 import { Icon, Scenery, TileArt } from './art.jsx';
 import { diagLog } from './diag.js';
 import { useOverlay, back } from './nav.js';
@@ -43,7 +43,7 @@ export default function Quiz({ cards, code, projectId, onExit }) {
   const [phase, setPhase] = useState('setup');
   const [ask, setAsk] = useState('term'); // what you are shown, for words
   const [how, setHow] = useState('type');
-  const [mix, setMix] = useState(true);
+  const [mix, setMix] = useState(false);
   const [pick, setPick] = useState(null);
   const [kind, setKind] = useState('all');
   const [deck, setDeck] = useState([]);
@@ -130,6 +130,7 @@ export default function Quiz({ cards, code, projectId, onExit }) {
   if (phase === 'setup') return (
     <section>
       <ScreenHead onBack={onExit} icon={<TileArt kind="quiz" />} title="Written quiz" />
+      <StartFab disabled={available === 0} onClick={() => begin(chosen)} />
       {hasTerm && (
         <fieldset className="seg" aria-label="Question shows">
           <legend>Question shows (for words)</legend>
@@ -153,7 +154,6 @@ export default function Quiz({ cards, code, projectId, onExit }) {
         <input type="checkbox" checked={mix} onChange={(e) => setMix(e.target.checked)} />
       </label>
       {available === 0 && <p className="hint">Nothing to ask with this selection.</p>}
-      <button className="btn primary bottom" disabled={available === 0} onClick={() => begin(chosen)}><Icon name="play" />Start</button>
     </section>
   );
 
@@ -188,17 +188,31 @@ export default function Quiz({ cards, code, projectId, onExit }) {
       )}
 
       {(mode === 'multi' || mode === 'order') && (
-        <div className="stack" role="group" aria-label="Answer choices">
+        <div className={'stack' + (result ? ' judged-list' : '')} role="group" aria-label="Answer choices">
+          {result && <span className="jhead" data-testid="jhead">Correct choice</span>}
           {q.options.map((o) => {
             const at = picks.indexOf(o);
-            let cls = at >= 0 ? ' on' : '';
-            if (result && mode === 'multi') cls = q.answers.includes(o) ? ' right' : at >= 0 ? ' wrong' : ' dim';
-            if (result && mode === 'order') cls = at === q.sequence.indexOf(o) ? ' right' : ' wrong';
+            const picked = at >= 0;
+            const dot = <span className={'radio-dot ' + (mode === 'multi' ? 'box' : 'num')} aria-hidden="true">{mode === 'order' ? (picked ? at + 1 : '') : picked ? '✓' : ''}</span>;
+            if (!result) {
+              return (
+                <button key={o} className={'opt' + (picked ? ' on' : '')} onClick={() => tap(o)} aria-pressed={picked}>
+                  {dot}<span className="opt-text">{o}</span>
+                </button>
+              );
+            }
+            // After Check: my own marks stay (greyed), every row is green or red, and a column on the right shows how it should be checked.
+            const should = mode === 'multi' ? q.answers.includes(o) : true;
+            const good = mode === 'multi' ? should === picked : at === q.sequence.indexOf(o);
             return (
-              <button key={o} className={'opt' + cls} onClick={() => tap(o)} disabled={!!result} aria-pressed={at >= 0}>
-                <span className={'radio-dot ' + (mode === 'multi' ? 'box' : 'num')} aria-hidden="true">{mode === 'order' ? (result ? q.sequence.indexOf(o) + 1 : at >= 0 ? at + 1 : '') : at >= 0 && !result ? '✓' : ''}</span>
-                <span className="opt-text">{o}</span>
-              </button>
+              <div key={o} className="jrow">
+                <button className={'opt judged ' + (good ? 'right' : 'wrong')} disabled aria-pressed={picked} data-row={good ? 'right' : 'wrong'}>
+                  {dot}<span className="opt-text">{o}</span>
+                </button>
+                <span className="jslot" data-testid="corr" data-on={should ? 'yes' : 'no'}>
+                  <span className={'radio-dot ' + (mode === 'multi' ? 'box' : 'num') + ' ok-dot' + (should ? ' on' : '')} aria-hidden="true">{mode === 'order' ? q.sequence.indexOf(o) + 1 : should ? '✓' : ''}</span>
+                </span>
+              </div>
             );
           })}
           {!result && <p className="muted tiny center">{mode === 'multi' ? 'Tap every correct choice, then Check.' : 'Tap them in order, first to last. Tap again to take one back.'}</p>}
@@ -228,7 +242,8 @@ export default function Quiz({ cards, code, projectId, onExit }) {
       {result && !result.selfCheck && (() => {
         const verdict = result.selfChecked ? (result.right ? 'Counted as correct' : 'Counted as missed') : result.overridden ? 'Counted as correct' : result.right ? 'Correct' : 'Not quite';
         const showGiven = !result.right && mode === 'type' && !result.selfChecked;
-        const showAnswer = !result.right || (mode === 'type' && result.given.trim() !== q.expected);
+        const rows = mode === 'multi' || mode === 'order'; // the rows themselves show what was right
+        const showAnswer = !rows && (!result.right || (mode === 'type' && result.given.trim() !== q.expected));
         const details = showGiven || showAnswer || !!c.correction;
         return (
           <>

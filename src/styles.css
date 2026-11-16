@@ -549,3 +549,68 @@ html::-webkit-scrollbar { display: none; }
 .dock .verdict.good { background: var(--good-bg); color: #0B7F54; }
 .dock .verdict.bad { background: var(--bad-bg); color: #C0302A; }
 .dock .verdict .link { font-size: .95rem; }
+
+/* ---- 0.17: readable cards, floating Start, judged quiz rows, version pill ---- */
+/* version: dark text on a solid, almost-white pill, readable on any background */
+.foot.plain .version-pill, .version-pill { display: inline-block; align-self: center; margin: 0 auto; width: fit-content; background: #FBFAFE; color: #15131F; border: 1px solid rgba(0, 0, 0, .14); border-radius: 999px; padding: 5px 14px; font-size: .74rem; font-weight: 700; line-height: 1.3; text-shadow: none; box-shadow: 0 2px 6px rgba(0, 0, 0, .14); }
+
+/* Start floats at the top right of the set-up screens and stays there while the page scrolls */
+.start-fab { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 14px); right: max(16px, calc(50vw - 264px)); z-index: 30; min-height: 50px; padding: 10px 20px 10px 16px; font-size: 1.05rem; gap: 7px; box-shadow: 0 10px 22px rgba(60, 40, 150, .4), inset 0 1px 0 rgba(255, 255, 255, .45); }
+.start-fab:disabled { opacity: 1; background: #D9D6E8; color: #77748F; border-color: #fff; text-shadow: none; box-shadow: 0 4px 10px rgba(60, 40, 150, .15); }
+.head:has(+ .start-fab) { padding-right: 108px; min-height: 58px; }
+.head:has(+ .start-fab) h1 { font-size: 1.45rem; overflow-wrap: anywhere; }
+.head:has(+ .start-fab) .tile-art { width: 44px; }
+
+/* study round: tighter top, so the card gets the room */
+.play { gap: 10px; }
+.play .play-top .back.round { width: 42px; height: 42px; }
+.play .play-top .chip { min-height: 40px; padding-top: 7px; padding-bottom: 7px; }
+.play:not(.quiz) .track { gap: 10px; margin-top: -2px; }
+.play:not(.quiz) .bar { height: 8px; }
+.play.on-scene:not(.quiz) .flip { margin-top: 0; }
+.kindrow { justify-content: space-between; align-items: center; gap: 8px; margin-top: 0; }
+.kind { font-size: .88rem; padding: 5px 14px; }
+.flip-hint, .on-scene .flip-hint { display: inline-flex; align-items: center; gap: 5px; margin: 0; font-size: .86rem; font-weight: 800; color: var(--violet-deep); background: rgba(255, 255, 255, .88); padding: 5px 12px; border-radius: 999px; text-shadow: none; white-space: nowrap; }
+.play .row.nav .btn { min-height: 50px; padding-top: 10px; padding-bottom: 10px; font-size: 1rem; }
+
+/* card text: a steady reading size, left-aligned; one size smaller if it does not fit, then it scrolls */
+.face { padding: 12px 6px 12px 12px; border-radius: 30px; }
+.scroller-wrap, .scroller-wrap.has-list { --ft: 1.45rem; }
+.scroller-wrap.fit-1, .scroller-wrap.has-list.fit-1 { --ft: 1.2rem; }
+.face-inner { align-items: stretch; text-align: left; gap: 10px; }
+.face b, .face-back b, .fitcard b { display: block; font-size: var(--ft); line-height: 1.36; font-weight: 700; letter-spacing: -0.005em; text-align: left; overflow-wrap: break-word; white-space: pre-line; }
+.face-choices { font-size: 1rem; margin: 0; display: grid; gap: 5px; }
+.scroller-wrap.fit-1 .face-choices { font-size: .93rem; }
+.face-choices li { margin: 0; padding: 6px 12px; border-radius: 12px; line-height: 1.32; }
+/* answers on the back: narrow letter column, smaller text, tighter rows */
+.ans-list { font-size: 1.02rem; gap: 6px; }
+.scroller-wrap.fit-1 .ans-list { font-size: .93rem; gap: 5px; }
+.ans-list li { gap: 8px; padding: 7px 10px; border-radius: 12px; line-height: 1.32; }
+.scroller-wrap.fit-1 .ans-list li { padding: 5px 10px; }
+.ans-list .k { min-width: 1.15em; }
+.ans-list .k.wide { min-width: 2.7em; white-space: nowrap; }
+
+/* voice quiz: the question card reads like a flashcard */
+.question.fitcard { padding: 16px 8px 14px 16px; gap: 8px; max-height: 46vh; min-height: 0; }
+.question.fitcard .scroller-wrap { flex: 0 1 auto; }
+.question.fitcard .scroller { padding: 2px 16px 2px 2px; }
+.question.fitcard .face-inner { margin: 0; }
+
+/* written quiz, select all and put in order, after Check: every row is green or red, the student's marks stay greyed */
+.opt { position: relative; }
+.opt.judged { opacity: 1; }
+.opt.judged .radio-dot, .opt.judged.right .radio-dot, .opt.judged.wrong .radio-dot { background: #E6E4EE; border-color: #B4B1C6; color: #6E6B86; }
+/* after Check: rows shrink to the left, and a vertical pill on the right shows how each choice should be checked */
+.judged-list { position: relative; padding-top: 34px; --slot: 74px; }
+.jhead { position: absolute; top: 0; right: 0; width: var(--slot); text-align: center; font-size: .68rem; font-weight: 800; line-height: 1.15; color: var(--violet-deep); }
+.jrow { position: relative; display: flex; align-items: center; padding-right: calc(var(--slot) + 10px); }
+.jrow .opt { flex: 1; min-width: 0; }
+.jslot { position: absolute; right: 0; top: 0; bottom: 0; width: var(--slot); display: grid; place-items: center; }
+.ok-dot { background: #fff; }
+.ok-dot.box.on { background: var(--good); border-color: var(--good); color: #fff; }
+.ok-dot.num { border-color: var(--good); color: var(--ink); background: #fff; }
+.head:has(+ .start-fab) { gap: 8px; padding-right: 104px; }
+.head:has(+ .start-fab) h1 { font-size: 1.3rem; white-space: nowrap; overflow-wrap: normal; }
+.head:has(+ .start-fab) .tile-art { width: 34px; }
+/* the question number sits on a line of its own, above the text */
+.card-num { display: block; font-size: var(--ft); line-height: 1.2; font-weight: 800; color: var(--violet-deep); text-align: left; margin-bottom: -4px; }

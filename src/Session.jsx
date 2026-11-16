@@ -91,6 +91,11 @@ export function ScreenHead({ onBack, icon, title, backLabel = 'Back' }) {
   );
 }
 
+// The Start button on the set-up screens: it floats at the top right and stays there while the page scrolls.
+export function StartFab({ disabled, onClick, icon = 'play' }) {
+  return <button className="btn primary start-fab" data-testid="start" disabled={disabled} onClick={onClick}><Icon name={icon} size={20} />Start</button>;
+}
+
 // Top of a study round: exit, how far along, and the stats button.
 export function PlayTop({ onExit, index, total, onStats, title }) {
   return (

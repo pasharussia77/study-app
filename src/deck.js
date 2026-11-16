@@ -6,6 +6,12 @@ import { cardKey } from './stats.js';
 export const tidy = (text) => String(text ?? '').replace(/_{3,}/g, '_____');
 export const withNumber = (c, text) => (c && c.number != null && c.number !== '' && text ? `${c.number}.\u00A0${tidy(text)}` : tidy(text));
 
+// For a card: the number goes on a line of its own, with the text under it. Returns [number or null, text].
+export function numberParts(c, shown) {
+  const prefix = c && c.number != null && c.number !== '' ? `${c.number}.\u00A0` : null;
+  return prefix && String(shown).startsWith(prefix) ? [`${c.number}.`, String(shown).slice(prefix.length)] : [null, shown];
+}
+
 // Items in the order of the pages: the photos in the order they were added, then the order on each page.
 export function inPageOrder(items, files = []) {
   const fileTime = new Map(files.map((f) => [f.id, f.createdAt ?? 0]));
@@ -58,7 +64,7 @@ export function cardFaces(c, first) {
   const L = LETTER;
   const lettered = c.choices.map((x, i) => `${L(i)}. ${x}`);
   if (c.type === 'multi') return { fl: 'select all that apply', ft: withNumber(c, c.prompt), bl: 'answers', bt: c.answers.map((t) => `${L(c.choices.indexOf(t))}. ${t}`).join('\n'), extra: lettered, list: c.answers.map((t) => ({ k: L(c.choices.indexOf(t)), text: t })) };
-  if (c.type === 'order') return { fl: 'put in order', ft: withNumber(c, c.prompt), bl: 'correct order', bt: c.sequence.map((t, i) => `${i + 1}. ${t}`).join('\n'), extra: lettered, list: c.sequence.map((t, i) => ({ k: `#${i + 1} · ${L(c.choices.indexOf(t))}`, text: t })) };
+  if (c.type === 'order') return { fl: 'put in order', ft: withNumber(c, c.prompt), bl: 'correct order', bt: c.sequence.map((t, i) => `${i + 1}. ${t}`).join('\n'), extra: lettered, list: c.sequence.map((t, i) => ({ k: `${i + 1} · ${L(c.choices.indexOf(t))}`, text: t })) };
   const idx = c.choices.findIndex((x) => x === c.answer);
   return { fl: 'multiple choice', ft: withNumber(c, c.prompt), bl: 'answer', bt: `${L(idx < 0 ? 0 : idx)}. ${c.answer}`, extra: c.choices.map((x, i) => `${L(i)}. ${x}`) };
 }

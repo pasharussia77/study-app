@@ -5,7 +5,9 @@ import { defaultPick, queueFor, normalize } from './stats.js';
 import { askAIDetailed } from './ai.js';
 import { describeQuestion, utterance, maxAttempts, countsRight, matchChoice, detectCommand, quickCorrect, praise, revealCanned, answerLine, buildTutorMessages, parseTutor, sttContext, isEnglishSpeech, isLetters, judgeLetters } from './tutor.js';
 import { speak, warm, stopSpeaking, startListening, transcribe, beep, primeMic, VOICES, getVoice, setVoice } from './voice.js';
-import { useStats, StatsSheet, CardPicker, TypePicker, RoundDone, ScreenHead, PlayTop } from './Session.jsx';
+import { useStats, StatsSheet, CardPicker, TypePicker, RoundDone, ScreenHead, PlayTop, StartFab } from './Session.jsx';
+import { FitBody } from './Scroller.jsx';
+import { numberParts } from './deck.js';
 import { Icon, Scenery, TileArt } from './art.jsx';
 import { diagLog } from './diag.js';
 import { useOverlay, back } from './nav.js';
@@ -24,7 +26,7 @@ export default function Voice({ cards, code, projectId, onExit }) {
   const [voice, setVoiceState] = useState(getVoice());
   const [mic, setMic] = useState(null);       // result of the microphone test
   const [voiceTest, setVoiceTest] = useState('');
-  const [mix, setMix] = useState(true);
+  const [mix, setMix] = useState(false);
   const [pick, setPick] = useState(null);
   const [kind, setKind] = useState('all');
   const [deck, setDeck] = useState([]);
@@ -266,6 +268,7 @@ export default function Voice({ cards, code, projectId, onExit }) {
     <section>
       <Scenery kind="waves" />
       <ScreenHead onBack={onExit} icon={<TileArt kind="voice" />} title="Voice quiz" />
+      <StartFab disabled={available === 0} onClick={() => start(chosen)} icon="mic" />
       <p className="muted">The tutor asks one question at a time. You answer out loud, and it helps you get to the right answer.</p>
       {hasTerm && (
         <fieldset className="seg" aria-label="Question shows">
@@ -313,7 +316,6 @@ export default function Voice({ cards, code, projectId, onExit }) {
       <p className="muted tiny">The screen stays on while you study. Studying with the screen off is not possible in a web app.</p>
       <p className="hint">Allow the microphone when your phone asks.</p>
       {available === 0 && <p className="hint">Nothing to ask with this selection.</p>}
-      <button className="btn primary bottom" disabled={available === 0} onClick={() => start(chosen)}><Icon name="mic" />Start talking</button>
     </section>
   );
 
@@ -326,10 +328,13 @@ export default function Voice({ cards, code, projectId, onExit }) {
     <section className="play voice">
       <Scenery kind="waves" />
       <PlayTop onExit={back} index={i} total={deck.length} onStats={() => setShowStats(true)} title="Voice quiz" />
-      <div className="question">
+      <div className="question fitcard">
         <small>{qd.label}</small>
-        <b data-testid="question">{qd.shown}</b>
-        {qd.choices && <ul className="qchoices">{qd.choices.map((t, k) => <li key={k}>{String.fromCharCode(65 + k)}. {t}</li>)}</ul>}
+        <FitBody key={'q' + c.key + i} hasList={!!qd.choices} dep={i}>
+          {numberParts(c, qd.shown)[0] && <span className="card-num" data-testid="card-num">{numberParts(c, qd.shown)[0]}</span>}
+          <b data-testid="question">{numberParts(c, qd.shown)[1]}</b>
+          {qd.choices && <ul className="face-choices qchoices">{qd.choices.map((t, k) => <li key={k}>{String.fromCharCode(65 + k)}. {t}</li>)}</ul>}
+        </FitBody>
       </div>
       <div className="voice-zone">
         <div className={'orb ' + status} aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /></div>

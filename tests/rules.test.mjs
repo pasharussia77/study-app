@@ -3,7 +3,7 @@
 import { resolvePage, resolveItem, reapplyItem, readTrueFalse, duplicateGroups, buildPrompt, buildTextPrompt, parseLabels, fixNumbers } from '../src/items.js';
 import { buildDeck, cardFaces, answerLetters, withNumber, inPageOrder, tidy } from '../src/deck.js';
 import { parseCards, shorterIsTerm } from '../src/parse.js';
-import { buildReport, splitReport } from '../src/report.js';
+import { buildReport, splitReport, latestReads } from '../src/report.js';
 import { cardKey } from '../src/stats.js';
 import { matchLetters, judgeLetters, describeQuestion, answerLine, maxAttempts, matchChoice } from '../src/tutor.js';
 import { enhancePixels } from '../src/enhance.js';
@@ -338,9 +338,39 @@ eq(withNumber({ number: 35 }, '________ interpreted some'), '35.\u00A0_____ inte
 ok(!/35\. /.test(withNumber({ number: 35 }, '_____ x')), 'no ordinary space after the number');
 const c41b = deck.find((c) => c.number === 41), c46b = deck.find((c) => c.number === 46);
 eq(cardFaces(c41b).list.map((x) => x.k), ['A', 'B', 'D', 'E'], 'select-all back is a list keyed by letter');
-eq(cardFaces(c46b).list.map((x) => x.k), ['#1 · A', '#2 · C', '#3 · E', '#4 · B', '#5 · D'], 'order back is a list: number, letter, text');
+eq(cardFaces(c46b).list.map((x) => x.k), ['1 · A', '2 · C', '3 · E', '4 · B', '5 · D'], 'order back is a list: number, letter, text');
 eq(cardFaces(c46b).list.map((x) => x.text), ['Event A', 'Event C', 'Event E', 'Event B', 'Event D'], 'order back list text');
 eq(cardFaces(dk[0]).list, undefined, 'plain cards have no list');
+
+
+// --- 0.17: handwriting read with only medium confidence needs a look (item 37: a T misread as F) ---
+const tf37 = (o, pg = {}) => resolveItem({ ...base, type: 'tf', number: 37, question: 'Statement 37', choices: TF, student_answer: 'F', ...o }, pg);
+ok(tf37({ confidence: 'medium' }).flagged, 'medium: a handwritten T/F read with medium confidence is flagged');
+ok(tf37({ confidence: 'medium' }).answer === 'False', 'medium: the answer is kept, only flagged');
+ok(tf37({ confidence: 'medium' }).note.includes('fairly sure'), 'medium: the note says why');
+ok(!tf37({ confidence: 'high' }).flagged, 'medium: high confidence is not flagged');
+ok(!resolveItem({ ...base, type: 'tf', question: 'Q', choices: TF, printed_answer: 'A', confidence: 'medium' }, {}).flagged, 'medium: a printed key is not handwriting, not flagged');
+ok(!resolveItem({ ...base, type: 'term', question: 'cat', answer_text: 'a small furry pet', confidence: 'medium' }, {}).flagged, 'medium: printed text on the page is not flagged');
+ok(resolveItem({ ...base, type: 'qa', question: 'All people have ____', student_answer: 'equality', confidence: 'medium' }, {}).flagged, 'medium: a handwritten fill-in is flagged');
+ok(resolveItem({ ...base, type: 'multi', question: 'Q', choices: five, selected_choices: ['A', 'C'], unclear_choices: [], confidence: 'medium' }, {}).flagged, 'medium: hand-filled circles are flagged');
+ok(resolveItem({ ...base, type: 'mc', question: 'Q', choices: five, student_answer: 'B', confidence: 'medium' }, { graded: true }).flagged, 'medium: graded page, handwritten answer is flagged');
+const stored37 = { ...tf37({ confidence: 'medium' }), id: 'm37', fileId: 'f5', flagged: false, note: '' };
+const re37 = reapplyItem(stored37, { graded: false, hand: 'key' });
+ok(re37 && re37.flagged === true, 'medium: Re-apply the rules flags an item already stored');
+const again37 = reapplyItem({ ...stored37, ...re37 }, { graded: false, hand: 'key' });
+eq(again37, null, 'medium: re-applying twice changes nothing (the note is not repeated)');
+eq(all47.filter((i) => i.flagged).length, 0, 'medium: the Chapter 5 fixture (all high) is still not flagged');
+
+// --- 0.17: the report lists only the latest reading of each photo ---
+const rd = (fileId, raw, extra = {}) => ({ t: Date.now(), type: 'photo_read', fileId, ignore: 'none', ok: true, raw, ms: 1000, usage: { prompt_tokens: 1, completion_tokens: 1 }, made: 1, ...extra });
+const twoFiles = [{ id: 'fA', ignore: 'none', hand: 'key', status: 'done', createdAt: 1 }, { id: 'fB', ignore: 'none', hand: 'key', status: 'done', createdAt: 2 }];
+const manyReads = [rd('fB', 'OLD-B'), rd('fA', 'OLD-A1'), rd('fA', 'OLD-A2'), rd('fGone', 'GONE'), rd('fA', 'NEW-A'), rd('fB', 'NEW-B'), { t: Date.now(), type: 'text_read', part: 1, chars: 10, ok: true, raw: 'TEXT-OLD' }, { t: Date.now(), type: 'text_read', part: 1, chars: 10, ok: true, raw: 'TEXT-NEW' }];
+eq(latestReads(manyReads, twoFiles).map((r) => r.raw), ['TEXT-NEW', 'NEW-A', 'NEW-B'], 'report: latest reading of each photo, in photo order');
+const rep17 = buildReport({ version: '0.17.0', device: 'test', health: null, profile: { name: 'Test', test: true }, project: { name: 'P' }, text: '', parsed: { cards: [], skipped: 0, skippedLines: [] }, sum: { total: 0, covered: 0, remainingCount: 0, correct: 0, incorrect: 0 }, files: twoFiles, items: [], check: null, events: manyReads, notes: 'my note' });
+ok(rep17.includes('NEW-A') && rep17.includes('NEW-B') && !rep17.includes('OLD-A1') && !rep17.includes('OLD-A2') && !rep17.includes('OLD-B') && !rep17.includes('GONE'), 'report: older readings are left out');
+ok(rep17.includes('5 older readings left out'), 'report: it says how many readings were left out');
+ok(rep17.includes('--- Photo 1 at') && rep17.includes('--- Photo 2 at'), 'report: readings are named by photo');
+ok(rep17.indexOf('YOUR NOTES') < rep17.indexOf('1. WHAT WAS ADDED') && splitReport(rep17).length === 1 && splitReport('x\n'.repeat(20000)).length > 1, 'report: notes first, and the parts feature is kept');
 
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -261,7 +261,7 @@ function Profiles({ family, onPick, onSettings }) {
         ))}
       </div>
       <footer className="foot plain">
-        <p className="muted tiny">Version {APP_VERSION}{isMock ? ' (test mode)' : ''}</p>
+        <p className="version-pill" data-testid="version">Version {APP_VERSION}{isMock ? ' (test mode)' : ''}</p>
       </footer>
       {pinFor && <PinSheet name={pinFor.name} onCancel={() => setPinFor(null)} onOk={() => { const p = pinFor; setPinFor(null); setTimeout(() => onPick(p), 200); }} />}
     </section>

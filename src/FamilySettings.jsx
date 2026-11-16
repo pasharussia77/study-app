@@ -52,7 +52,7 @@ export default function FamilySettings({ code, family, version, onCreate, onJoin
       )}
 
       <button className="link danger" onClick={() => { if (confirm('Leave this family on this phone? Your projects stay saved.')) onLeave(); }}><Icon name="trash" size={18} />Leave this family on this phone</button>
-      <p className="version-line">Version {version}</p>
+      <p className="version-line version-pill">Version {version}</p>
     </section>
   );
 }

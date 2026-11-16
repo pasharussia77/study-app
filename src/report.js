@@ -39,11 +39,14 @@ export function buildReport({ version, device, health, profile, project, text, p
   docs.forEach((d) => L.push(`File "${d.name}" (${kb(d.size || 0)}): ${d.ok === false ? 'FAILED: ' + d.error : d.method + ', ' + (d.pages ? d.pages + ' page(s), ' : '') + d.chars + ' characters, ' + sec(d.ms || 0)}${d.note ? '. ' + d.note : ''}`));
   if (!files.length && !docs.length) L.push('No photos or files were added (text may have been typed or pasted).');
 
-  h('2. THE AI\'S RAW ANSWER FOR EACH READING (first 350 characters)');
-  const rawReads = events.filter((e) => e.type === 'photo_read' || e.type === 'text_read');
+  h('2. THE AI\'S RAW ANSWER, LATEST READING OF EACH PHOTO (first 350 characters)');
+  const allReads = events.filter((e) => e.type === 'photo_read' || e.type === 'text_read');
+  const rawReads = latestReads(allReads, files);
   if (!rawReads.length) L.push('No AI readings recorded.');
-  rawReads.forEach((r, i) => {
-    L.push(`--- Reading ${i + 1}${r.label ? ' (' + r.label + ')' : ''} at ${time(r.t)}: ${r.type === 'text_read' ? `typed/pasted text, part ${r.part}, ${r.chars} characters` : (NAMES[r.ignore] || r.ignore)}${r.usage ? `, ${sec(r.ms || 0)}, tokens in/out ${r.usage.prompt_tokens}/${r.usage.completion_tokens}` : ''} ---`);
+  if (allReads.length > rawReads.length) L.push(`(${allReads.length - rawReads.length} older reading${allReads.length - rawReads.length === 1 ? '' : 's'} left out: earlier readings of the same photo, and readings of photos that were removed.)`);
+  const photoNo = new Map(files.map((f, i) => [f.id, i + 1]));
+  rawReads.forEach((r) => {
+    L.push(`--- ${r.type === 'text_read' ? 'Text' : 'Photo ' + (photoNo.get(r.fileId) ?? '?')} at ${time(r.t)}: ${r.type === 'text_read' ? `typed/pasted text, part ${r.part}, ${r.chars} characters` : (NAMES[r.ignore] || r.ignore)}${r.usage ? `, ${sec(r.ms || 0)}, tokens in/out ${r.usage.prompt_tokens}/${r.usage.completion_tokens}` : ''} ---`);
     L.push(r.ok ? clip(r.raw || '', 350) : 'FAILED: ' + r.error + (r.raw ? '\nRaw answer:\n' + clip(r.raw, 1200) : ''));
   });
   if (rawReads.some((x) => x.type === 'photo_read')) L.push('', `Instruction sent with each picture: mode "${NAMES[(rawReads.find((x) => x.type === 'photo_read') || {}).ignore] || ''}", ${String((rawReads.find((x) => x.type === 'photo_read') || {}).prompt || '').length} characters (the full text is built into this app version).`);
@@ -115,6 +118,20 @@ export function buildReport({ version, device, health, profile, project, text, p
   });
 
   return L.join('\n');
+}
+
+// Only the latest reading of each photo that is still in the project (and of each part of the typed text), in photo order.
+export function latestReads(reads, files = []) {
+  const last = new Map();
+  reads.forEach((r, i) => {
+    const key = r.type === 'text_read' ? 'text:' + (r.part ?? i) : r.fileId != null ? 'photo:' + r.fileId : 'other:' + i;
+    last.set(key, r);
+  });
+  const known = new Set(files.map((f) => f.id));
+  const order = new Map(files.map((f, i) => [f.id, i]));
+  const kept = [...last.values()].filter((r) => r.type === 'text_read' || r.fileId == null || known.has(r.fileId));
+  const rank = (r) => (r.type === 'text_read' ? -1 : order.get(r.fileId) ?? 1e6);
+  return kept.map((r, i) => ({ r, i })).sort((a, b) => rank(a.r) - rank(b.r) || a.i - b.i).map((x) => x.r);
 }
 
 // Cuts a long report into parts that are short enough to paste into a chat one at a time.

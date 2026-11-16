@@ -142,7 +142,10 @@ export function parseLabels(value, choices) {
   return out;
 }
 
+export const MEDIUM_NOTE = 'The AI was only fairly sure it read the handwriting correctly.';
+const HAND_SOURCES = ['handwritten answer key', 'assumed correct (no red mark)', 'inferred from red X', 'circled by teacher'];
 const REASONS = [
+  MEDIUM_NOTE,
   'The teacher marked this wrong, but the correct choices are not shown.',
   'No choices are marked on the page.',
   'The numbers written beside the events are not a complete order.',
@@ -237,8 +240,11 @@ export function resolveItem(raw, page = {}, index = 0) {
     else unknownReason = 'No answer is marked on the page.';
     if (out.correctLabel) out.answer = choices.find((c) => c.label === out.correctLabel).text;
   }
+  // An answer that rests on handwriting the AI read with only medium confidence is worth a look (a T can be misread as an F).
+  const shakyHand = !!out.answer && confidence === 'medium' && (HAND_SOURCES.includes(out.source) || (out.source === 'page' && !!out.studentAnswer));
+  if (shakyHand) unknownReason = [unknownReason, MEDIUM_NOTE].filter(Boolean).join(' ');
   if (unknownReason) out.note = [out.note, unknownReason].filter(Boolean).join(' ');
-  out.flagged = !out.answer || (out.unclear && out.unclear.length > 0) || confidence === 'low' || raw.needs_review === true || (graded && markedWrong === null && type !== 'term' && type !== 'qa');
+  out.flagged = shakyHand || !out.answer || (out.unclear && out.unclear.length > 0) || confidence === 'low' || raw.needs_review === true || (graded && markedWrong === null && type !== 'term' && type !== 'qa');
   return out;
 }
 
