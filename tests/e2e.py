@@ -23,6 +23,11 @@ PAGE6 = {'page': {'graded': False, 'score': None}, 'ends_with': {}, 'items': [
     {**base, 'type': 'order', 'number': 46, 'question': 'Number the events in order', 'choices': five(['Declaration', 'Constitution', 'Revolution won', 'Bill of Rights', 'Articles']), 'order_numbers': [1, 4, 2, 5, 3]},
 ]}
 
+PAGE_LONG = {'page': {'graded': False, 'score': None}, 'ends_with': {}, 'items': [
+    {**base, 'type': 'mc', 'number': 24, 'question': "What political party was developing at the time of Adams's election that wanted a strong but limited government, a national bank, and power for the national government to tax and pay off state debts?", 'choices': [{'label': l, 'text': t} for l, t in zip('ABCDEFGH', ['amendment', 'cabinet', 'Democratic-Republican Party', 'Electoral College', 'Federalist Party', 'judges', 'treaties', 'two'])], 'student_answer': 'E'},
+    {**base, 'type': 'order', 'number': 46, 'question': 'Number the events of the acquisition of Florida.', 'choices': five(['James Monroe sent Andrew Jackson to stop Seminole raiders and protect US land, but Monroe did not order Jackson to attack the Spanish.', 'The United States used Andrew Jackson’s actions to prove America’s military might.', 'Andrew Jackson destroyed Seminole villages, captured two Spanish forts, and occupied the Spanish town of Pensacola.', 'Spain signed a treaty agreeing to give Florida to the United States.', 'Jackson’s illegal actions angered Spain, causing them to demand money from the United States.']), 'order_numbers': [1, 4, 2, 5, 3]},
+]}
+
 passed = failed = 0
 def ok(cond, name):
     global passed, failed
@@ -185,31 +190,35 @@ try:
         ok('Select all that apply' in text(), 'quiz: select-all label')
         for t in ['Free speech', 'Free press', 'Fair trial']: pg.locator('button.opt', has_text=t).click()
         btn('Check').click()
-        ok('Correct' in pg.inner_text('[data-testid=feedback]'), 'quiz: select all answered right')
+        ok('Correct' in pg.inner_text('[data-testid=verdict]'), 'quiz: select all answered right')
         pg.locator('[data-testid=next]').click()
         ok('Put these in order' in text(), 'quiz: put-in-order label')
         ok(btn('Check').is_disabled(), 'quiz: order cannot be checked until all are tapped')
         for t in ['Revolution won', 'Declaration', 'Articles', 'Constitution', 'Bill of Rights']: pg.locator('button.opt', has_text=t).click()
         btn('Check').click()
-        ok('Correct' in pg.inner_text('[data-testid=feedback]'), 'quiz: order answered right')
+        ok('Correct' in pg.inner_text('[data-testid=verdict]'), 'quiz: order answered right')
         pg.locator('[data-testid=next]').click()
         # again, wrong this time
         pg.go_back(); btn('Start').click()
         pg.locator('button.opt', has_text='Free speech').click(); btn('Check').click()
-        fb = pg.inner_text('[data-testid=feedback]')
-        ok('Not quite' in fb and 'Free speech; Free press; Fair trial' in fb, 'quiz: wrong select all shows the answers')
+        ok('Not quite' in pg.inner_text('[data-testid=verdict]'), 'quiz: wrong select all says not quite in the floating bar')
+        ok(pg.locator('[data-testid=answer-lines] li').all_inner_texts() == ['•\nFree speech', '•\nFree press', '•\nFair trial'], 'quiz: wrong select all lists the answers one per line')
         pg.locator('[data-testid=next]').click()
         for t in ['Declaration', 'Revolution won', 'Articles', 'Constitution', 'Bill of Rights']: pg.locator('button.opt', has_text=t).click()
         btn('Check').click()
-        fb = pg.inner_text('[data-testid=feedback]')
-        ok('Not quite' in fb and '1. Revolution won' in fb, 'quiz: wrong order shows the right order')
+        ok('Not quite' in pg.inner_text('[data-testid=verdict]'), 'quiz: wrong order says not quite in the floating bar')
+        ok(pg.locator('[data-testid=answer-lines] li').first.inner_text() == '1\nRevolution won' and pg.locator('[data-testid=answer-lines] li').count() == 5, 'quiz: wrong order lists the right order, one per line')
+        ok(pg.locator('[data-testid=next]').is_visible() and pg.locator('[data-testid=verdict]').is_visible(), 'quiz: the verdict and Next are on screen right after answering')
         pg.locator('[data-testid=next]').click(); pg.go_back(); pg.get_by_role('button', name='Start').wait_for(); pg.go_back()
 
         # Flashcards show the new types.
         btn('Flashcards').click(); pg.get_by_text('Shuffle the cards').click(); btn('Start').click()
         ok('SELECT ALL THAT APPLY' in text().upper() and 'E. Bear arms' in text(), 'flashcards: select all front lists the choices')
+        ok(pg.inner_text('[data-testid=kind]').lower() == 'select all that apply', 'flashcards: the label is above the card')
+        ok('select all' not in pg.locator('[data-testid=card]').inner_text().lower() and 'tap to flip' not in pg.locator('[data-testid=card]').inner_text().lower(), 'flashcards: no label or hint on top of the card text')
         pg.locator('[data-testid=card]').click()
-        ok('C. Fair trial' not in pg.locator('.face-back b').inner_text() and 'D. Fair trial' in pg.locator('.face-back b').inner_text(), 'flashcards: select all back lists the answers')
+        items = pg.locator('[data-testid=ans-list] li').all_inner_texts()
+        ok(len(items) == 3 and 'D\nFair trial' in items and not any(i.startswith('C\n') for i in items), 'flashcards: select all back is one answer per line (' + str(items) + ')')
 
         # 0.15: Re-read all photos, keeping an edited item, with the number rule.
         pg.evaluate('localStorage.clear()'); pg.goto(URL)
@@ -238,7 +247,7 @@ try:
         open_fold(); pg.locator('#material').fill('1. the part of government that makes the laws - Congress\n2. Veto - to reject a bill')
         pg.wait_for_timeout(300)
         btn('Flashcards').click(); pg.get_by_text('Shuffle the cards').click(); btn('Start').click()
-        ok('1. Congress' in text() or '1. Veto' in text(), 'typed: number shown and the shorter side is the word')
+        ok('1. Congress' in text().replace('\u00a0', ' ') or '2. Veto' in text().replace('\u00a0', ' '), 'typed: number shown and the shorter side is the word')
         pg.go_back(); pg.go_back()
 
         # 0.15: the report comes in parts when it is long (the Test account has the report button).
@@ -262,6 +271,26 @@ try:
         ok(btn('Copy part 1 of %d' % n).is_visible() and btn('Copy part %d of %d' % (n, n)).is_visible(), 'report: a copy button for each part')
         rep = pg.locator('[data-testid=report]').input_value()
         ok(rep.startswith('FAMILY STUDY') and 'note line 399' in rep, 'report: the box still holds the whole text')
+
+        # 0.16: a long card is not cut off at the top, has a visible scroll bar, and the label stays off the text.
+        pg.evaluate('localStorage.clear()'); pg.goto(URL)
+        btn('Start a new family').click()
+        for i, n in enumerate(['Anna', 'Ben', 'Cleo']): pg.get_by_placeholder(f'Name {i + 1}').fill(n)
+        btn('Create family').click(); btn('Continue').click()
+        btn('Anna').click(); btn('New project').click()
+        pg.get_by_label('Project name').fill('Long'); btn('Create project').click()
+        add_photo('The answer key', PAGE_LONG, 2)
+        pg.set_viewport_size({'width': 384, 'height': 854})
+        btn('Flashcards').click(); pg.get_by_text('Shuffle the cards').click(); btn('Start').click(); pg.wait_for_timeout(500)
+        top_ok = pg.evaluate('''() => { const s = document.querySelector('.face-front .scroller'); const i = s.querySelector('.face-inner'); return i.getBoundingClientRect().top >= s.getBoundingClientRect().top - 1; }''')
+        ok(top_ok, 'long card: the first line is not cut off at the top')
+        ok(pg.locator('.face-front [data-testid=sbar]').count() == 1, 'long card: a scroll bar is drawn')
+        ok(pg.evaluate("document.querySelector('.face-front .scroller-wrap').className.includes('fit-1')"), 'long card: the text went one size smaller')
+        pg.evaluate("document.querySelector('.face-front .scroller').scrollTop = 99999"); pg.wait_for_timeout(200)
+        ok('F. judges' in text() and pg.evaluate("document.querySelector('.face-front .scroller').scrollTop") > 0, 'long card: scrolling reaches the last choice')
+        ok('24.' in text(), 'long card: the question number is on the card')
+        pg.locator('[data-testid=card]').click(); pg.wait_for_timeout(700)
+        ok(pg.evaluate('''() => { const s = document.querySelector('.face-back .scroller'); const i = s.querySelector('.face-inner'); return i.getBoundingClientRect().top >= s.getBoundingClientRect().top - 1; }'''), 'long card back: not cut off at the top')
         ok(not errors, 'no page errors: ' + '; '.join(errors))
         b.close()
 finally:

@@ -3,10 +3,11 @@ import './theme.js';
 import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
 import Crack from './Crack.jsx';
+import { PageScrollBar } from './Scroller.jsx';
 import '@fontsource-variable/plus-jakarta-sans';
 import './styles.css';
 
-createRoot(document.getElementById('root')).render(<><App /><Crack /></>);
+createRoot(document.getElementById('root')).render(<><App /><Crack /><PageScrollBar /></>);
 
 if ('serviceWorker' in navigator && !location.search.includes('mock')) {
   window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));

@@ -503,3 +503,49 @@ body::before { content: ''; position: fixed; inset: 0; z-index: -1; background: 
 .face-back b { white-space: pre-line; }
 .ichoices.ordered li { font-weight: 600; }
 .numin { width: 3.2em; text-align: center; border: 1.5px solid var(--line); border-radius: 12px; padding: 6px 4px; font: inherit; font-weight: 700; background: #fff; color: var(--ink); }
+
+/* ---- 0.16: cards and screens that stay readable ---- */
+html { scrollbar-width: none; }
+html::-webkit-scrollbar { display: none; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: rgba(84, 56, 217, .55); border-radius: 8px; }
+*::-webkit-scrollbar-track { background: rgba(84, 56, 217, .10); border-radius: 8px; }
+.pagebar { position: fixed; right: 2px; width: 6px; z-index: 50; pointer-events: none; }
+.pagebar::before { content: ''; position: absolute; inset: 0; border-radius: 6px; background: rgba(84, 56, 217, .14); }
+.pagebar i { position: absolute; left: 0; right: 0; top: 0; border-radius: 6px; background: rgba(84, 56, 217, .65); }
+
+.kindrow { display: flex; justify-content: flex-start; margin-top: 2px; }
+.kind { background: var(--lav); color: var(--violet-deep); font-weight: 800; font-size: .95rem; padding: 6px 16px; border-radius: 999px; }
+.kind::first-letter { text-transform: uppercase; }
+.flip-hint { margin: 0; display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 800; font-size: .95rem; color: var(--violet-deep); }
+.on-scene .flip-hint { color: var(--violet-deep); text-shadow: 0 1px 6px rgba(255, 255, 255, .9); }
+.flip { min-height: 300px; margin-top: 0; }
+.face { padding: 14px 8px 14px 14px; align-items: stretch; justify-content: stretch; gap: 0; overflow: hidden; }
+.scroller-wrap { position: relative; flex: 1; min-height: 0; width: 100%; display: flex; --ft: 2.1rem; }
+.scroller-wrap.fit-1 { --ft: 1.7rem; }
+.scroller-wrap.has-list { --ft: 1.5rem; }
+.scroller-wrap.has-list.fit-1 { --ft: 1.25rem; }
+.scroller { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; padding: 4px 18px 4px 8px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.scroller::-webkit-scrollbar { display: none; }
+.face-inner { margin: auto 0; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
+.sbar { position: absolute; right: 3px; top: 0; width: 6px; border-radius: 6px; background: rgba(84, 56, 217, .65); pointer-events: none; z-index: 2; }
+.scroller-wrap.scrolls::after { content: ''; position: absolute; right: 3px; top: 0; bottom: 0; width: 6px; border-radius: 6px; background: rgba(84, 56, 217, .14); pointer-events: none; z-index: 1; }
+.face b, .face-back b { font-size: var(--ft, 2.1rem); line-height: 1.25; font-weight: 800; letter-spacing: -0.015em; overflow-wrap: break-word; white-space: pre-line; }
+.face-choices { margin: 2px 0 0; align-self: stretch; text-align: left; font-size: max(.95rem, calc(var(--ft) * .66)); }
+.face-choices li { margin: 6px 0; padding: 9px 14px; }
+.ans-list { list-style: none; margin: 0; padding: 0; align-self: stretch; text-align: left; display: grid; gap: 10px; font-size: 1.15rem; }
+.scroller-wrap.fit-1 .ans-list { font-size: 1rem; }
+.ans-list li { display: flex; gap: 12px; align-items: baseline; padding: 10px 14px; background: var(--paper); border-radius: 14px; }
+.ans-list .k { flex: none; font-weight: 800; color: var(--violet-deep); min-width: 2.2em; }
+.ans-list .k.wide { min-width: 4.6em; }
+.ans-list .t { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.ans-list.small { font-size: 1.02rem; gap: 8px; margin-top: 4px; }
+.ans-list.small li { background: rgba(255, 255, 255, .75); padding: 9px 12px; }
+
+.dock { position: sticky; bottom: 0; z-index: 8; margin: auto -8px 0; padding: 22px 8px calc(env(safe-area-inset-bottom, 0px) + 6px); display: flex; flex-direction: column; gap: 8px; background: linear-gradient(180deg, transparent, var(--bg-sky1, #EAE4FF) 30%); }
+.dock .row { margin: 0; }
+.dock .btn { width: 100%; }
+.dock .verdict { display: flex; align-items: center; justify-content: space-between; gap: 10px; border-radius: 20px; padding: 11px 18px; font-weight: 800; font-size: 1.15rem; box-shadow: var(--shadow); border: var(--edge); }
+.dock .verdict.good { background: var(--good-bg); color: #0B7F54; }
+.dock .verdict.bad { background: var(--bad-bg); color: #C0302A; }
+.dock .verdict .link { font-size: .95rem; }

@@ -1,7 +1,7 @@
 // Rule tests built on the "Chapter 5 Review" fixture (six photos, answers handwritten in red).
 // Run with: npm test
 import { resolvePage, resolveItem, reapplyItem, readTrueFalse, duplicateGroups, buildPrompt, buildTextPrompt, parseLabels, fixNumbers } from '../src/items.js';
-import { buildDeck, cardFaces, answerLetters, withNumber, inPageOrder } from '../src/deck.js';
+import { buildDeck, cardFaces, answerLetters, withNumber, inPageOrder, tidy } from '../src/deck.js';
 import { parseCards, shorterIsTerm } from '../src/parse.js';
 import { buildReport, splitReport } from '../src/report.js';
 import { cardKey } from '../src/stats.js';
@@ -259,7 +259,7 @@ eq(pc.cards[2].rawTerm, '12. Veto', 'parseCards: the saved key still uses the or
 eq(pc.skipped, 1, 'parseCards: a line with no separator is skipped');
 eq(cardKey({ term: pc.cards[0].rawTerm, definition: pc.cards[0].rawDefinition }), cardKey({ term: 'Congress', definition: 'the part of government that makes laws' }), 'progress key is unchanged for a card that did not change');
 const tdeck = buildDeck(pc.cards, [], []).deck;
-eq(tdeck.map((c) => withNumber(c, c.prompt)), ['Congress', 'Senate', '12. Veto', '13. Veto'], 'typed cards show their numbers');
+eq(tdeck.map((c) => withNumber(c, c.prompt)), ['Congress', 'Senate', '12.\u00A0Veto', '13.\u00A0Veto'], 'typed cards show their numbers');
 
 // AI-made word items: swapped when the question side is longer
 const termRaw = (q, a) => ({ ...base, type: 'term', number: 3, question: q, answer_text: a });
@@ -305,10 +305,10 @@ const withText = [{ ...mk('t1', 'text', 1, 2), createdAt: 5 }, { ...mk('t0', 'te
 eq(inPageOrder(withText, files3).map((i) => i.id), ['t0', 't1', 'a1'], 'typed-text items come first, in order');
 const dk = buildDeck([], jumbled, files3).deck;
 eq(dk.map((c) => c.number), [1, 2, 5, 6, 11, 12], 'the deck follows the pages');
-eq(withNumber(dk[2], dk[2].prompt), '5. Q b1', 'number shown before the question');
-eq(cardFaces(dk[0]).ft, '1. Q a1', 'flashcard front shows the number');
+eq(withNumber(dk[2], dk[2].prompt), '5.\u00A0Q b1', 'number shown before the question');
+eq(cardFaces(dk[0]).ft, '1.\u00A0Q a1', 'flashcard front shows the number');
 eq(withNumber({ number: null }, 'Q'), 'Q', 'no number, nothing added');
-eq(describeQuestion({ ...dk[0], type: 'qa' }).shown, '1. Q a1', 'voice and quiz show the number');
+eq(describeQuestion({ ...dk[0], type: 'qa' }).shown, '1.\u00A0Q a1', 'voice and quiz show the number');
 ok(!describeQuestion({ ...dk[0], type: 'qa' }).spoken.startsWith('1.'), 'voice does not read the number aloud');
 
 // --- 0.15: the report is short enough and comes in parts ---
@@ -329,6 +329,18 @@ const joined = parts.map((p) => p.split('\n').slice(1, -1).join('\n')).join('\n'
 ok(rep.split('\n').every((line) => joined.includes(line)), 'no line of the report is lost by splitting');
 eq(splitReport('short\nreport', 10000), ['short\nreport\nEND OF REPORT'], 'a short report stays one part');
 ok(splitReport('a'.repeat(25000), 10000).every((p) => p.length < 10400), 'one huge line is still cut into pieces');
+
+
+// --- 0.16: readable cards ---
+eq(tidy('Shays’s ________ resulted'), 'Shays’s _____ resulted', 'long blanks are shortened to one even size');
+eq(tidy('no blank here_ or __ two'), 'no blank here_ or __ two', 'one or two underscores are left alone');
+eq(withNumber({ number: 35 }, '________ interpreted some'), '35.\u00A0_____ interpreted some', 'the number is glued to the blank so they never split');
+ok(!/35\. /.test(withNumber({ number: 35 }, '_____ x')), 'no ordinary space after the number');
+const c41b = deck.find((c) => c.number === 41), c46b = deck.find((c) => c.number === 46);
+eq(cardFaces(c41b).list.map((x) => x.k), ['A', 'B', 'D', 'E'], 'select-all back is a list keyed by letter');
+eq(cardFaces(c46b).list.map((x) => x.k), ['#1 · A', '#2 · C', '#3 · E', '#4 · B', '#5 · D'], 'order back is a list: number, letter, text');
+eq(cardFaces(c46b).list.map((x) => x.text), ['Event A', 'Event C', 'Event E', 'Event B', 'Event D'], 'order back list text');
+eq(cardFaces(dk[0]).list, undefined, 'plain cards have no list');
 
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

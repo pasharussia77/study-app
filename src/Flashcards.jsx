@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { backend } from './firebase.js';
 import { shuffle } from './parse.js';
 import { defaultPick, queueFor } from './stats.js';
@@ -7,6 +7,22 @@ import { useStats, StatsSheet, CardPicker, TypePicker, RoundDone, ScreenHead, Pl
 import { Icon, Scenery, TileArt } from './art.jsx';
 import { diagLog } from './diag.js';
 import { useOverlay, back } from './nav.js';
+import { Scroller } from './Scroller.jsx';
+
+// What is on one side of a card. If it does not fit it goes one size smaller; if it still does not fit it scrolls.
+function FaceBody({ children, hasList, dep }) {
+  const ref = useRef(null);
+  const [step, setStep] = useState(0);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el && step === 0 && el.scrollHeight > el.clientHeight + 1) setStep(1);
+  }, [step, dep, children]);
+  return (
+    <Scroller innerRef={ref} dep={step + ':' + dep} className={'fit-' + step + (hasList ? ' has-list' : '')}>
+      <div className="face-inner">{children}</div>
+    </Scroller>
+  );
+}
 
 export default function Flashcards({ cards, code, projectId, onExit }) {
   const { sum, sumNow } = useStats(code, projectId, cards);
@@ -73,14 +89,23 @@ export default function Flashcards({ cards, code, projectId, onExit }) {
     <section className="play on-scene">
       <Scenery kind="peaks" />
       <PlayTop onExit={back} index={i} total={deck.length} onStats={() => setShowStats(true)} title="Flashcards" />
+      <div className="kindrow"><span className="kind" data-testid="kind">{flipped ? f.bl : f.fl}</span></div>
       <button className={'flip' + (flipped ? ' flipped' : '')} onClick={() => setFlipped(!flipped)} aria-label={flipped ? 'Show front' : 'Show back'} data-testid="card">
-        <span className="face face-front">
-          <small>{f.fl}</small><b>{f.ft}</b>
-          {f.extra && <ul className="face-choices">{f.extra.map((x) => <li key={x}>{x}</li>)}</ul>}
-          <em><Icon name="tap" size={18} />Tap to flip</em>
+        <span className="face face-front" aria-hidden={flipped}>
+          <FaceBody key={'f' + deck[i].key + i} hasList={!!f.extra} dep={i}>
+            <b>{f.ft}</b>
+            {f.extra && <ul className="face-choices">{f.extra.map((x) => <li key={x}>{x}</li>)}</ul>}
+          </FaceBody>
         </span>
-        <span className="face face-back"><small>{f.bl}</small><b>{f.bt}</b><em><Icon name="swap" size={18} />Tap to flip back</em></span>
+        <span className="face face-back" aria-hidden={!flipped}>
+          <FaceBody key={'b' + deck[i].key + i} hasList={!!f.list} dep={i}>
+            {f.list
+              ? <ul className="ans-list" data-testid="ans-list">{f.list.map((x, n) => <li key={n}><span className={'k' + (x.k.length > 3 ? ' wide' : '')}>{x.k}</span><span className="t">{x.text}</span></li>)}</ul>
+              : <b>{f.bt}</b>}
+          </FaceBody>
+        </span>
       </button>
+      <p className="flip-hint"><Icon name={flipped ? 'swap' : 'tap'} size={18} />{flipped ? 'Tap to flip back' : 'Tap to flip'}</p>
       {deck[i].type === 'term' && (
         <button className="link swap" onClick={() => { setFirst(first === 'term' ? 'definition' : 'term'); setFlipped(false); }}>
           <Icon name="swap" size={18} />Showing {first === 'term' ? 'word' : 'definition'} first · Swap sides

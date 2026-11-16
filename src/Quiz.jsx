@@ -8,13 +8,19 @@ import { Icon, Scenery, TileArt } from './art.jsx';
 import { diagLog } from './diag.js';
 import { useOverlay, back } from './nav.js';
 
+// The correct answer as separate lines (for several answers) or one line.
+function AnswerBlock({ q }) {
+  if (q.lines) return (<><p className="answer-line">{q.mode === 'order' ? 'Correct order:' : 'Correct answers:'}</p><ul className="ans-list small" data-testid="answer-lines">{q.lines.map((x, n) => <li key={n}><span className="k">{x.k}</span><span className="t">{x.text}</span></li>)}</ul></>);
+  return <p className="answer-line">Answer: <b>{q.expected}</b></p>;
+}
+
 // How one question is asked: what is shown, what counts as right, and the choices if any.
 function plan(c, cards, ask, how) {
-  if (c.type === 'multi') return { mode: 'multi', shown: withNumber(c, c.prompt), expected: c.answers.join('; '), label: 'Select all that apply', options: shuffle(c.choices), answers: c.answers };
+  if (c.type === 'multi') return { mode: 'multi', shown: withNumber(c, c.prompt), expected: c.answers.join('; '), label: 'Select all that apply', options: shuffle(c.choices), answers: c.answers, lines: c.answers.map((t) => ({ k: '•', text: t })) };
   if (c.type === 'order') {
     let options = shuffle(c.choices);
     if (options.every((o, k) => o === c.sequence[k])) options = [...options.slice(1), options[0]]; // never start already in order
-    return { mode: 'order', shown: withNumber(c, c.prompt), expected: c.sequence.map((t, k) => `${k + 1}. ${t}`).join('; '), label: 'Put these in order', options, sequence: c.sequence };
+    return { mode: 'order', shown: withNumber(c, c.prompt), expected: c.sequence.map((t, k) => `${k + 1}. ${t}`).join('; '), label: 'Put these in order', options, sequence: c.sequence, lines: c.sequence.map((t, k) => ({ k: String(k + 1), text: t })) };
   }
   if (isChoiceOnly(c)) {
     return { mode: 'choice', shown: withNumber(c, c.prompt), expected: c.answer, label: c.type === 'tf' ? 'True or false?' : 'Choose the correct answer', options: c.type === 'tf' ? c.choices : shuffle(c.choices) };
@@ -48,6 +54,7 @@ export default function Quiz({ cards, code, projectId, onExit }) {
   const [round, setRound] = useState({ right: 0, wrong: 0 });
   const [showStats, setShowStats] = useState(false);
   const inputRef = useRef(null);
+  const detailsRef = useRef(null);
   useOverlay(phase !== 'setup', () => setPhase('setup'));
   useOverlay(showStats, () => setShowStats(false));
   const chosen = pick || defaultPick(sum);
@@ -195,35 +202,56 @@ export default function Quiz({ cards, code, projectId, onExit }) {
             );
           })}
           {!result && <p className="muted tiny center">{mode === 'multi' ? 'Tap every correct choice, then Check.' : 'Tap them in order, first to last. Tap again to take one back.'}</p>}
-          {!result && <button className="btn primary" disabled={mode === 'multi' ? !picks.length : picks.length !== q.options.length} onClick={submitPicks}>Check</button>}
         </div>
+      )}
+      {(mode === 'multi' || mode === 'order') && !result && (
+        <div className="dock"><button className="btn primary" data-testid="check" disabled={mode === 'multi' ? !picks.length : picks.length !== q.options.length} onClick={submitPicks}>Check</button></div>
       )}
 
       {result && result.selfCheck && (
-        <div className="feedback check" role="status" data-testid="feedback">
-          <b>Compare your answer</b>
-          <p className="given">You wrote: {result.given}</p>
-          <p className="answer-line">Answer: <b>{q.expected}</b></p>
-          <p className="muted tiny">Long answers can be worded in many ways, so you decide.</p>
-          <div className="row">
-            <button className="btn miss" onClick={() => decide(false)}>Missed it</button>
-            <button className="btn primary" onClick={() => decide(true)}>I got it</button>
+        <>
+          <div className="feedback check" role="status" data-testid="feedback">
+            <b>Compare your answer</b>
+            <p className="given">You wrote: {result.given}</p>
+            <AnswerBlock q={q} />
+            <p className="muted tiny">Long answers can be worded in many ways, so you decide.</p>
           </div>
-        </div>
+          <div className="dock">
+            <div className="row">
+              <button className="btn miss" onClick={() => decide(false)}>Missed it</button>
+              <button className="btn primary" onClick={() => decide(true)}>I got it</button>
+            </div>
+          </div>
+        </>
       )}
 
-      {result && !result.selfCheck && (
-        <div className={'feedback ' + (result.right ? 'good' : 'bad')} role="status" data-testid="feedback">
-          <b>{result.selfChecked ? (result.right ? 'Counted as correct' : 'Counted as missed') : result.overridden ? 'Counted as correct' : result.right ? 'Correct' : 'Not quite'}</b>
-          {!result.right && mode === 'type' && !result.selfChecked && <p className="given">You wrote: {result.given}</p>}
-          {(!result.right || result.given.trim() !== q.expected) && <p className="answer-line">Answer: <b>{q.expected}</b></p>}
-          {c.correction && <p className="answer-line" data-testid="quiz-correction">Correction: <b>{c.correction}</b></p>}
-          <div className="row">
-            {!result.right && mode === 'type' && !result.selfChecked && <button className="btn ghost" onClick={override}>I was right</button>}
-            <button className="btn primary" onClick={next} data-testid="next">{i + 1 < deck.length ? 'Next' : 'Finish'}</button>
-          </div>
-        </div>
-      )}
+      {result && !result.selfCheck && (() => {
+        const verdict = result.selfChecked ? (result.right ? 'Counted as correct' : 'Counted as missed') : result.overridden ? 'Counted as correct' : result.right ? 'Correct' : 'Not quite';
+        const showGiven = !result.right && mode === 'type' && !result.selfChecked;
+        const showAnswer = !result.right || (mode === 'type' && result.given.trim() !== q.expected);
+        const details = showGiven || showAnswer || !!c.correction;
+        return (
+          <>
+            {details && (
+              <div className={'feedback ' + (result.right ? 'good' : 'bad')} role="status" data-testid="feedback" ref={detailsRef}>
+                {showGiven && <p className="given">You wrote: {result.given}</p>}
+                {showAnswer && <AnswerBlock q={q} />}
+                {c.correction && <p className="answer-line" data-testid="quiz-correction">Correction: <b>{c.correction}</b></p>}
+              </div>
+            )}
+            <div className="dock">
+              <div className={'verdict ' + (result.right ? 'good' : 'bad')} data-testid="verdict" role="status">
+                <span>{result.right ? '✓ ' : '✗ '}{verdict}</span>
+                {details && !result.right && <button className="link inline" onClick={() => detailsRef.current && detailsRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })}>See the answer</button>}
+              </div>
+              <div className="row">
+                {showGiven && <button className="btn ghost" onClick={override}>I was right</button>}
+                <button className="btn primary" onClick={next} data-testid="next">{i + 1 < deck.length ? 'Next' : 'Finish'}</button>
+              </div>
+            </div>
+          </>
+        );
+      })()}
       {showStats && <StatsSheet sum={sum} onClose={() => setShowStats(false)} />}
     </section>
   );

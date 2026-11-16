@@ -2,7 +2,9 @@
 import { cardKey } from './stats.js';
 
 // Everything shown to the student carries the question's number from the page, when it has one.
-export const withNumber = (c, text) => (c && c.number != null && c.number !== '' && text ? `${c.number}. ${text}` : text);
+// The number stays glued to the first word (no line break after it), and a blank like ________ is always the same short length.
+export const tidy = (text) => String(text ?? '').replace(/_{3,}/g, '_____');
+export const withNumber = (c, text) => (c && c.number != null && c.number !== '' && text ? `${c.number}.\u00A0${tidy(text)}` : tidy(text));
 
 // Items in the order of the pages: the photos in the order they were added, then the order on each page.
 export function inPageOrder(items, files = []) {
@@ -55,8 +57,8 @@ export function cardFaces(c, first) {
   if (c.type === 'tf') return { fl: 'true or false?', ft: withNumber(c, c.prompt), bl: 'answer', bt: c.correction ? `${c.answer} (correct: ${c.correction})` : c.answer, extra: null };
   const L = LETTER;
   const lettered = c.choices.map((x, i) => `${L(i)}. ${x}`);
-  if (c.type === 'multi') return { fl: 'select all that apply', ft: withNumber(c, c.prompt), bl: 'answers', bt: c.answers.map((t) => `${L(c.choices.indexOf(t))}. ${t}`).join('\n'), extra: lettered };
-  if (c.type === 'order') return { fl: 'put in order', ft: withNumber(c, c.prompt), bl: 'correct order', bt: c.sequence.map((t, i) => `${i + 1}. ${t}`).join('\n'), extra: lettered };
+  if (c.type === 'multi') return { fl: 'select all that apply', ft: withNumber(c, c.prompt), bl: 'answers', bt: c.answers.map((t) => `${L(c.choices.indexOf(t))}. ${t}`).join('\n'), extra: lettered, list: c.answers.map((t) => ({ k: L(c.choices.indexOf(t)), text: t })) };
+  if (c.type === 'order') return { fl: 'put in order', ft: withNumber(c, c.prompt), bl: 'correct order', bt: c.sequence.map((t, i) => `${i + 1}. ${t}`).join('\n'), extra: lettered, list: c.sequence.map((t, i) => ({ k: `#${i + 1} · ${L(c.choices.indexOf(t))}`, text: t })) };
   const idx = c.choices.findIndex((x) => x === c.answer);
   return { fl: 'multiple choice', ft: withNumber(c, c.prompt), bl: 'answer', bt: `${L(idx < 0 ? 0 : idx)}. ${c.answer}`, extra: c.choices.map((x, i) => `${L(i)}. ${x}`) };
 }
