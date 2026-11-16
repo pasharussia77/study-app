@@ -338,8 +338,8 @@ eq(withNumber({ number: 35 }, '________ interpreted some'), '35.\u00A0_____ inte
 ok(!/35\. /.test(withNumber({ number: 35 }, '_____ x')), 'no ordinary space after the number');
 const c41b = deck.find((c) => c.number === 41), c46b = deck.find((c) => c.number === 46);
 eq(cardFaces(c41b).list.map((x) => x.k), ['A', 'B', 'D', 'E'], 'select-all back is a list keyed by letter');
-eq(cardFaces(c46b).list.map((x) => x.k), ['1 · A', '2 · C', '3 · E', '4 · B', '5 · D'], 'order back is a list: number, letter, text');
-eq(cardFaces(c46b).list.map((x) => x.text), ['Event A', 'Event C', 'Event E', 'Event B', 'Event D'], 'order back list text');
+eq(cardFaces(c46b).list.map((x) => x.k), ['1', '4', '2', '5', '3'], 'order back: the answers stay in their place A to E, each with its number');
+eq(cardFaces(c46b).list.map((x) => x.text), ['A. Event A', 'B. Event B', 'C. Event C', 'D. Event D', 'E. Event E'], 'order back list keeps the order and the letters of the front');
 eq(cardFaces(dk[0]).list, undefined, 'plain cards have no list');
 
 

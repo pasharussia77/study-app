@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { backend } from './firebase.js';
 import { summarize, pickChoices } from './stats.js';
 import { deckTypes } from './deck.js';
-import { TYPE_LABEL } from './items.js';
+import { TYPE_LABEL, KIND_LABEL } from './items.js';
 import { Icon, Ring, Scenery } from './art.jsx';
 
 export function useStats(code, projectId, cards) {
@@ -75,7 +75,7 @@ export function TypePicker({ deck, value, onChange }) {
     <fieldset className="seg stack-seg" aria-label="Which kind">
       <legend>Which kind</legend>
       <button className={value === 'all' ? 'on' : ''} onClick={() => onChange('all')}>{`All kinds (${deck.length})`}</button>
-      {kinds.map((k) => <button key={k} className={value === k ? 'on' : ''} onClick={() => onChange(k)}>{`${TYPE_LABEL[k]} (${counts[k]})`}</button>)}
+      {kinds.map((k) => <button key={k} className={value === k ? 'on' : ''} onClick={() => onChange(k)}>{`${KIND_LABEL[k] || TYPE_LABEL[k]} (${counts[k]})`}</button>)}
     </fieldset>
   );
 }

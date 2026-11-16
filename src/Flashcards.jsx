@@ -90,7 +90,7 @@ export default function Flashcards({ cards, code, projectId, onExit }) {
         <span className="face face-back" aria-hidden={!flipped}>
           <FitBody key={'b' + deck[i].key + i} hasList={!!f.list} dep={i}>
             {f.list
-              ? <ul className="ans-list" data-testid="ans-list">{f.list.map((x, n) => <li key={n}><span className={'k' + (x.k.length > 3 ? ' wide' : '')}>{x.k}</span><span className="t">{x.text}</span></li>)}</ul>
+              ? <ul className="ans-list" data-testid="ans-list">{f.list.map((x, n) => <li key={n}><span className={'k' + (x.k.length > 3 ? ' wide' : '') + (x.dot ? ' dot' : '')}>{x.k}</span><span className="t">{x.text}</span></li>)}</ul>
               : <b>{f.bt}</b>}
           </FitBody>
         </span>

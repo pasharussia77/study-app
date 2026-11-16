@@ -639,3 +639,21 @@ html::-webkit-scrollbar { display: none; }
 .station .nchip { width: 42px; height: 42px; font-size: 1.15rem; }
 .nslot { display: inline-grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; border: 2.5px dashed #B9B5D6; background: rgba(230, 226, 245, .5); color: #A9A5C6; font-weight: 800; font-size: 1.1rem; flex: none; user-select: none; }
 .station-label { width: auto; white-space: nowrap; font-size: .7rem; }
+/* order card back: the answers keep their place, each with its number in a circle */
+.ans-list .k.dot { display: inline-grid; place-items: center; flex: none; min-width: 0; width: 30px; height: 30px; border-radius: 50%; background: var(--grad); color: #fff; font-size: 1rem; font-weight: 800; box-shadow: 0 3px 8px rgba(84, 56, 217, .3); }
+.scroller-wrap.fit-1 .ans-list .k.dot { width: 26px; height: 26px; font-size: .9rem; }
+.ans-list li:has(.k.dot) { align-items: center; }
+
+/* 0.18.1: compact set-up screens, so the choices fit without scrolling */
+.stack-seg { gap: 6px; margin-top: 2px; }
+.seg legend { margin-bottom: 6px; font-size: 1.02rem; }
+.stack-seg button { padding: 7px 14px; min-height: 42px; gap: 10px; font-size: .95rem; border-radius: 18px; box-shadow: 0 3px 8px rgba(72, 52, 160, .1); }
+.stack-seg button::before { width: 20px; height: 20px; border-width: 2.2px; }
+.stack-seg button .ic { width: 18px; height: 18px; }
+/* smaller switches and notes on the set-up screens */
+.switch { padding: 8px 14px 8px 16px; border-radius: 18px; gap: 10px; font-size: .95rem; }
+.switch input { width: 48px; height: 28px; }
+.switch input::before { top: 3px; left: 3px; width: 22px; height: 22px; }
+.switch input:checked::before { transform: translateX(20px); }
+.setup > .muted:not(.tiny) { font-size: .9rem; line-height: 1.3; margin: 0; }
+.setup > .muted.tiny { font-size: .76rem; line-height: 1.25; margin: -2px 0 0; }

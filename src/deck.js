@@ -64,7 +64,8 @@ export function cardFaces(c, first) {
   const L = LETTER;
   const lettered = c.choices.map((x, i) => `${L(i)}. ${x}`);
   if (c.type === 'multi') return { fl: 'select all that apply', ft: withNumber(c, c.prompt), bl: 'answers', bt: c.answers.map((t) => `${L(c.choices.indexOf(t))}. ${t}`).join('\n'), extra: lettered, list: c.answers.map((t) => ({ k: L(c.choices.indexOf(t)), text: t })) };
-  if (c.type === 'order') return { fl: 'put in order', ft: withNumber(c, c.prompt), bl: 'correct order', bt: c.sequence.map((t, i) => `${i + 1}. ${t}`).join('\n'), extra: lettered, list: c.sequence.map((t, i) => ({ k: `${i + 1} · ${L(c.choices.indexOf(t))}`, text: t })) };
+  if (c.type === 'order') return { fl: 'put in order', ft: withNumber(c, c.prompt), bl: 'correct order', bt: c.sequence.map((t, i) => `${i + 1}. ${t}`).join('\n'), extra: lettered, // the answers stay where they are on the front (A, B, C...); each one just gets its number
+    list: c.choices.map((t, i) => ({ k: String(c.sequence.indexOf(t) + 1), text: `${L(i)}. ${t}`, dot: true })) };
   const idx = c.choices.findIndex((x) => x === c.answer);
   return { fl: 'multiple choice', ft: withNumber(c, c.prompt), bl: 'answer', bt: `${L(idx < 0 ? 0 : idx)}. ${c.answer}`, extra: c.choices.map((x, i) => `${L(i)}. ${x}`) };
 }

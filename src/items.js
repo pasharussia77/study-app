@@ -4,6 +4,8 @@ import { normalize } from './stats.js';
 
 import { shorterIsTerm } from './parse.js';
 
+// the name of each kind in the pickers on the set-up screens
+export const KIND_LABEL = { multi: 'Select all that apply' };
 export const TYPE_LABEL = { term: 'Word', qa: 'Question', tf: 'True/False', mc: 'Multiple choice', multi: 'Select all', order: 'Put in order' };
 
 const MODE_RULES = {
