@@ -614,3 +614,28 @@ html::-webkit-scrollbar { display: none; }
 .head:has(+ .start-fab) .tile-art { width: 34px; }
 /* the question number sits on a line of its own, above the text */
 .card-num { display: block; font-size: var(--ft); line-height: 1.2; font-weight: 800; color: var(--violet-deep); text-align: left; margin-bottom: -4px; }
+
+/* ---- 0.18: put in order, with a number station ---- */
+.order-board { display: flex; flex-direction: column; gap: 12px; }
+.station { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 8px); z-index: 12; display: flex; align-items: center; gap: 12px; min-height: 68px; padding: 8px 14px; border-radius: 999px; background: rgba(255, 255, 255, .94); border: var(--edge); box-shadow: var(--shadow-lift); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.station.over { outline: 3px dashed var(--violet); outline-offset: 2px; }
+.station-label { font-size: .72rem; font-weight: 800; color: var(--violet-deep); line-height: 1.1; flex: none; width: 3.6em; }
+.station-chips { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; min-width: 0; }
+.station-note { font-size: .8rem; font-weight: 700; color: var(--muted); line-height: 1.25; }
+.nchip { display: inline-grid; place-items: center; width: 50px; height: 50px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .8); background: var(--grad); color: #fff; font-weight: 800; font-size: 1.3rem; box-shadow: 0 6px 14px rgba(84, 56, 217, .35); touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; padding: 0; }
+.nchip.small { width: 38px; height: 38px; font-size: 1.05rem; }
+.nchip.sel { outline: 3px solid var(--sun); outline-offset: 2px; }
+.nchip.lifted { opacity: .3; }
+.nchip.ghost { position: fixed; z-index: 60; width: 60px; height: 60px; transform: translate(-50%, -75%); pointer-events: none; font-size: 1.5rem; box-shadow: 0 14px 28px rgba(60, 40, 150, .5); }
+.obub { display: flex; align-items: center; gap: 12px; background: var(--glass); border: 1.5px solid rgba(255, 255, 255, .95); border-radius: 22px; padding: 12px 16px 12px 10px; font-weight: 700; font-size: 1.04rem; box-shadow: var(--shadow); min-height: 64px; }
+.obub.over { border-color: var(--violet); background: #F1EAFF; box-shadow: 0 0 0 3px rgba(108, 67, 236, .35), var(--shadow); }
+.obub.armed:not(.over) { border-color: rgba(108, 67, 236, .45); }
+.oslot { flex: none; width: 42px; display: grid; place-items: center; }
+.oempty { width: 30px; height: 30px; border-radius: 50%; border: 2.5px dashed #B9B5D6; }
+.obub .opt-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.station { min-height: 62px; gap: 10px; padding: 8px 12px; }
+.station-label { width: 3.2em; }
+.station-chips { gap: 7px; flex-wrap: nowrap; }
+.station .nchip { width: 42px; height: 42px; font-size: 1.15rem; }
+.nslot { display: inline-grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; border: 2.5px dashed #B9B5D6; background: rgba(230, 226, 245, .5); color: #A9A5C6; font-weight: 800; font-size: 1.1rem; flex: none; user-select: none; }
+.station-label { width: auto; white-space: nowrap; font-size: .7rem; }

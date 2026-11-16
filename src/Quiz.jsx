@@ -7,6 +7,7 @@ import { useStats, StatsSheet, CardPicker, TypePicker, RoundDone, ScreenHead, Pl
 import { Icon, Scenery, TileArt } from './art.jsx';
 import { diagLog } from './diag.js';
 import { useOverlay, back } from './nav.js';
+import { OrderBoard } from './OrderBoard.jsx';
 
 // The correct answer as separate lines (for several answers) or one line.
 function AnswerBlock({ q }) {
@@ -49,7 +50,8 @@ export default function Quiz({ cards, code, projectId, onExit }) {
   const [deck, setDeck] = useState([]);
   const [i, setI] = useState(0);
   const [answer, setAnswer] = useState('');
-  const [picks, setPicks] = useState([]); // choices tapped so far, for "select all" and "put in order"
+  const [picks, setPicks] = useState([]); // choices tapped so far (select all), or the order that was checked (put in order)
+  const [place, setPlace] = useState({}); // put in order: answer -> the number placed on it
   const [result, setResult] = useState(null); // { right, given, overridden }
   const [round, setRound] = useState({ right: 0, wrong: 0 });
   const [showStats, setShowStats] = useState(false);
@@ -68,7 +70,7 @@ export default function Quiz({ cards, code, projectId, onExit }) {
     const q = filtered(which, sumNow());
     if (!q.length) return;
     diagLog(projectId, { type: 'session_start', mode: 'written quiz', shows: hasTerm ? (ask === 'term' ? 'word' : 'definition') : 'question', how: hasTyped ? (how === 'type' ? 'typing' : 'choosing') + (hasChoiceOnly ? ' (true/false and multiple choice always choose)' : '') : 'choosing', pick: which + (kind !== 'all' ? ', only ' + kind : ''), shuffle: mix, deckSize: q.length });
-    setDeck(mix ? shuffle(q) : q); setI(0); setAnswer(''); setPicks([]); setResult(null);
+    setDeck(mix ? shuffle(q) : q); setI(0); setAnswer(''); setPicks([]); setPlace({}); setResult(null);
     setRound({ right: 0, wrong: 0 }); setPhase('play');
   };
   const reset = async () => { await backend.resetStats(code, projectId); setKind('all'); begin('all'); };
@@ -102,11 +104,14 @@ export default function Quiz({ cards, code, projectId, onExit }) {
   };
   const tap = (opt) => { if (!result) setPicks(picks.includes(opt) ? picks.filter((x) => x !== opt) : [...picks, opt]); };
   const submitPicks = () => {
-    if (result || !picks.length) return;
+    // for "put in order" the list is the answers sorted by the number placed on each
+    const list = mode === 'order' ? [...q.options].filter((o) => place[o] != null).sort((a, b) => place[a] - place[b]) : picks;
+    if (result || !list.length || (mode === 'order' && list.length !== q.options.length)) return;
+    if (mode === 'order') setPicks(list);
     const right = mode === 'multi'
-      ? picks.length === q.answers.length && q.answers.every((a) => picks.includes(a))
-      : picks.length === q.sequence.length && picks.every((p, k) => p === q.sequence[k]);
-    const given = mode === 'multi' ? q.options.filter((o) => picks.includes(o)).join('; ') : picks.map((t, k) => `${k + 1}. ${t}`).join('; ');
+      ? list.length === q.answers.length && q.answers.every((a) => list.includes(a))
+      : list.length === q.sequence.length && list.every((p, k) => p === q.sequence[k]);
+    const given = mode === 'multi' ? q.options.filter((o) => list.includes(o)).join('; ') : list.map((t, k) => `${k + 1}. ${t}`).join('; ');
     diagLog(projectId, { type: 'answer', mode: `quiz ${c.type} (${mode === 'multi' ? 'select all' : 'put in order'})`, question: q.shown, expected: q.expected, given, correct: right });
     setResult({ right, given });
     record(right); count(right);
@@ -123,7 +128,7 @@ export default function Quiz({ cards, code, projectId, onExit }) {
     setRound((r) => ({ right: r.right + 1, wrong: r.wrong - 1 }));
   };
   const next = () => {
-    if (i + 1 < deck.length) { setI(i + 1); setAnswer(''); setPicks([]); setResult(null); }
+    if (i + 1 < deck.length) { setI(i + 1); setAnswer(''); setPicks([]); setPlace({}); setResult(null); }
     else { diagLog(projectId, { type: 'round_done', mode: 'quiz', right: round.right, wrong: round.wrong }); setPhase('done'); }
   };
 
@@ -187,7 +192,8 @@ export default function Quiz({ cards, code, projectId, onExit }) {
         </div>
       )}
 
-      {(mode === 'multi' || mode === 'order') && (
+      {mode === 'order' && !result && <OrderBoard key={'o' + i} options={q.options} place={place} setPlace={setPlace} />}
+      {(mode === 'multi' || (mode === 'order' && result)) && (
         <div className={'stack' + (result ? ' judged-list' : '')} role="group" aria-label="Answer choices">
           {result && <span className="jhead" data-testid="jhead">Correct choice</span>}
           {q.options.map((o) => {
@@ -219,7 +225,7 @@ export default function Quiz({ cards, code, projectId, onExit }) {
         </div>
       )}
       {(mode === 'multi' || mode === 'order') && !result && (
-        <div className="dock"><button className="btn primary" data-testid="check" disabled={mode === 'multi' ? !picks.length : picks.length !== q.options.length} onClick={submitPicks}>Check</button></div>
+        <div className="dock"><button className="btn primary" data-testid="check" disabled={mode === 'multi' ? !picks.length : Object.keys(place).length !== q.options.length} onClick={submitPicks}>Check</button></div>
       )}
 
       {result && result.selfCheck && (

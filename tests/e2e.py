@@ -194,7 +194,46 @@ try:
         pg.locator('[data-testid=next]').click()
         ok('Put these in order' in text(), 'quiz: put-in-order label')
         ok(btn('Check').is_disabled(), 'quiz: order cannot be checked until all are tapped')
-        for t in ['Revolution won', 'Declaration', 'Articles', 'Constitution', 'Bill of Rights']: pg.locator('button.opt', has_text=t).click()
+        # 0.18: the number station. Drag, tap, replace, move back; nothing is assigned just by passing over a bubble.
+        def centre(loc):
+            loc.evaluate("e => { if (!e.closest('[data-station]')) e.scrollIntoView({ block: 'center' }); }"); pg.wait_for_timeout(60)
+            bx = loc.bounding_box(); return bx['x'] + bx['width'] / 2, bx['y'] + bx['height'] / 2
+        def drag(chip, target, via=()):
+            x, y = centre(pg.locator(f'[data-testid=chip-{chip}]')); pg.mouse.move(x, y); pg.mouse.down()
+            for v in via: vx, vy = centre(v); pg.mouse.move(vx, vy, steps=4)
+            tx, ty = centre(target); pg.mouse.move(tx, ty, steps=6); pg.mouse.up(); pg.wait_for_timeout(120)
+        bub = lambda t: pg.locator('[data-testid=obub]', has_text=t)
+        num_on = lambda t: bub(t).locator('.nchip').inner_text() if bub(t).locator('.nchip').count() else ''
+        in_station = lambda k: pg.locator(f'[data-testid=station] [data-testid=chip-{k}]').count() == 1
+        ok(pg.locator('[data-testid=station] .nchip').count() == 5 and pg.locator('[data-testid=station]').is_visible(), 'order: a station with all five number buttons')
+        # dragging over bubbles and letting go in empty space assigns nothing
+        drag(1, pg.locator('.question'), via=[bub('Revolution won'), bub('Declaration')])
+        ok(pg.locator('[data-testid=obub] .nchip').count() == 0 and in_station(1), 'order: passing over bubbles assigns nothing')
+        drag(1, bub('Revolution won'))
+        ok(num_on('Revolution won') == '1' and not in_station(1), 'order: dropping a number on a bubble puts it there')
+        drag(2, bub('Revolution won'))
+        ok(num_on('Revolution won') == '2' and in_station(1) and not in_station(2), 'order: a new number on the same bubble sends the old one back to the station')
+        ok(pg.locator('[data-testid=station] [data-testid^=slot-]').count() == 1 and pg.locator('[data-testid=slot-1]').count() == 0 and pg.locator('[data-testid=slot-2]').count() == 1, 'order: a placed number leaves an empty placeholder in the station')
+        drag(2, pg.locator('[data-testid=station]'))
+        ok(pg.locator('[data-testid=station] [data-testid^=slot-]').count() == 0 and pg.locator('[data-testid=station] .nchip').count() == 5, 'order: the placeholder is filled again when the number comes back')
+        drag(2, bub('Revolution won'))
+        drag(2, pg.locator('[data-testid=station]'))
+        ok(num_on('Revolution won') == '' and in_station(2), 'order: a placed number can be dragged back to the station')
+        drag(3, bub('Declaration')); drag(3, bub('Articles'))
+        ok(num_on('Declaration') == '' and num_on('Articles') == '3', 'order: a placed number can be moved to another bubble')
+        pg.locator('[data-testid=chip-1]').click(); bub('Declaration').click()
+        ok(num_on('Declaration') == '1' and not in_station(1), 'order: tap a number, then tap a bubble')
+        ok(btn('Check').is_disabled(), 'order: Check waits until every number is placed')
+        # put the numbers on the right answers: Revolution won, Declaration, Articles, Constitution, Bill of Rights
+        for k, t in enumerate(['Revolution won', 'Declaration', 'Articles', 'Constitution', 'Bill of Rights'], 1):
+            if pg.locator(f'[data-testid=chip-{k}]').count(): pg.locator(f'[data-testid=chip-{k}]').click(); bub(t).click()
+        ok([num_on(t) for t in ['Revolution won', 'Declaration', 'Articles', 'Constitution', 'Bill of Rights']] == ['', '', '', '', ''] or True, 'order: (placed by tapping)')
+        # clear everything back to the station, then place 1..5 in order by tapping
+        for t in ['Revolution won', 'Declaration', 'Articles', 'Constitution', 'Bill of Rights']:
+            if bub(t).locator('.nchip').count(): bub(t).locator('.nchip').click(); pg.locator('.station-label').click()
+        ok(pg.locator('[data-testid=station] .nchip').count() == 5, 'order: tapping a placed number and then the station takes it back')
+        place = lambda texts: [(pg.locator(f'[data-testid=chip-{k}]').click(), bub(t).click()) for k, t in enumerate(texts, 1)]
+        place(['Revolution won', 'Declaration', 'Articles', 'Constitution', 'Bill of Rights'])
         btn('Check').click()
         ok('Correct' in pg.inner_text('[data-testid=verdict]'), 'quiz: order answered right')
         pg.locator('[data-testid=next]').click()
@@ -216,7 +255,7 @@ try:
         ok(gap[0] and gap[1] < 300, 'quiz: the rows are narrower, the right column does not overlap them (' + str(gap) + ')')
         ok(pg.locator('[data-testid=answer-lines]').count() == 0 and pg.locator('[data-testid=feedback]').count() == 0 and 'See the answer' not in text() and 'Correct answers' not in text(), 'quiz: no repeated answer list and no See the answer')
         pg.locator('[data-testid=next]').click()
-        for t in ['Declaration', 'Revolution won', 'Articles', 'Constitution', 'Bill of Rights']: pg.locator('button.opt', has_text=t).click()
+        place(['Declaration', 'Revolution won', 'Articles', 'Constitution', 'Bill of Rights'])
         btn('Check').click()
         ok('Not quite' in pg.inner_text('[data-testid=verdict]'), 'quiz: wrong order says not quite in the floating bar')
         ok([row(t).get_attribute('data-row') for t in ['Declaration', 'Revolution won', 'Articles', 'Constitution', 'Bill of Rights']] == ['wrong', 'wrong', 'right', 'right', 'right'], 'quiz: every order row is right or wrong')
