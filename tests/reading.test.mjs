@@ -1,5 +1,5 @@
 // Rule tests for Reading projects (layout, chunks, blocks, question builder). Run with: npm test
-import { parseJson, parseTranscript, makeChunks, layoutText, parseBlocks, buildQuestions, splitTextPages, textTranscript, cleanCount, toRows, suggestCount, countQuestions, readingReport } from '../src/reading.js';
+import { parseJson, parseTranscript, makeChunks, layoutText, parseBlocks, buildQuestions, splitTextPages, textTranscript, cleanCount, toRows, suggestCount, countQuestions, readingReport, parseBlocksDetailed } from '../src/reading.js';
 import { buildDeck } from '../src/deck.js';
 
 let pass = 0, fail = 0;
@@ -98,6 +98,15 @@ ok(rep.includes('Page 1') && rep.includes('blocks: 8 found') && rep.includes('wa
 const items = qs.map((q, i) => ({ ...q, id: 'i' + i, fileId: 'f1' }));
 const { deck, notReady } = buildDeck([], items, [{ id: 'f1', createdAt: 1 }]);
 ok(deck.length === items.length && notReady === 0, 'all reading items become cards in the existing study modes (got ' + deck.length + ', notReady ' + notReady + ')');
+
+// 0.20.2: reworded-subject answers are dropped, with a reason in the report info
+const pd = parseBlocksDetailed({ blocks: [
+  { type: 'fact', source: 'the constitution divided Federal Power', subject: 'Division of federal power', question: 'What did the constitution do to federal power?', value: 'divided Federal Power' },
+  { type: 'fact', source: 'The constitution assigned different responsibilities to three branches.', subject: 'Responsibilities of branches', question: 'What did it assign to the branches?', value: 'different responsibilities' },
+  { type: 'date', source: 'In 1787, delegates met in Philadelphia.', subject: 'Philadelphia meeting', question: 'When did delegates meet in Philadelphia?', value: '1787' }
+] });
+ok(pd.blocks.length === 2 && pd.asked === 3, 'reworded-subject block dropped, others kept (got ' + pd.blocks.length + ')');
+ok(pd.dropped.length === 1 && /repeats/.test(pd.dropped[0].why), 'dropped block has a reason');
 
 console.log(`reading: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

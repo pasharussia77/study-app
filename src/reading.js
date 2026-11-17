@@ -203,7 +203,7 @@ For each block return:
 
 How to read the layout: the text is shown with its spacing as on the page.${kind === 'handwritten' || kind === 'mixed' ? ' This page was handwritten notes, so lines may be short fragments like "1776 - independence". Treat those as blocks. Indented lines under a heading belong to that heading. An arrow (→) means the left part leads to or causes the right part.' : ''} Markers: [text] boxed, (text) circled, _text_ underlined, *text starred.
 Skip headings that stand alone, page numbers, captions and anything that is not study content.
-Find every block that deserves a question, up to ${wantBlocks}. One block per separate piece of information: never report the same fact twice. Do not pad. A block's value must say something more than its subject (never "Congress" → "Congress").
+Find every block that deserves a question, up to ${wantBlocks}. One block per separate piece of information: never report the same fact twice. If one sentence holds two separate facts (for example what happened and when, or two different results), report two blocks, each with its own source and its own question. Every bullet or line that states something to learn should give a block, unless another block already covers the same fact. Do not pad. A block's value must say something more than its subject (never "Congress" → "Congress").
 
 Return ONLY JSON: {"blocks":[...]}
 
@@ -217,27 +217,40 @@ export function saysMore(subject, value, question = '') {
   if (!v) return false;
   if (s && (v === s || s.includes(v))) return false;
   if (norm(question).includes(v)) return false;
+  if (s && onlyReworded(s, v)) return false;
   return true;
+}
+// "Division of federal power" -> "divided Federal Power": every answer word is already in the subject (endings ignored).
+const FILLER = new Set(['of', 'the', 'a', 'an', 'and', 'in', 'to', 'is', 'are', 'was', 'were', 'by', 'for', 'on']);
+const sameWord = (a, b) => a === b || (a.length >= 5 && b.length >= 5 && a.slice(0, 4) === b.slice(0, 4));
+function onlyReworded(subject, value) {
+  const sw = subject.split(' ').filter((w) => w && !FILLER.has(w));
+  const vw = value.split(' ').filter((w) => w && !FILLER.has(w));
+  return vw.length > 0 && vw.every((w) => sw.some((x) => sameWord(w, x)));
 }
 export function blockLine(b) {
   if (b.type === 'list') return `${b.subject || b.question}: ${b.items.join(', ')}`;
   return `${b.subject || b.question} → ${b.value}`;
 }
 
-export function parseBlocks(raw) {
+export function parseBlocks(raw) { return parseBlocksDetailed(raw).blocks; }
+
+export function parseBlocksDetailed(raw) {
   const data = typeof raw === 'string' ? parseJson(raw) : raw;
   const list = Array.isArray(data && data.blocks) ? data.blocks : [];
   const seen = new Set();
   const out = [];
+  const dropped = [];
+  const drop = (why, b) => dropped.push({ why, line: String((b && (b.subject || b.question)) || '?').slice(0, 60) + ' → ' + String((b && (b.value || (Array.isArray(b.items) ? b.items.join(', ') : ''))) || '').slice(0, 60) });
   for (const b of list) {
     const type = BLOCK_TYPES.includes(b.type) ? b.type : 'fact';
     const source = str(b.source), question = str(b.question), value = str(b.value);
     const items = (Array.isArray(b.items) ? b.items : []).map(str).filter(Boolean).slice(0, 8);
-    if (!source || !question) continue;
-    if (type === 'list' ? items.length < 2 : !value) continue;
-    if (type !== 'list' && !saysMore(b.subject, value, question)) continue;
+    if (!source || !question) { drop('no source or question', b); continue; }
+    if (type === 'list' ? items.length < 2 : !value) { drop(type === 'list' ? 'list with under 2 items' : 'no answer', b); continue; }
+    if (type !== 'list' && !saysMore(b.subject, value, question)) { drop('answer repeats the subject or the question', b); continue; }
     const keys = [norm(question), type === 'list' ? '' : 'v:' + norm(value) + '|' + norm(b.subject || question)].filter(Boolean);
-    if (keys.some((k) => seen.has(k))) continue;
+    if (keys.some((k) => seen.has(k))) { drop('same fact found twice', b); continue; }
     keys.forEach((k) => seen.add(k));
     out.push({
       id: 'b' + (out.length + 1), on: true, type, source, subject: str(b.subject), question, value: type === 'list' ? '' : value, items: type === 'list' ? items : [],
@@ -245,7 +258,7 @@ export function parseBlocks(raw) {
       grounded: type === 'list' ? items.every((it) => norm(source).includes(norm(it))) : norm(source).includes(norm(value))
     });
   }
-  return out;
+  return { blocks: out, asked: list.length, dropped: dropped.slice(0, 20) };
 }
 
 export async function findBlocks(code, t, off, log = () => {}) {
@@ -258,9 +271,10 @@ export async function findBlocks(code, t, off, log = () => {}) {
   let res;
   try { res = await askAIDetailed(code, { messages: [{ role: 'user', content: prompt }], json: true, maxTokens: 4000 }); }
   catch (e) { log({ type: 'blocks', ok: false, error: e.message, ms: Date.now() - t0 }); throw e; }
-  let blocks;
-  try { blocks = parseBlocks(res.text); } catch (e) { log({ type: 'blocks', ok: false, error: e.message, raw: res.text }); throw new Error(e.message); }
-  log({ type: 'blocks', ok: true, ms: res.ms, usage: res.usage, made: blocks.length });
+  let blocks, info;
+  try { const r = parseBlocksDetailed(res.text); blocks = r.blocks; info = { asked: r.asked, dropped: r.dropped }; } catch (e) { log({ type: 'blocks', ok: false, error: e.message, raw: res.text }); throw new Error(e.message); }
+  log({ type: 'blocks', ok: true, ms: res.ms, usage: res.usage, made: blocks.length, asked: info.asked });
+  blocks.info = info; // read by the caller and saved with the page for the report
   return blocks;
 }
 
@@ -437,6 +451,11 @@ export function readingReport(files, items, perFact) {
     }
     const bl = f.blocks || [];
     out.push(`blocks: ${bl.length} found, ${bl.filter((b) => b.on !== false).length} ticked`);
+    if (f.blocksInfo) {
+      const d = f.blocksInfo.dropped || [];
+      out.push(`  the AI sent ${f.blocksInfo.asked} blocks, the app dropped ${d.length}${d.length ? ':' : ''}`);
+      d.forEach((x) => out.push(`    dropped (${x.why}): ${x.line}`));
+    }
     bl.forEach((b) => out.push(`  [${b.on === false ? ' ' : 'x'}] ${b.type}${b.important ? ' !' : ''}${b.grounded ? '' : ' (not in source)'}: ${blockLine(b)}  <= "${b.source}"`));
     out.push(`questions: ${mine.length} ${JSON.stringify(types)}`);
     mine.forEach((x) => out.push(`  ${x.type}: ${x.question} => ${x.answer}${x.flagged ? ' [flagged]' : ''}`));

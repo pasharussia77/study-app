@@ -82,7 +82,7 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
     setBusy('Typing up the page… this can take a minute.');
     try {
       const t = await transcribePhoto(code, data, log(id));
-      await backend.updateFile(code, projectId, id, { transcript: t, transcriptRev: Date.now(), status: 'typed', error: '', checked: false, off: [], blocks: null, blocksStamp: '', qStamp: '' });
+      await backend.updateFile(code, projectId, id, { transcript: t, transcriptRev: Date.now(), status: 'typed', error: '', checked: false, off: [], blocks: null, blocksInfo: null, blocksStamp: '', qStamp: '' });
       return true;
     } catch (e) {
       await backend.updateFile(code, projectId, id, { status: 'error', error: e.message }).catch(() => {});
@@ -153,7 +153,7 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
       setBusy(`Finding information blocks, page ${i + 1} of ${toFind.length}…`);
       try {
         const blocks = await findBlocks(code, f.transcript, f.off || [], log(f.id));
-        await backend.updateFile(code, projectId, f.id, { blocks, blocksStamp: stampOf(f), error: '' });
+        await backend.updateFile(code, projectId, f.id, { blocks, blocksInfo: blocks.info || null, blocksStamp: stampOf(f), error: '' });
         found += blocks.length;
       } catch (e) { failed++; lastErr = e.message; }
     }
@@ -290,6 +290,7 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
         </div>
       )}
       {itemList.length > 0 && <button className="btn ghost" onClick={onReview}><Icon name="list" />Review questions ({itemList.length})</button>}
+      {itemList.length > 0 && stale && withBlocks.length > 0 && <p className="muted tiny" data-testid="out-of-date">Out of date: these questions were made from earlier blocks. Tap "Make {willMake} question{willMake === 1 ? '' : 's'}" to refresh them.</p>}
       <div className="testtools">
         <b><Icon name="flask" size={18} /> Testing tools</b>
         <p className="muted tiny">Creates a report of the typed pages, the blocks found and the questions made. Paste it to Claude.</p>
@@ -498,7 +499,7 @@ function PageEditor({ code, projectId, projectName, file, index, onClose }) {
     setBusy('Typing up the page…'); setNote('');
     try {
       const nt = await transcribePhoto(code, file.data, (e) => diagLog(projectId, { ...e, fileId: file.id }));
-      await backend.updateFile(code, projectId, file.id, { transcript: nt, transcriptRev: Date.now(), status: 'typed', error: '', checked: false, off: [], blocks: null, blocksStamp: '', qStamp: '' });
+      await backend.updateFile(code, projectId, file.id, { transcript: nt, transcriptRev: Date.now(), status: 'typed', error: '', checked: false, off: [], blocks: null, blocksInfo: null, blocksStamp: '', qStamp: '' });
     } catch (e) { setNote(e.message); }
     setBusy('');
   };
