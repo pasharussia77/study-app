@@ -1,5 +1,5 @@
 // Rule tests for Reading projects (layout, chunks, blocks, question builder). Run with: npm test
-import { parseJson, parseTranscript, makeChunks, layoutText, parseBlocks, buildQuestions, splitTextPages, textTranscript, cleanCount, toRows, suggestCount } from '../src/reading.js';
+import { parseJson, parseTranscript, makeChunks, layoutText, parseBlocks, buildQuestions, splitTextPages, textTranscript, cleanCount, toRows, suggestCount, countQuestions, readingReport } from '../src/reading.js';
 import { buildDeck } from '../src/deck.js';
 
 let pass = 0, fail = 0;
@@ -58,31 +58,41 @@ ok(blocks.length === 8, 'bad and duplicate blocks are dropped (got ' + blocks.le
 ok(blocks.find((b) => b.value === '1999').grounded === false, 'a value that is not in its source is marked not grounded');
 ok(blocks.find((b) => b.value === '1783').grounded === true, 'a value found in its source is grounded');
 
-const qs = buildQuestions(blocks, blocks, 10, 'Page 1', 'a');
-ok(qs.length === 10, 'makes the requested number (got ' + qs.length + ')');
-ok(qs[0].blockType !== undefined && qs.every((q) => q.source === 'reading'), 'items carry block type and source');
-ok(qs.filter((q) => q.type === 'qa').length >= 4, 'round 1 gives each block its main question');
-const first = qs.slice(0, 3).map((q) => q.question).join('|');
-ok(first.includes('Declaration') || qs[0].srcText.includes('1776'), 'important blocks come first');
-ok(qs.every((q) => q.question && q.answer), 'every question has an answer');
-for (const q of qs.filter((x) => x.type === 'mc')) {
-  ok(q.choices.length >= 3 && new Set(q.choices.map((c) => c.text)).size === q.choices.length, 'mc choices are different');
-  ok(q.choices.find((c) => c.label === q.correctLabel).text === q.answer, 'mc correct label matches the answer');
-}
-for (const q of qs.filter((x) => x.type === 'tf')) ok((q.answer === 'True') === (q.correctLabel === 'A') && (q.answer === 'True' || q.correction), 'tf answer and label agree; false ones give the true version');
-const multi = qs.find((q) => q.type === 'multi');
-ok(multi && multi.correctLabels.length === 4 && multi.choices.length >= 6, 'list makes a select-all with extra wrong choices from other lists');
-const order = qs.find((q) => q.type === 'order') || buildQuestions(blocks.filter((b) => b.ordered), blocks, 5, 'P', 'b').find((q) => q.type === 'order');
-ok(order && order.correctOrder.length === 3 && order.correctOrder.join('') !== 'ABC', 'ordered list makes a put-in-order with a mixed-up start');
-ok(JSON.stringify(buildQuestions(blocks, blocks, 10, 'Page 1', 'a')) === JSON.stringify(qs), 'same blocks and count give the same questions');
-const few = buildQuestions(blocks.slice(0, 1), blocks.slice(0, 1), 25, 'P', 'c');
-ok(few.length < 25 && few.length >= 1, 'a page with little in it is not padded');
-ok(buildQuestions(blocks, blocks, 7, 'P', 'd').length === 7, 'a custom number like 7 works');
-ok(cleanCount('7') === 7 && cleanCount('0') === 1 && cleanCount('999') === 40 && cleanCount('x') === 10, 'the typed number is cleaned');
+ok(blocks.every((b) => b.id && b.on === true), 'blocks get an id and start ticked');
+// Blocks that say nothing are dropped: Congress -> Congress, answer given away in the question
+const empty = parseBlocks({ blocks: [
+  { type: 'name', source: 'Congress', subject: 'Congress', question: 'Which body makes laws?', value: 'Congress' },
+  { type: 'name', source: 'Legislative -> Congress', subject: 'Legislative branch', question: 'Which body is the legislative branch?', value: 'Congress' },
+  { type: 'fact', source: 'The war began in 1775.', subject: 'war', question: 'The war began in 1775. When?', value: '1775' },
+  { type: 'date', source: 'In 1787.', subject: 'Constitution', question: 'When?', value: '1787' },
+  { type: 'date', source: 'In 1787 again.', subject: 'Constitution', question: 'What year?', value: '1787' }
+] });
+ok(empty.length === 2 && empty[0].value === 'Congress' && empty[0].subject === 'Legislative branch', 'subject = answer and answer-in-question blocks are dropped; the same fact twice is kept once (got ' + empty.length + ')');
 
-ok(suggestCount(t) === 5, 'a short page suggests 5');
-ok(suggestCount(textTranscript(['word '.repeat(150)])) === 10 && suggestCount(textTranscript(['word '.repeat(400)])) === 20, 'longer pages suggest more');
-ok(suggestCount(textTranscript(['word '.repeat(400), 'x']), ['l1']) === 5, 'unticked text does not count');
+const qs = buildQuestions(blocks, blocks, 1, 'Page 1', 'a');
+ok(qs.length === blocks.length, 'one question per block by default (got ' + qs.length + ' for ' + blocks.length + ')');
+ok(new Set(qs.map((q) => q.srcText)).size === qs.length, 'no fact is asked twice');
+ok(qs.every((q) => q.source === 'reading' && q.blockType), 'items carry block type and source');
+ok(qs.every((q) => q.question && q.answer), 'every question has an answer');
+ok(qs.some((q) => q.type === 'mc') && qs.some((q) => q.type === 'term') && qs.some((q) => q.type === 'multi'), 'types vary to suit the block: ' + qs.map((q) => q.type).join(','));
+ok(qs.every((q) => q.type === 'tf' || q.type === 'multi' || q.type === 'order' || !q.question.toLowerCase().includes(q.answer.toLowerCase())), 'no question gives its answer away');
+for (const q of qs.filter((x) => x.type === 'mc')) ok(q.choices.find((c) => c.label === q.correctLabel).text === q.answer && new Set(q.choices.map((c) => c.text)).size === q.choices.length, 'mc right label and different choices');
+const order = qs.find((q) => q.type === 'order');
+ok(order && order.correctOrder.length === 3 && order.correctOrder.join('') !== 'ABC', 'an ordered list becomes put-in-order with a mixed-up start');
+const two = buildQuestions(blocks, blocks, 2, 'Page 1', 'a');
+ok(two.length > qs.length && two.length <= blocks.length * 2, 'two per fact adds questions (got ' + two.length + ')');
+const byFact = {}; two.forEach((q) => { (byFact[q.srcText] ||= []).push(q.type); });
+ok(Object.values(byFact).every((ts) => new Set(ts.map((t) => t)).size === ts.length), 'extra questions on a fact use a different form');
+const three = buildQuestions(blocks, blocks, 3, 'Page 1', 'a');
+ok(three.length >= two.length && Object.values(three.reduce((m, q) => ((m[q.srcText] = (m[q.srcText] || 0) + 1), m), {})).every((n) => n <= 3), 'three per fact at most');
+const ticked = blocks.map((b, i) => ({ ...b, on: i % 2 === 0 }));
+ok(buildQuestions(ticked, ticked, 1, 'P', 'a').length === ticked.filter((b) => b.on).length, 'unticked blocks make no questions');
+ok(JSON.stringify(buildQuestions(blocks, blocks, 1, 'Page 1', 'a')) === JSON.stringify(qs), 'same blocks give the same questions');
+const cong = parseBlocks({ blocks: [{ type: 'name', source: 'Legislative -> Congress', subject: 'Legislative branch', question: 'Which body is the legislative branch?', value: 'Congress' }] });
+ok(!buildQuestions(cong, cong, 3, 'P', 'z').some((q) => /^congress: congress$/i.test(q.question)), 'never "Congress: Congress"');
+ok(countQuestions([{ id: 'p1', blocks }], 1) === blocks.length, 'the count of questions is known before making them');
+const rep = readingReport([{ id: 'f1', source: 'photo', status: 'typed', checked: true, transcript: t, off: ['l5'], blocks }], qs.map((q) => ({ ...q, fileId: 'f1' })), 1);
+ok(rep.includes('Page 1') && rep.includes('blocks: 8 found') && rep.includes('war starts') && rep.includes('unticked: war starts'), 'the report shows typed copy, blocks and questions');
 
 // They fit the existing deck builder
 const items = qs.map((q, i) => ({ ...q, id: 'i' + i, fileId: 'f1' }));

@@ -203,12 +203,25 @@ For each block return:
 
 How to read the layout: the text is shown with its spacing as on the page.${kind === 'handwritten' || kind === 'mixed' ? ' This page was handwritten notes, so lines may be short fragments like "1776 - independence". Treat those as blocks. Indented lines under a heading belong to that heading. An arrow (→) means the left part leads to or causes the right part.' : ''} Markers: [text] boxed, (text) circled, _text_ underlined, *text starred.
 Skip headings that stand alone, page numbers, captions and anything that is not study content.
-Find up to ${wantBlocks} blocks, as many as the text really supports. Do not pad.
+Find every block that deserves a question, up to ${wantBlocks}. One block per separate piece of information: never report the same fact twice. Do not pad. A block's value must say something more than its subject (never "Congress" → "Congress").
 
 Return ONLY JSON: {"blocks":[...]}
 
 TEXT:
 ${sourceText}`;
+}
+
+// A block is only worth a question if its answer says more than its subject and is not given away by the question.
+export function saysMore(subject, value, question = '') {
+  const v = norm(value), s = norm(subject);
+  if (!v) return false;
+  if (s && (v === s || s.includes(v))) return false;
+  if (norm(question).includes(v)) return false;
+  return true;
+}
+export function blockLine(b) {
+  if (b.type === 'list') return `${b.subject || b.question}: ${b.items.join(', ')}`;
+  return `${b.subject || b.question} → ${b.value}`;
 }
 
 export function parseBlocks(raw) {
@@ -222,11 +235,12 @@ export function parseBlocks(raw) {
     const items = (Array.isArray(b.items) ? b.items : []).map(str).filter(Boolean).slice(0, 8);
     if (!source || !question) continue;
     if (type === 'list' ? items.length < 2 : !value) continue;
-    const key = norm(question);
-    if (seen.has(key)) continue;
-    seen.add(key);
+    if (type !== 'list' && !saysMore(b.subject, value, question)) continue;
+    const keys = [norm(question), type === 'list' ? '' : 'v:' + norm(value) + '|' + norm(b.subject || question)].filter(Boolean);
+    if (keys.some((k) => seen.has(k))) continue;
+    keys.forEach((k) => seen.add(k));
     out.push({
-      type, source, subject: str(b.subject), question, value: type === 'list' ? '' : value, items: type === 'list' ? items : [],
+      id: 'b' + (out.length + 1), on: true, type, source, subject: str(b.subject), question, value: type === 'list' ? '' : value, items: type === 'list' ? items : [],
       ordered: type === 'list' && b.ordered === true, important: b.important === true,
       grounded: type === 'list' ? items.every((it) => norm(source).includes(norm(it))) : norm(source).includes(norm(value))
     });
@@ -234,10 +248,10 @@ export function parseBlocks(raw) {
   return out;
 }
 
-export async function findBlocks(code, t, off, wantCount, log = () => {}) {
+export async function findBlocks(code, t, off, log = () => {}) {
   const sourceText = layoutText(t, { marks: true, off });
   if (!sourceText.trim()) throw new Error('Nothing on this page is ticked as source material.');
-  const want = clamp(Math.ceil(wantCount * 0.7) + 2, 4, 30);
+  const want = 30;
   const { askAIDetailed } = await import('./ai.js');
   const prompt = buildFactsPrompt(sourceText, want, t.kind);
   const t0 = Date.now();
@@ -309,6 +323,7 @@ function mcOf(b, all, label, seq, rand) {
   return baseItem(b, { type: 'mc', question: b.question, choices, correctLabel: correct.label, answer: b.value }, label, seq);
 }
 function tfOf(b, all, label, seq, rand, which) {
+  if (!b.subject || !saysMore(b.subject, b.value)) return null;
   const claim = (v) => (b.subject ? `${b.subject}: ${v}` : `${b.question} ${v}`);
   const trueClaim = claim(b.value);
   const makeFalse = which === 'false';
@@ -321,9 +336,9 @@ function tfOf(b, all, label, seq, rand, which) {
   const choices = [{ label: 'A', text: 'True' }, { label: 'B', text: 'False' }];
   return baseItem(b, { type: 'tf', question: statement, choices, correctLabel: makeFalse ? 'B' : 'A', answer, correction: makeFalse ? trueClaim : '' }, label, seq);
 }
-function listOf(b, all, label, seq, rand) {
+function listOf(b, all, label, seq, rand, form = '') {
   const items = b.items.slice(0, 6);
-  if (b.ordered && items.length >= 3) {
+  if (form !== 'multi' && b.ordered && items.length >= 3) {
     let order = shuffled(items, rand);
     if (order.every((t, i) => t === items[i])) order = [...order.slice(1), order[0]];
     const choices = order.map((text, i) => ({ label: LETTER(i), text }));
@@ -353,24 +368,80 @@ function listTfOf(b, all, label, seq, rand) {
   return baseItem(b, { type: 'tf', question: `${wrong} belongs to: ${subj}`, choices, correctLabel: 'B', answer: 'False', correction: `${subj}: ${b.items.join('; ')}` }, label, seq);
 }
 
-// Makes up to `count` questions for one page. Important blocks first. Round 1 is every block's main question,
-// then multiple choice, then true/false, then word cards, until the count is reached or the blocks run out.
-export function buildQuestions(pageBlocks, allBlocks, count, label, pageKey = 'p') {
-  const blocks = [...pageBlocks.map((b, i) => ({ b, i }))].sort((x, y) => (y.b.important ? 1 : 0) - (x.b.important ? 1 : 0) || x.i - y.i).map((x) => x.b);
+// One question per ticked block, so no fact is asked twice. The type is chosen to suit the block.
+// With perFact 2 or 3, extra questions on the same fact are added in other forms (the student's choice).
+export function buildQuestions(pageBlocks, allBlocks, perFact, label, pageKey = 'p') {
+  const pool = allBlocks.filter((b) => b.on !== false);
+  const blocks = pageBlocks.filter((b) => b.on !== false);
+  const per = clamp(Math.round(+perFact) || 1, 1, 3);
   const out = []; const used = new Set();
-  const push = (it) => { if (!it) return false; const k = norm(it.question) + '|' + it.type; if (used.has(k)) return false; used.add(k); it.order = out.length; out.push(it); return true; };
-  const rounds = [
-    (b, r) => (b.type === 'list' ? listOf(b, allBlocks, label, 0, r) : qaOf(b, label, 0)),
-    (b, r) => (b.type === 'list' ? listPickOf(b, allBlocks, label, 0, r) : mcOf(b, allBlocks, label, 0, r)),
-    (b, r) => (b.type === 'list' ? listTfOf(b, allBlocks, label, 0, r) : tfOf(b, allBlocks, label, 0, r, 'false')),
-    (b, r) => (b.type === 'list' ? null : (b.type === 'definition' ? termOf(b, label, 0) : tfOf(b, allBlocks, label, 0, r, 'true')))
-  ];
-  for (let r = 0; r < rounds.length && out.length < count; r++) {
-    for (let i = 0; i < blocks.length && out.length < count; i++) {
-      push(rounds[r](blocks[i], rng(`${pageKey}:${i}:${r}`)));
+  const push = (it) => {
+    if (!it) return false;
+    if (it.type !== 'tf' && it.type !== 'multi' && it.type !== 'order' && norm(it.question).includes(norm(it.answer))) return false; // never give the answer away
+    const k = norm(it.question) + '|' + it.type + '|' + norm(it.answer);
+    if (used.has(k)) return false; used.add(k); it.order = out.length; out.push(it); return true;
+  };
+  blocks.forEach((b, i) => {
+    const r = rng(`${pageKey}:${b.id || i}`);
+    const forms = formsFor(b);
+    let made = 0; const types = new Set();
+    for (const f of forms) {
+      if (made >= per) break;
+      const kind = f === 'tf-true' || f === 'tf-false' ? 'tf' : f;
+      if (types.has(kind)) continue;
+      const it = make(f, b, pool, label, r);
+      if (it && push(it)) { made++; types.add(kind); }
     }
-  }
+  });
   return out;
+}
+// The forms a block can take, best first.
+function formsFor(b) {
+  if (b.type === 'list') return b.ordered && b.items.length >= 3 ? ['order', 'multi', 'listmc', 'listtf'] : ['multi', 'listmc', 'listtf'];
+  if (b.type === 'definition') return ['term', 'mc', 'qa', 'tf-false'];
+  if (b.type === 'date' || b.type === 'name') return ['mc', 'qa', 'tf-false'];
+  return ['qa', 'mc', 'tf-false'];
+}
+function make(form, b, all, label, r) {
+  switch (form) {
+    case 'qa': return qaOf(b, label, 0);
+    case 'term': return termOf(b, label, 0);
+    case 'mc': return mcOf(b, all, label, 0, r);
+    case 'tf-false': return tfOf(b, all, label, 0, r, 'false');
+    case 'tf-true': return tfOf(b, all, label, 0, r, 'true');
+    case 'order': { const it = listOf(b, all, label, 0, r, 'order'); return it && it.type === 'order' ? it : null; }
+    case 'multi': return listOf(b, all, label, 0, r, 'multi');
+    case 'listmc': return listPickOf(b, all, label, 0, r);
+    case 'listtf': return listTfOf(b, all, label, 0, r);
+    default: return null;
+  }
+}
+// How many questions the ticked blocks would make (shown before making them).
+export function countQuestions(pages, perFact) {
+  const all = pages.flatMap((p) => p.blocks || []);
+  return pages.reduce((n, p) => n + buildQuestions(p.blocks || [], all, perFact, 'x', p.id).length, 0);
+}
+
+// Text for the diagnostic report: each page's typed copy, the blocks found and the questions made.
+export function readingReport(files, items, perFact) {
+  const out = ['=== READING PROJECT ===', `Questions per fact: ${perFact}`];
+  files.forEach((f, i) => {
+    const mine = items.filter((x) => x.fileId === f.id);
+    const types = {}; mine.forEach((x) => { types[x.type] = (types[x.type] || 0) + 1; });
+    out.push('', `--- Page ${i + 1} (${f.source || 'photo'}${f.from ? ', ' + f.from : ''}) status=${f.status || ''} approved=${!!f.checked}${f.error ? ' error=' + f.error : ''}`);
+    if (f.transcript) {
+      const t = f.transcript;
+      out.push(`typed copy: kind=${t.kind} pieces=${t.lines.length} unticked=${(f.off || []).length} low-confidence=${t.lines.filter((l) => l.conf !== 'high').length} figures=${(t.figures || []).length}`);
+      out.push(layoutText(t, { marks: true }));
+      if ((f.off || []).length) out.push('unticked: ' + t.lines.filter((l) => (f.off || []).includes(l.id)).map((l) => l.text).join(' | '));
+    }
+    const bl = f.blocks || [];
+    out.push(`blocks: ${bl.length} found, ${bl.filter((b) => b.on !== false).length} ticked`);
+    bl.forEach((b) => out.push(`  [${b.on === false ? ' ' : 'x'}] ${b.type}${b.important ? ' !' : ''}${b.grounded ? '' : ' (not in source)'}: ${blockLine(b)}  <= "${b.source}"`));
+    out.push(`questions: ${mine.length} ${JSON.stringify(types)}`);
+    mine.forEach((x) => out.push(`  ${x.type}: ${x.question} => ${x.answer}${x.flagged ? ' [flagged]' : ''}`));
+  });
+  return out.join('\n');
 }
 
 export function countNote(made, wanted) {

@@ -99,7 +99,7 @@ export default function App() {
   );
   if (screen === 'project' && project.kind === 'reading' && profile.test) return (
     <Shell>
-      <ReadingProject key={project.id} code={code} projectId={project.id} profile={profile} onBack={goUp}
+      <ReadingProject key={project.id} code={code} projectId={project.id} profile={profile} onBack={goUp} onSpeechTest={() => pushScreen({ screen: 'speechtest', profile })}
         onStudy={(mode, deck) => pushScreen({ screen: 'study', profile, project, mode, deck })}
         onReview={() => pushScreen({ screen: 'items', profile, project })} />
     </Shell>

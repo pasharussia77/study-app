@@ -10,7 +10,7 @@ import { APP_VERSION } from './version.js';
 
 const WORKER_URL = 'https://study-api.pasharussia77.workers.dev';
 
-export default function ReportSheet({ code, project, profile, text, deck, onClose }) {
+export default function ReportSheet({ code, project, profile, text, deck, onClose, extra = '' }) {
   const [files, setFiles] = useState([]);
   const [items, setItems] = useState([]);
   const [stats, setStats] = useState({});
@@ -33,8 +33,8 @@ export default function ReportSheet({ code, project, profile, text, deck, onClos
       version: APP_VERSION,
       device: `${navigator.userAgent} | screen ${screen.width}x${screen.height} | online ${navigator.onLine}`,
       health, profile, project, text, parsed, sum: summarize(deck, stats), files, items, check: crossCheck(files, items), events, notes
-    });
-  }, [text, stats, files, items, deck, events, notes, health, profile, project]);
+    }) + (extra ? '\n\n' + extra : '');
+  }, [text, stats, files, items, deck, events, notes, health, profile, project, extra]);
 
   const parts = useMemo(() => splitReport(report), [report]);
   const copy = async (i = 0) => {
