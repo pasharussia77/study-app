@@ -52,5 +52,6 @@ async function mockAI(messages) {
   window.__allMessages = [...(window.__allMessages || []), messages];
   if (new URLSearchParams(location.search).has('aifail')) throw new Error('Pretend AI failure.');
   if (window.__mockAI && window.__mockAI.length) { const next = window.__mockAI.shift(); return typeof next === 'string' ? next : JSON.stringify(next); }
+  if (JSON.stringify(messages).includes('CHECK THESE QUESTIONS')) return '{"checks":[]}';
   return MOCK_DEFAULT;
 }

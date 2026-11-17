@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { backend } from './firebase.js';
 import { TYPE_LABEL, crossCheck, reapplyItem, duplicateGroups, fixNumbers } from './items.js';
 import { inPageOrder } from './deck.js';
-import { BLOCK_LABEL } from './reading.js';
+import { BLOCK_LABEL, checkLabel, recheckItems } from './reading.js';
+import { diagLog } from './diag.js';
 import { useOverlay, goUp } from './nav.js';
 import { Icon } from './art.jsx';
 import { ScreenHead } from './Session.jsx';
@@ -44,6 +45,17 @@ export default function Items({ code, projectId }) {
   }, [items, files]);
 
   const flaggedCount = items.filter((i) => i.flagged).length;
+  const isReading = files.some((f) => f.kind === 'page');
+  const aiFlagged = items.filter((i) => i.aiNote).length;
+  const unchecked = isReading ? items.filter((i) => i.srcText && i.aiChecked !== true).length : 0;
+  const tickedCount = items.filter((i) => !i.off).length;
+  const toggleTick = async (it) => { try { await backend.updateItem(code, projectId, it.id, { off: !it.off }); } catch (e) { setDone('Could not save the tick: ' + e.message); } };
+  const checkAgain = async () => {
+    setDone(''); setWorking('Checking the questions…');
+    try { const n = await recheckItems(code, projectId, items, backend, (e) => diagLog(projectId, { ...e, fileId: 'check' })); setDone(n ? `The AI check flagged ${n}.` : 'The AI check found no problems.'); }
+    catch (e) { setDone('The AI check did not work: ' + e.message); }
+    setWorking('');
+  };
   const check = useMemo(() => crossCheck(files, items), [files, items]);
   const dups = useMemo(() => duplicateGroups(items), [items]);
   const dupCount = dups.reduce((n, g) => n + g.drop.length, 0);
@@ -90,7 +102,13 @@ export default function Items({ code, projectId }) {
       <ScreenHead onBack={goUp} backLabel="Project" icon={<span className="head-ic"><Icon name="list" size={26} /></span>} title="Study items" />
       {!loaded ? <p className="muted" data-testid="items-loading">Loading…</p> : (
       <>
-      <p className="muted" data-testid="items-summary">{items.length} item{items.length === 1 ? '' : 's'}{flaggedCount ? ` · ${flaggedCount} need a look` : ' · all look fine'}</p>
+      <p className="muted" data-testid="items-summary">{items.length} item{items.length === 1 ? '' : 's'}{flaggedCount ? ` · ${flaggedCount} need a look` : ' · all look fine'}{isReading ? ` · ${tickedCount} of ${items.length} ticked${aiFlagged ? ` · ${aiFlagged} flagged by the AI check` : ''}` : ''}</p>
+      {unchecked > 0 && (
+        <div className="hint" data-testid="check-missing">
+          The AI check has not been done for {unchecked} question{unchecked === 1 ? '' : 's'}.
+          <button className="link inline" disabled={!!working} onClick={checkAgain} data-testid="check-again">Check again</button>
+        </div>
+      )}
       {check && (
         <div className={check.ok && check.countOk ? 'okmsg' : 'hint'} data-testid="crosscheck">
           Score on the sheet: {check.score}, so {check.expectedWrong} wrong. Found {check.wrongFound} marked wrong. {check.ok ? 'These match.' : 'These do not match, so a red mark may have been missed or misread.'}
@@ -106,13 +124,13 @@ export default function Items({ code, projectId }) {
       {fromPhotos > 0 && <button className="btn ghost small" disabled={!!working} onClick={() => setAsking(true)} data-testid="reapply">Re-apply the rules</button>}
       {working && <p className="hint" role="status">{working}</p>}
       {done && <div className="okmsg" role="status" data-testid="reapply-done">{done}</div>}
-      {flaggedCount > 0 && (
+      {flaggedCount + aiFlagged > 0 && (
         <label className="switch"><Icon name="alert" /><span>Only show items that need a look</span><input type="checkbox" checked={onlyFlagged} onChange={(e) => setOnlyFlagged(e.target.checked)} /></label>
       )}
       {items.length === 0 && <div className="empty"><p>No study items yet.</p><p className="muted">Take a photo and tap Read.</p></div>}
 
       {groups.map((g) => {
-        const shown = onlyFlagged ? g.list.filter((i) => i.flagged) : g.list;
+        const shown = onlyFlagged ? g.list.filter((i) => i.flagged || i.aiNote) : g.list;
         if (!shown.length) return null;
         return (
           <div key={g.label} className="igroup">
@@ -123,8 +141,9 @@ export default function Items({ code, projectId }) {
             </div>
             <ul className="ilist">
               {shown.map((it) => (
-                <li key={it.id} className={'item' + (it.flagged ? ' flagged' : '')} data-testid="item">
+                <li key={it.id} className={'item' + (it.flagged || it.aiNote ? ' flagged' : '') + (it.off ? ' off' : '')} data-testid="item">
                   <div className="item-top">
+                    {isReading && it.srcText && <label className="rq-tick" data-testid="tick"><input type="checkbox" checked={!it.off} onChange={() => toggleTick(it)} aria-label="Use this question" /></label>}
                     {it.number != null && <b>{it.number}.</b>}
                     <span className={'ttype t-' + it.type}>{TYPE_LABEL[it.type]}</span>
                     <span className="src">{SOURCE_LABEL[it.source] || it.source}</span>
@@ -150,6 +169,7 @@ export default function Items({ code, projectId }) {
                   {(it.type === 'term' || it.type === 'qa') && <p className="ichoices-answer">Answer: <b>{it.answer || '—'}</b></p>}
                   {it.studentAnswer && it.type !== 'term' && it.type !== 'qa' && <p className="muted tiny">{it.source === 'handwritten answer key' ? 'Written on the page' : 'Student wrote'}: {it.studentAnswer}{it.markedWrong ? ' (marked wrong)' : ''}</p>}
                   {it.srcText && <p className="muted tiny item-src" data-testid="item-src">{BLOCK_LABEL[it.blockType] ? BLOCK_LABEL[it.blockType] + ' · ' : ''}From the page: {it.srcText}</p>}
+                  {it.aiNote && <p className="needs" data-testid="ai-note">AI check · {checkLabel(it.aiKind)}: {it.aiNote}</p>}
                   {it.flagged && <p className="needs">Needs a look{it.note ? ': ' + it.note : ''}</p>}
                   <button className="btn ghost small" onClick={() => setEditing(it)}>{it.flagged ? 'Check and fix' : 'Edit'}</button>
                 </li>
@@ -200,7 +220,7 @@ function EditSheet({ item, onClose, code, projectId }) {
   const canSave = q.trim() && (isChoice ? !!correct : isMulti ? many.length > 0 : isOrder ? numsOk : answer.trim());
 
   const save = async () => {
-    const patch = { question: q.trim(), flagged: false, source: 'set by you', note: '' };
+    const patch = { question: q.trim(), flagged: false, source: 'set by you', note: '', aiNote: '', aiKind: '' };
     if (isChoice) {
       patch.choices = choices.map((c) => ({ label: c.label, text: c.text.trim() }));
       patch.correctLabel = correct;

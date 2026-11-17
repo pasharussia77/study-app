@@ -739,3 +739,8 @@ html::-webkit-scrollbar { display: none; }
 .rd-stage.full .rd-bar { position: relative; z-index: 5; padding: 10px 12px; background: rgba(255,255,255,.92); }
 .rd-stage.full .rd-vp { border: 0; }
 .rd-stage.full .rd-edit-bar { padding: 8px 12px; background: #fff; }
+
+/* Reading review: tick box per question, unticked ones fade */
+.item.off { opacity: .55; }
+.item .rq-tick { display: inline-flex; align-items: center; margin-right: 4px; }
+.item .rq-tick input { width: 26px; height: 26px; accent-color: var(--accent, #6d4be8); }

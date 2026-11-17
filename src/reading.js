@@ -278,6 +278,69 @@ export async function findBlocks(code, t, off, log = () => {}) {
   return blocks;
 }
 
+// ---------------------------------------------------------------- AI check of the made questions (reading projects)
+
+const CHECK_KIND = { unclear: 'Not clear', mismatch: 'Answer does not fit', wrong: 'May be factually wrong', trivial: 'Too trivial to study' };
+export const checkLabel = (k) => CHECK_KIND[k] || 'Look at this one';
+
+function choiceLine(q) {
+  if (!q.choices || !q.choices.length || q.type === 'order') return q.type === 'order' ? ` Items: ${(q.choices || []).map((c) => c.text).join(' | ')}` : '';
+  return ` Choices: ${q.choices.map((c) => c.label + '. ' + c.text).join(' | ')}`;
+}
+export function buildCheckPrompt(list) {
+  const lines = list.map((q, i) => `${i + 1}. [${q.type}] ${q.question}${choiceLine(q)}\n   Answer: ${q.answer || '(none)'}${q.correction ? ' (correction: ' + q.correction + ')' : ''}\n   Source sentence: ${q.srcText || '(none)'}`).join('\n');
+  return `CHECK THESE QUESTIONS. They were made automatically from a student's study material. Look at each one and report only the ones with a problem.
+Problem kinds:
+- unclear: the question does not make sense on its own, is cut off, or has no clear answer
+- mismatch: the answer does not answer the question, or is not supported by the source sentence
+- wrong: the fact itself looks wrong compared with what you know (be sure; if you are not sure, do not report it)
+- trivial: so simple or common that a student at this level would not need to study it
+Do not report a question just because the wording could be nicer. A question with no problem is NOT reported.
+For each problem return: n (the question number), kind (unclear, mismatch, wrong or trivial), why (at most 12 words, plain).
+
+Return ONLY JSON: {"checks":[{"n":1,"kind":"unclear","why":"..."}]}  (use {"checks":[]} if all are fine)
+
+QUESTIONS:
+${lines}`;
+}
+export function parseChecks(raw, count) {
+  const data = typeof raw === 'string' ? parseJson(raw) : raw;
+  if (!data || !Array.isArray(data.checks)) throw new Error('The AI check answer could not be read.');
+  const out = new Map();
+  for (const c of data.checks) {
+    const n = Number(c && c.n);
+    if (!Number.isInteger(n) || n < 1 || n > count) continue;
+    const kind = CHECK_KIND[c.kind] ? c.kind : 'unclear';
+    const why = str(c.why).slice(0, 140);
+    out.set(n - 1, { kind, why });
+  }
+  return out;
+}
+// One AI call for a list of question items. Returns Map(index -> {kind, why}) for the ones with a problem. Throws if the call or answer fails.
+export async function checkQuestions(code, list, log = () => {}) {
+  if (!list.length) return new Map();
+  const { askAIDetailed } = await import('./ai.js');
+  const t0 = Date.now();
+  let res;
+  try { res = await askAIDetailed(code, { messages: [{ role: 'user', content: buildCheckPrompt(list) }], json: true, maxTokens: 4000 }); }
+  catch (e) { log({ type: 'check', ok: false, error: e.message, ms: Date.now() - t0 }); throw e; }
+  let flags;
+  try { flags = parseChecks(res.text, list.length); } catch (e) { log({ type: 'check', ok: false, error: e.message, raw: res.text }); throw e; }
+  log({ type: 'check', ok: true, ms: res.ms, usage: res.usage, asked: list.length, flagged: flags.size });
+  return flags;
+}
+
+// Checks the made questions that have no AI check yet and saves the result on them. Returns how many were flagged. Throws if the check fails.
+export async function recheckItems(code, projectId, items, backend, log = () => {}) {
+  const list = items.filter((x) => x.srcText && x.aiChecked !== true);
+  const flags = await checkQuestions(code, list, log);
+  for (let i = 0; i < list.length; i++) {
+    const f = flags.get(i);
+    await backend.updateItem(code, projectId, list[i].id, { aiChecked: true, aiNote: f ? f.why : '', aiKind: f ? f.kind : '' });
+  }
+  return flags.size;
+}
+
 // ---------------------------------------------------------------- questions from blocks (fixed rules, no AI)
 
 function rng(seed) {
@@ -458,7 +521,9 @@ export function readingReport(files, items, perFact) {
     }
     bl.forEach((b) => out.push(`  [${b.on === false ? ' ' : 'x'}] ${b.type}${b.important ? ' !' : ''}${b.grounded ? '' : ' (not in source)'}: ${blockLine(b)}  <= "${b.source}"`));
     out.push(`questions: ${mine.length} ${JSON.stringify(types)}`);
-    mine.forEach((x) => out.push(`  ${x.type}: ${x.question} => ${x.answer}${x.flagged ? ' [flagged]' : ''}`));
+    const unchecked = mine.filter((x) => x.aiChecked !== true).length;
+    out.push(unchecked ? `AI check: not done for ${unchecked} of ${mine.length} questions` : `AI check: done, ${mine.filter((x) => x.aiNote).length} flagged, ${mine.filter((x) => x.off).length} unticked by you`);
+    mine.forEach((x) => out.push(`  ${x.off ? '[ ] ' : ''}${x.type}: ${x.question} => ${x.answer}${x.flagged ? ' [flagged]' : ''}${x.aiNote ? ` [AI ${x.aiKind || 'check'}: ${x.aiNote}]` : ''}`));
   });
   return out.join('\n');
 }

@@ -11,7 +11,7 @@ import { TileArt } from './art.jsx';
 import ReportSheet from './Report.jsx';
 import {
   BLOCK_LABEL, transcribePhoto, findBlocks, buildQuestions, countQuestions, blockLine, readingReport,
-  splitTextPages, textTranscript, makeChunks, layoutText, chunkPreview
+  splitTextPages, textTranscript, makeChunks, layoutText, chunkPreview, checkQuestions, recheckItems
 } from './reading.js';
 
 const hash = (s) => { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0; return String(h); };
@@ -172,22 +172,34 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
   const madeFrom = (f) => blocksSig(f) + ':' + perFact;
   const stale = withBlocks.some((f) => f.qStamp !== madeFrom(f) || f.qText !== stampOf(f));
 
-  // ---- step 2: make the questions from the ticked blocks (no AI)
+  const unchecked = itemList.filter((x) => x.srcText && x.aiChecked !== true).length;
+  const checkAgain = async () => {
+    setMsg(null); setBusy('Checking the questions…');
+    try { const n = await recheckItems(code, projectId, itemList, backend, log('check')); setMsg({ kind: 'ok', review: true, text: n ? `The AI check flagged ${n}. Look at them in the review.` : 'The AI check found no problems.' }); }
+    catch (e) { setMsg({ kind: 'error', text: 'The AI check did not work: ' + e.message }); }
+    setBusy('');
+  };
+
+  // ---- step 2: make the questions from the ticked blocks (no AI for the questions, then one AI check)
   const makeQuestions = async () => {
-    setMsg(null); setBusy('Making questions…');
-    let total = 0;
+    setMsg(null); setBusy('Making questions, then checking them…');
+    let total = 0, flagged = 0, checkFailed = false;
     try {
       for (const f of withBlocks) {
         const label = `Page ${fileList.indexOf(f) + 1}`;
         const kept = itemList.filter((x) => x.fileId === f.id && x.source === 'set by you').map(({ id, createdAt, fileId, ...rest }) => rest);
         const made = buildQuestions(f.blocks || [], allBlocks, perFact, label, f.id);
-        await backend.replaceItemsForFile(code, projectId, f.id, [...made, ...kept]);
+        let flags = null;
+        try { flags = await checkQuestions(code, made, log(f.id)); } catch { checkFailed = true; }
+        const marked = made.map((q, i) => flags ? { ...q, aiChecked: true, aiNote: flags.has(i) ? flags.get(i).why : '', aiKind: flags.has(i) ? flags.get(i).kind : '' } : { ...q, aiChecked: false });
+        if (flags) flagged += flags.size;
+        await backend.replaceItemsForFile(code, projectId, f.id, [...marked, ...kept]);
         await backend.updateFile(code, projectId, f.id, { qStamp: madeFrom(f), qText: stampOf(f), made: made.length });
         total += made.length;
       }
     } catch (e) { setBusy(''); setMsg({ kind: 'error', text: e.message }); return; }
     setBusy('');
-    setMsg({ kind: 'ok', review: true, text: `Made ${total} question${total === 1 ? '' : 's'} from ${tickedBlocks} information block${tickedBlocks === 1 ? '' : 's'}.` });
+    setMsg({ kind: 'ok', review: true, text: `Made ${total} question${total === 1 ? '' : 's'} from ${tickedBlocks} information block${tickedBlocks === 1 ? '' : 's'}. ` + (checkFailed ? 'The AI check did not work, so none are checked yet. Tap "Check again".' : flagged ? `The AI check flagged ${flagged}. Look at them in the review.` : 'The AI check found no problems.') });
   };
 
   const del = async () => {
@@ -290,6 +302,12 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
         </div>
       )}
       {itemList.length > 0 && <button className="btn ghost" onClick={onReview}><Icon name="list" />Review questions ({itemList.length})</button>}
+      {unchecked > 0 && !stale && (
+        <div className="hint" data-testid="check-missing">
+          The AI check has not been done for {unchecked} question{unchecked === 1 ? '' : 's'}.
+          <button className="link inline" disabled={!!busy} onClick={checkAgain} data-testid="check-again">Check again</button>
+        </div>
+      )}
       {itemList.length > 0 && stale && withBlocks.length > 0 && <p className="muted tiny" data-testid="out-of-date">Out of date: these questions were made from earlier blocks. Tap "Make {willMake} question{willMake === 1 ? '' : 's'}" to refresh them.</p>}
       <div className="testtools">
         <b><Icon name="flask" size={18} /> Testing tools</b>

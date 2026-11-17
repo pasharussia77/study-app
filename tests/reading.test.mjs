@@ -1,5 +1,5 @@
 // Rule tests for Reading projects (layout, chunks, blocks, question builder). Run with: npm test
-import { parseJson, parseTranscript, makeChunks, layoutText, parseBlocks, buildQuestions, splitTextPages, textTranscript, cleanCount, toRows, suggestCount, countQuestions, readingReport, parseBlocksDetailed } from '../src/reading.js';
+import { parseJson, parseTranscript, makeChunks, layoutText, parseBlocks, buildQuestions, splitTextPages, textTranscript, cleanCount, toRows, suggestCount, countQuestions, readingReport, parseBlocksDetailed, buildCheckPrompt, parseChecks } from '../src/reading.js';
 import { buildDeck } from '../src/deck.js';
 
 let pass = 0, fail = 0;
@@ -107,6 +107,18 @@ const pd = parseBlocksDetailed({ blocks: [
 ] });
 ok(pd.blocks.length === 2 && pd.asked === 3, 'reworded-subject block dropped, others kept (got ' + pd.blocks.length + ')');
 ok(pd.dropped.length === 1 && /repeats/.test(pd.dropped[0].why), 'dropped block has a reason');
+
+// 0.20.3: AI check of questions and unticked questions
+const cq = [{ type: 'qa', question: 'What does the Legislative branch do?', answer: 'Moves federal laws', srcText: 'Moves federal laws' }, { type: 'mc', question: 'When?', answer: '1787', srcText: 'In 1787', choices: [{ label: 'A', text: '1787' }, { label: 'B', text: '1789' }] }];
+const cp = buildCheckPrompt(cq);
+ok(/CHECK THESE QUESTIONS/.test(cp) && /1\. \[qa\]/.test(cp) && /2\. \[mc\]/.test(cp) && /Choices: A\. 1787/.test(cp) && /Source sentence: In 1787/.test(cp), 'check prompt lists every question with answer and source');
+const pc = parseChecks('Sure: {"checks":[{"n":1,"kind":"wrong","why":"Laws are made, not moved"},{"n":9,"kind":"wrong","why":"x"},{"n":2,"kind":"odd","why":"y"}]}', 2);
+ok(pc.size === 2 && pc.get(0).kind === 'wrong' && pc.get(1).kind === 'unclear', 'check answer parsed: bad numbers ignored, unknown kind becomes unclear');
+ok(parseChecks('{"checks":[]}', 2).size === 0, 'empty check answer means no problems');
+let badCheck = false; try { parseChecks('not json', 2); } catch { badCheck = true; }
+ok(badCheck, 'an unreadable check answer throws (so the app shows "check did not work")');
+const dk = buildDeck([], [{ id: 'a', fileId: 'f1', type: 'qa', question: 'Q1', answer: 'A1' }, { id: 'b', fileId: 'f1', type: 'qa', question: 'Q2', answer: 'A2', off: true }], [{ id: 'f1', createdAt: 1 }]);
+ok(dk.deck.length === 1 && dk.deck[0].prompt === 'Q1' && dk.notReady === 0, 'an unticked question is left out of the deck');
 
 console.log(`reading: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

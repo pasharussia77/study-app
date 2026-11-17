@@ -31,6 +31,7 @@ export function buildDeck(textCards, items, files = []) {
   }
   let notReady = 0;
   for (const it of inPageOrder(items, files)) {
+    if (it.off) continue; // unticked in the review: kept in the list, left out of study
     if (!it.answer || !it.question) { notReady++; continue; }
     const key = 'i' + cardKey({ term: it.id, definition: it.answer });
     const base = { key, type: it.type, prompt: it.question, answer: it.answer, itemId: it.id, number: it.number, section: it.section, correction: it.type === 'tf' && it.correction ? it.correction : '' };
