@@ -349,6 +349,12 @@ try:
         n = int(re.search(r'in (\d+) parts', pg.inner_text('[data-testid=parts-note]')).group(1))
         ok(n >= 3, 'report: the screen says how many parts (' + str(n) + ')')
         ok(btn('Copy part 1 of %d' % n).is_visible() and btn('Copy part %d of %d' % (n, n)).is_visible(), 'report: a copy button for each part')
+        try: pg.context.grant_permissions(['clipboard-read', 'clipboard-write'])
+        except Exception: pass
+        cls = lambda i: pg.locator('[data-testid=copy-%d]' % i).get_attribute('class')
+        ok('primary' in cls(0) and 'primary' not in cls(1), 'report: the first part is lit up at the start')
+        pg.locator('[data-testid=copy-0]').click(); pg.wait_for_timeout(300)
+        ok('copied' in cls(0) and 'Copied part 1' in pg.locator('[data-testid=copy-0]').inner_text() and 'primary' in cls(1) and 'primary' not in cls(0), 'report: a copied part shows as copied and the next part lights up')
         rep = pg.locator('[data-testid=report]').input_value()
         ok(rep.startswith('FAMILY STUDY') and 'note line 399' in rep, 'report: the box still holds the whole text')
 

@@ -1,5 +1,5 @@
 // Rule tests for Reading projects (layout, chunks, blocks, question builder). Run with: npm test
-import { parseJson, parseTranscript, makeChunks, layoutText, parseBlocks, buildQuestions, splitTextPages, textTranscript, cleanCount, toRows, suggestCount, countQuestions, readingReport, parseBlocksDetailed, buildCheckPrompt, parseChecks } from '../src/reading.js';
+import { parseJson, parseTranscript, makeChunks, layoutText, parseBlocks, buildQuestions, splitTextPages, textTranscript, cleanCount, toRows, suggestCount, countQuestions, readingReport, parseBlocksDetailed, buildCheckPrompt, parseChecks, struckIds } from '../src/reading.js';
 import { buildDeck } from '../src/deck.js';
 
 let pass = 0, fail = 0;
@@ -105,8 +105,21 @@ const pd = parseBlocksDetailed({ blocks: [
   { type: 'fact', source: 'The constitution assigned different responsibilities to three branches.', subject: 'Responsibilities of branches', question: 'What did it assign to the branches?', value: 'different responsibilities' },
   { type: 'date', source: 'In 1787, delegates met in Philadelphia.', subject: 'Philadelphia meeting', question: 'When did delegates meet in Philadelphia?', value: '1787' }
 ] });
-ok(pd.blocks.length === 2 && pd.asked === 3, 'reworded-subject block dropped, others kept (got ' + pd.blocks.length + ')');
-ok(pd.dropped.length === 1 && /repeats/.test(pd.dropped[0].why), 'dropped block has a reason');
+ok(pd.blocks.length === 3 && pd.asked === 3 && pd.blocks[0].plain === true && !pd.blocks[1].plain, 'reworded-subject block with a real question is kept as plain question (got ' + pd.blocks.length + ')');
+const pd2 = parseBlocksDetailed({ blocks: [
+  { type: 'fact', source: 'Congress', subject: 'Congress', question: 'What is Congress?', value: 'Congress' },
+  { type: 'fact', source: 'the new constitution', subject: 'new constitution', question: 'Tell me about the new constitution and the delegates', value: 'the new constitution' }
+] });
+ok(pd2.blocks.length === 0 && pd2.dropped.length === 2 && /repeats/.test(pd2.dropped[0].why), 'weak subject AND weak question is dropped, with a reason');
+const pd3 = parseBlocksDetailed({ blocks: [{ type: 'list', source: 'The constitution assigned different responsibilities to three branches.', subject: 'three branches', question: 'What did the constitution assign to the three branches?', items: ['different responsibilities'] }] });
+ok(pd3.blocks.length === 1 && pd3.blocks[0].type === 'fact' && pd3.blocks[0].value === 'different responsibilities', 'a list with one item becomes a fact block');
+const plainQs = buildQuestions(pd.blocks, pd.blocks, 3, 'Page 1', 'pp');
+ok(plainQs.filter((q) => q.srcText === pd.blocks[0].source && (q.type === 'term' || q.type === 'tf')).length === 0, 'a plain block never makes a word card or true/false');
+// 0.20.4: crossed-out pieces
+const tr = parseTranscript({ kind: 'handwritten', lines: [{ text: 'gained new powers', x: .1, y: .2, w: .3, h: .03, marks: ['strike'] }, { text: 'decided to write', x: .5, y: .2, w: .3, h: .03 }] });
+ok(tr.lines[0].marks.includes('strike') && struckIds(tr).length === 1 && struckIds(tr)[0] === tr.lines[0].id, 'crossed-out piece keeps its strike mark and is listed to start unticked');
+ok(/~~gained new powers~~/.test(layoutText(tr, { marks: true })) && !/gained/.test(layoutText(tr, { off: struckIds(tr) })), 'report shows ~~crossed out~~ text; unticked it is left out of the source text');
+ok(/handwriting/.test(buildCheckPrompt([{ type: 'qa', question: 'Q', answer: 'A', srcText: 'S' }])), 'check prompt warns about handwriting misreads');
 
 // 0.20.3: AI check of questions and unticked questions
 const cq = [{ type: 'qa', question: 'What does the Legislative branch do?', answer: 'Moves federal laws', srcText: 'Moves federal laws' }, { type: 'mc', question: 'When?', answer: '1787', srcText: 'In 1787', choices: [{ label: 'A', text: '1787' }, { label: 'B', text: '1789' }] }];

@@ -16,7 +16,7 @@ export const DEFAULT_COUNT = 10;
 export const MAX_COUNT = 40;
 export const BLOCK_TYPES = ['definition', 'fact', 'date', 'name', 'event', 'cause', 'list'];
 export const BLOCK_LABEL = { definition: 'Definition', fact: 'Fact', date: 'Date', name: 'Name', event: 'Event', cause: 'Cause and effect', list: 'List' };
-const MARKS = ['underline', 'box', 'circle', 'star'];
+const MARKS = ['underline', 'box', 'circle', 'star', 'strike'];
 
 const str = (x) => (x == null ? '' : String(x).trim());
 const num = (x, d = 0) => (isFinite(+x) && x !== null && x !== '' ? +x : d);
@@ -37,13 +37,16 @@ Return ONLY JSON: {"kind":"printed"|"handwritten"|"mixed","lines":[...],"figures
 - w: its width as a fraction of the picture width. h: the height of one text line as a fraction of the picture height.
 - If a line has a big gap in the middle, or two phrases sit far apart on the same row, make two entries.
 - If there is empty space between two lines, the y values must show it. If a phrase is short and sits in the middle of the page, its x must show that. Short lines stay short.
-- marks: any of "underline", "box", "circle", "star" when that phrase is underlined, boxed, circled or starred. Leave marks out when there are none.
+- marks: any of "underline", "box", "circle", "star", "strike" when that phrase is underlined, boxed, circled, starred or crossed out. Leave marks out when there are none. "strike" means a line drawn THROUGH the middle of the words, as when a writer scratches out a mistake: it is not an underline (a line under the words). Type crossed-out words exactly as written, and mark them "strike".
 - conf: "low" or "medium" when you are not sure you read it right. Leave conf out when you are sure.
 Keep the answer short: round x, y, w and h to 3 decimals and add nothing else.
 "figures": drawings, diagrams, tables or pictures you cannot type: {"x":..,"y":..,"w":..,"h":..,"label":"short description"}.
 Skip page numbers, running headers and footers, and ads.
 Do not add anything that is not on the page.`;
 }
+
+// Crossed-out pieces start unticked: the writer scratched them out, so they are not study material (the student can tick them back).
+export const struckIds = (t) => ((t && t.lines) || []).filter((l) => l.marks.includes('strike')).map((l) => l.id);
 
 // Cleans the AI's answer: numbers clamped to the page, ids added, empty pieces dropped.
 export function parseTranscript(raw) {
@@ -150,6 +153,7 @@ const wrap = (l, marks) => {
   if (!marks) return l.text;
   if (l.marks.includes('box')) return `[${l.text}]`;
   if (l.marks.includes('circle')) return `(${l.text})`;
+  if (l.marks.includes('strike')) return `~~${l.text}~~`;
   if (l.marks.includes('underline')) return `_${l.text}_`;
   if (l.marks.includes('star')) return `*${l.text}`;
   return l.text;
@@ -243,18 +247,25 @@ export function parseBlocksDetailed(raw) {
   const dropped = [];
   const drop = (why, b) => dropped.push({ why, line: String((b && (b.subject || b.question)) || '?').slice(0, 60) + ' → ' + String((b && (b.value || (Array.isArray(b.items) ? b.items.join(', ') : ''))) || '').slice(0, 60) });
   for (const b of list) {
-    const type = BLOCK_TYPES.includes(b.type) ? b.type : 'fact';
-    const source = str(b.source), question = str(b.question), value = str(b.value);
-    const items = (Array.isArray(b.items) ? b.items : []).map(str).filter(Boolean).slice(0, 8);
+    let type = BLOCK_TYPES.includes(b.type) ? b.type : 'fact';
+    const source = str(b.source), question = str(b.question);
+    let value = str(b.value);
+    let items = (Array.isArray(b.items) ? b.items : []).map(str).filter(Boolean).slice(0, 8);
+    if (type === 'list' && items.length === 1) { type = 'fact'; value = value || items[0]; items = []; } // one item is not a list
     if (!source || !question) { drop('no source or question', b); continue; }
     if (type === 'list' ? items.length < 2 : !value) { drop(type === 'list' ? 'list with under 2 items' : 'no answer', b); continue; }
-    if (type !== 'list' && !saysMore(b.subject, value, question)) { drop('answer repeats the subject or the question', b); continue; }
+    let plain = false;
+    if (type !== 'list' && !saysMore(b.subject, value, question)) {
+      // The answer repeats the subject: keep it only if the question itself is a real question that does not give the answer away. Then it stays a plain question and answer.
+      if (question.split(/\s+/).length >= 4 && !norm(question).includes(norm(value)) && norm(value) !== norm(b.subject)) plain = true;
+      else { drop('answer repeats the subject or the question', b); continue; }
+    }
     const keys = [norm(question), type === 'list' ? '' : 'v:' + norm(value) + '|' + norm(b.subject || question)].filter(Boolean);
     if (keys.some((k) => seen.has(k))) { drop('same fact found twice', b); continue; }
     keys.forEach((k) => seen.add(k));
     out.push({
       id: 'b' + (out.length + 1), on: true, type, source, subject: str(b.subject), question, value: type === 'list' ? '' : value, items: type === 'list' ? items : [],
-      ordered: type === 'list' && b.ordered === true, important: b.important === true,
+      ordered: type === 'list' && b.ordered === true, important: b.important === true, plain,
       grounded: type === 'list' ? items.every((it) => norm(source).includes(norm(it))) : norm(source).includes(norm(value))
     });
   }
@@ -295,6 +306,7 @@ Problem kinds:
 - mismatch: the answer does not answer the question, or is not supported by the source sentence
 - wrong: the fact itself looks wrong compared with what you know (be sure; if you are not sure, do not report it)
 - trivial: so simple or common that a student at this level would not need to study it
+Some source sentences were read from a photo of handwriting by a program, so a word can be misread. If a word looks like a misread of a likelier word (for example \"Moves federal laws\" where \"Makes federal laws\" is meant), report it as unclear and name the likely word in why.
 Do not report a question just because the wording could be nicer. A question with no problem is NOT reported.
 For each problem return: n (the question number), kind (unclear, mismatch, wrong or trivial), why (at most 12 words, plain).
 
@@ -388,7 +400,7 @@ function baseItem(block, extra, label, seq) {
 
 function qaOf(b, label, seq) { return baseItem(b, { type: 'qa', question: b.question, answer: b.value }, label, seq); }
 function termOf(b, label, seq) {
-  if (b.type !== 'definition' || !b.subject || b.subject.split(/\s+/).length > 6) return null;
+  if (b.plain || b.type !== 'definition' || !b.subject || b.subject.split(/\s+/).length > 6) return null;
   return baseItem(b, { type: 'term', question: b.subject, answer: b.value }, label, seq);
 }
 function mcOf(b, all, label, seq, rand) {
@@ -474,6 +486,7 @@ export function buildQuestions(pageBlocks, allBlocks, perFact, label, pageKey = 
 }
 // The forms a block can take, best first.
 function formsFor(b) {
+  if (b.plain) return ['qa', 'mc']; // subject label is weak: no word card or true/false made from it
   if (b.type === 'list') return b.ordered && b.items.length >= 3 ? ['order', 'multi', 'listmc', 'listtf'] : ['multi', 'listmc', 'listtf'];
   if (b.type === 'definition') return ['term', 'mc', 'qa', 'tf-false'];
   if (b.type === 'date' || b.type === 'name') return ['mc', 'qa', 'tf-false'];

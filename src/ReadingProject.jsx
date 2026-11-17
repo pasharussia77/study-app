@@ -11,7 +11,7 @@ import { TileArt } from './art.jsx';
 import ReportSheet from './Report.jsx';
 import {
   BLOCK_LABEL, transcribePhoto, findBlocks, buildQuestions, countQuestions, blockLine, readingReport,
-  splitTextPages, textTranscript, makeChunks, layoutText, chunkPreview, checkQuestions, recheckItems
+  splitTextPages, textTranscript, makeChunks, layoutText, chunkPreview, checkQuestions, recheckItems, struckIds
 } from './reading.js';
 
 const hash = (s) => { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0; return String(h); };
@@ -43,6 +43,7 @@ function pictureOf(t, ratio) {
     const tw = g.measureText(l.text).width;
     g.strokeStyle = '#111'; g.lineWidth = 2;
     if (l.marks.includes('underline')) { g.beginPath(); g.moveTo(x, y + 4); g.lineTo(x + tw, y + 4); g.stroke(); }
+    if (l.marks.includes('strike')) { g.beginPath(); g.moveTo(x, y - fs * 0.3); g.lineTo(x + tw, y - fs * 0.3); g.stroke(); }
     if (l.marks.includes('box')) g.strokeRect(x - 6, y - fs, tw + 12, fs * 1.25);
     if (l.marks.includes('circle')) { g.beginPath(); g.ellipse(x + tw / 2, y - fs * 0.35, tw / 2 + 12, fs * 0.8, 0, 0, Math.PI * 2); g.stroke(); }
   }
@@ -82,7 +83,7 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
     setBusy('Typing up the page… this can take a minute.');
     try {
       const t = await transcribePhoto(code, data, log(id));
-      await backend.updateFile(code, projectId, id, { transcript: t, transcriptRev: Date.now(), status: 'typed', error: '', checked: false, off: [], blocks: null, blocksInfo: null, blocksStamp: '', qStamp: '' });
+      await backend.updateFile(code, projectId, id, { transcript: t, transcriptRev: Date.now(), status: 'typed', error: '', checked: false, off: struckIds(t), blocks: null, blocksInfo: null, blocksStamp: '', qStamp: '' });
       return true;
     } catch (e) {
       await backend.updateFile(code, projectId, id, { status: 'error', error: e.message }).catch(() => {});

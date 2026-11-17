@@ -18,6 +18,7 @@ export default function ReportSheet({ code, project, profile, text, deck, onClos
   const [notes, setNotes] = useState('');
   const [events, setEvents] = useState(() => diagGet(project.id));
   const [copied, setCopied] = useState('');
+  const [done, setDone] = useState([]); // which parts were copied
 
   useEffect(() => backend.watchFiles(code, project.id, setFiles), [code, project.id]);
   useEffect(() => backend.watchStats(code, project.id, setStats), [code, project.id]);
@@ -37,8 +38,10 @@ export default function ReportSheet({ code, project, profile, text, deck, onClos
   }, [text, stats, files, items, deck, events, notes, health, profile, project, extra]);
 
   const parts = useMemo(() => splitReport(report), [report]);
+  useEffect(() => { setDone([]); }, [report]);
+  const nextPart = parts.findIndex((_, i) => !done.includes(i));
   const copy = async (i = 0) => {
-    try { await navigator.clipboard.writeText(parts[i]); setCopied(parts.length > 1 ? `Copied part ${i + 1} of ${parts.length}. Paste it in the chat, send it, then copy the next part.` : 'Copied. Now paste it in the chat with Claude.'); }
+    try { await navigator.clipboard.writeText(parts[i]); setDone((d) => (d.includes(i) ? d : [...d, i])); setCopied(parts.length > 1 ? `Copied part ${i + 1} of ${parts.length}. Paste it in the chat, send it, then copy the next part.` : 'Copied. Now paste it in the chat with Claude.'); }
     catch { setCopied('Could not copy automatically. Press and hold in the box, choose Select all, then Copy.'); }
   };
 
@@ -52,7 +55,7 @@ export default function ReportSheet({ code, project, profile, text, deck, onClos
         <textarea className="report-box" readOnly value={report} aria-label="Report text" data-testid="report" />
         {parts.length > 1 && <p className="muted tiny" data-testid="parts-note">The report is long, so it comes in {parts.length} parts. Paste each part in the chat as its own message, in order.</p>}
         {parts.map((p, i) => (
-          <button key={i} className={'btn ' + (i === 0 ? 'primary' : 'ghost')} onClick={() => copy(i)} data-testid={'copy-' + i}>{parts.length > 1 ? `Copy part ${i + 1} of ${parts.length}` : 'Copy report'}</button>
+          <button key={i} className={'btn ' + (done.includes(i) ? 'ghost copied' : (i === nextPart || (nextPart < 0 && i === 0 && parts.length === 1)) ? 'primary' : 'ghost')} onClick={() => copy(i)} data-testid={'copy-' + i}>{done.includes(i) ? (parts.length > 1 ? `✓ Copied part ${i + 1} of ${parts.length}` : '✓ Copied') : parts.length > 1 ? `Copy part ${i + 1} of ${parts.length}` : 'Copy report'}</button>
         ))}
         {copied && <p className="okmsg" role="status">{copied}</p>}
         <div className="row">

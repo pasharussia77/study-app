@@ -689,6 +689,7 @@ html::-webkit-scrollbar { display: none; }
 .rd-piece.low { background: rgba(255,200,60,.4); }
 .rd-piece.off { opacity: .3; }
 .rd-piece.m-underline { text-decoration: underline; }
+.rd-piece.m-strike { text-decoration: line-through; color: #777; }
 .rd-piece.m-box { outline: 1.5px solid #111; outline-offset: 2px; }
 .rd-piece.m-circle { border: 1.5px solid #111; border-radius: 999px; padding: 0 .6em; }
 .rd-fig { position: absolute; border: 2px dashed #9a9ab0; border-radius: 6px; display: grid; place-items: center; text-align: center; color: #6b6b80; font-size: .7rem; padding: 2px; }
@@ -744,3 +745,5 @@ html::-webkit-scrollbar { display: none; }
 .item.off { opacity: .55; }
 .item .rq-tick { display: inline-flex; align-items: center; margin-right: 4px; }
 .item .rq-tick input { width: 26px; height: 26px; accent-color: var(--accent, #6d4be8); }
+
+.btn.copied { background: #E3F6EA; color: #1B6B3A; border-color: #9AD7B0; }
