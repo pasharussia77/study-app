@@ -373,6 +373,8 @@ function PageEditor({ code, projectId, projectName, file, index, onClose }) {
   const [locked, setLocked] = useState(true);
   const [view, setView] = useState({ s: 1, x: 0, y: 0 });
   const [vpW, setVpW] = useState(0);
+  const [full, setFull] = useState(false);
+  const [hint, setHint] = useState(true); // the short how-to over the page, until the first zoom or move
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState('');
   const vpRef = useRef(null), topRef = useRef(null);
@@ -380,6 +382,9 @@ function PageEditor({ code, projectId, projectName, file, index, onClose }) {
   const timer = useRef(null);
   const ptrs = useRef(new Map());
   const gest = useRef(null);
+  const lastTap = useRef(null);
+  useOverlay(full, () => setFull(false));
+  useEffect(() => { setView({ s: 1, x: 0, y: 0 }); }, [full]);
 
   // a fresh typed copy (typed again) replaces what is on screen
   useEffect(() => { setLines((file.transcript && file.transcript.lines) || []); setOff(file.off || []); setSel(null); setHl(null); }, [file.transcriptRev]); // eslint-disable-line
@@ -404,7 +409,8 @@ function PageEditor({ code, projectId, projectName, file, index, onClose }) {
 
   // ---- zoom and move with the fingers
   const pageH = vpW * ratio;
-  const vpH = Math.round(Math.min(pageH || 1, (typeof window !== 'undefined' ? window.innerHeight : 800) * 0.7));
+  const winH = typeof window !== 'undefined' ? window.innerHeight : 800;
+  const vpH = Math.round(full ? Math.max(200, winH - 64 - (sel ? 150 : 0)) : Math.min(pageH || 1, winH * 0.8));
   const fit = (v) => {
     const s = clamp(v.s, 1, 6);
     return { s, x: clamp(v.x, Math.min(0, vpW - vpW * s), 0), y: clamp(v.y, Math.min(0, vpH - pageH * s), 0) };
@@ -417,6 +423,7 @@ function PageEditor({ code, projectId, projectName, file, index, onClose }) {
     const pt = rel(e); ptrs.current.set(e.pointerId, pt);
     if (ptrs.current.size === 2) {
       const [a, b] = [...ptrs.current.values()]; const v = latest.current.view;
+      setHint(false);
       gest.current = { type: 'pinch', d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, m0: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, ...v };
       return;
     }
@@ -439,7 +446,7 @@ function PageEditor({ code, projectId, projectName, file, index, onClose }) {
       setView(fit({ s, x: m.x - cx * s, y: m.y - cy * s }));
     } else if (g.type === 'pan') {
       const dx = pt.x - g.sx, dy = pt.y - g.sy;
-      if (Math.abs(dx) + Math.abs(dy) > 8) g.moved = true;
+      if (Math.abs(dx) + Math.abs(dy) > 8) { if (!g.moved) setHint(false); g.moved = true; }
       if (g.moved) setView((v) => fit({ ...v, x: g.x0 + dx, y: g.y0 + dy }));
     } else if (g.type === 'piece') {
       const s = latest.current.view.s;
@@ -450,7 +457,14 @@ function PageEditor({ code, projectId, projectName, file, index, onClose }) {
   const up = (e) => {
     ptrs.current.delete(e.pointerId);
     const g = gest.current;
-    if (g && g.type === 'pan' && !g.moved) setSel(g.pid || null);   // a tap picks a piece (or clears the pick)
+    if (g && g.type === 'pan' && !g.moved) {
+      // a tap picks a piece (or clears the pick); a double tap zooms in there, or back to fit
+      const now = Date.now(), pt = { x: g.sx, y: g.sy }, prev = lastTap.current;
+      if (prev && now - prev.t < 320 && Math.hypot(pt.x - prev.x, pt.y - prev.y) < 30) {
+        lastTap.current = null; setHint(false);
+        if (latest.current.view.s > 1.05) setView({ s: 1, x: 0, y: 0 }); else zoomAt(2.5, pt.x, pt.y);
+      } else { lastTap.current = { t: now, ...pt }; setSel(g.pid || null); }
+    }
     if (g && g.type === 'piece') persist();
     if (g && g.type === 'pinch' && ptrs.current.size === 1) { startPan([...ptrs.current.values()][0], null); gest.current.moved = true; return; }
     if (!ptrs.current.size) gest.current = null;
@@ -503,46 +517,46 @@ function PageEditor({ code, projectId, projectName, file, index, onClose }) {
 
       {layout ? (
         <>
-          <p className="muted tiny">Typed copy with the same layout as the page. Pinch to zoom, drag to move around. Tap a piece to fix its words.</p>
-          <div className="rd-fade">
-            {file.data && <button className="link inline" onClick={() => setFade(0)}>Original</button>}
-            {file.data && <input type="range" min="0" max="100" value={Math.round(fade * 100)} onChange={(e) => setFade(e.target.value / 100)} aria-label="Fade between the original and the typed copy" />}
-            {file.data && <button className="link inline" onClick={() => setFade(1)}>Typed</button>}
-          </div>
-          <div className="rd-tools">
-            <button className="rd-round" onClick={() => zoomAt(1 / 1.5)} aria-label="Zoom out" disabled={view.s <= 1}>−</button>
-            <button className="rd-round" onClick={() => zoomAt(1.5)} aria-label="Zoom in" disabled={view.s >= 6}>+</button>
-            <button className="link inline" onClick={() => setView({ s: 1, x: 0, y: 0 })} disabled={view.s === 1 && !view.x && !view.y}>Fit</button>
-            <span className="muted tiny" data-testid="zoom">{Math.round(view.s * 100)}%</span>
-            <button className={'chip rd-lock' + (locked ? '' : ' open')} onClick={() => { setLocked(!locked); }} aria-pressed={!locked} data-testid="lock">
-              <Icon name={locked ? 'lock' : 'edit'} size={16} />{locked ? 'Pieces locked' : 'Moving pieces'}
-            </button>
-          </div>
-          {!locked && <p className="hint tiny">Tap a piece, then press and drag it. Tap "Moving pieces" to lock them again.</p>}
-          <div ref={vpRef} className="rd-vp" style={{ height: vpH || undefined }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} data-testid="viewport">
-            <div className="rd-page" style={{ paddingBottom: `${ratio * 100}%`, transform: `translate(${view.x}px, ${view.y}px) scale(${view.s})` }} data-testid="page-copy">
-              {file.data && <img className="rd-photo" src={file.data} alt={`Original page ${index + 1}`} draggable="false" />}
-              <div className="rd-typed" style={{ opacity: file.data ? fade : 1 }}>
-                {(t0.figures || []).map((f, i) => <div key={i} className="rd-fig" style={{ left: `${f.x * 100}%`, top: `${f.y * 100}%`, width: `${f.w * 100}%`, height: `${f.h * 100}%` }}><span>{f.label || 'Picture'}</span></div>)}
-                {lines.map((l) => (
-                  <div key={l.id} data-testid="piece" data-pid={l.id}
-                    className={'rd-piece' + (off.includes(l.id) ? ' off' : '') + (sel === l.id ? ' sel' : '') + (l.conf === 'low' ? ' low' : '') + l.marks.map((m) => ' m-' + m).join('')}
-                    style={{ left: `${l.x * 100}%`, top: `${l.y * 100}%`, fontSize: fs(l) }}>{l.marks.includes('star') ? '★ ' : ''}{l.text}</div>
-                ))}
-                {hlChunk && hlChunk.box && <div className="rd-hl" style={{ left: `${hlChunk.box.x * 100 - 1}%`, top: `${hlChunk.box.y * 100 - 0.6}%`, width: `${hlChunk.box.w * 100 + 2}%`, height: `${hlChunk.box.h * 100 + 1.2}%` }} />}
-              </div>
+          <div className={'rd-stage' + (full ? ' full' : '')}>
+            <div className="rd-bar">
+              <button className={'rd-ic' + (locked ? '' : ' open')} onClick={() => setLocked(!locked)} aria-pressed={!locked} aria-label={locked ? 'Pieces locked. Tap to move pieces' : 'Moving pieces. Tap to lock'} data-testid="lock"><Icon name={locked ? 'lock' : 'unlock'} size={20} /></button>
+              {file.data ? (
+                <div className="rd-fade">
+                  <button className="rd-end" onClick={() => setFade(0)}>Photo</button>
+                  <input type="range" min="0" max="100" value={Math.round(fade * 100)} onChange={(e) => setFade(e.target.value / 100)} aria-label="Fade between the original and the typed copy" />
+                  <button className="rd-end" onClick={() => setFade(1)}>Typed</button>
+                </div>
+              ) : <span className="rd-fade" />}
+              {!locked && <button className="rd-ic" onClick={addLine} aria-label="Add missing text"><Icon name="plus" size={20} /></button>}
+              <button className="rd-ic" onClick={() => setView({ s: 1, x: 0, y: 0 })} aria-label="Fit" disabled={view.s === 1 && !view.x && !view.y}><Icon name="fit" size={20} /></button>
+              <button className="rd-ic" onClick={() => setFull(!full)} aria-label={full ? 'Close full screen' : 'Full screen'} data-testid="full"><Icon name={full ? 'x' : 'expand'} size={20} /></button>
+              <span className="sr" data-testid="zoom">{Math.round(view.s * 100)}%</span>
             </div>
-          </div>
-          {selLine && (
-            <div className="rd-edit-bar">
-              <input className="big-input" value={selLine.text} aria-label="Words of the selected piece" onChange={(e) => edit(selLine.id, { text: e.target.value })} />
-              <div className="row">
-                <button className="btn ghost" onClick={() => removeLine(selLine.id)}><Icon name="trash" size={18} />Delete</button>
-                <button className="btn primary" onClick={() => setSel(null)}>Done</button>
+            <div ref={vpRef} className="rd-vp" style={{ height: vpH || undefined }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} data-testid="viewport">
+              <div className="rd-page" style={{ paddingBottom: `${ratio * 100}%`, transform: `translate(${view.x}px, ${view.y}px) scale(${view.s})` }} data-testid="page-copy">
+                {file.data && <img className="rd-photo" src={file.data} alt={`Original page ${index + 1}`} draggable="false" />}
+                <div className="rd-typed" style={{ opacity: file.data ? fade : 1 }}>
+                  {(t0.figures || []).map((f, i) => <div key={i} className="rd-fig" style={{ left: `${f.x * 100}%`, top: `${f.y * 100}%`, width: `${f.w * 100}%`, height: `${f.h * 100}%` }}><span>{f.label || 'Picture'}</span></div>)}
+                  {lines.map((l) => (
+                    <div key={l.id} data-testid="piece" data-pid={l.id}
+                      className={'rd-piece' + (off.includes(l.id) ? ' off' : '') + (sel === l.id ? ' sel' : '') + (l.conf === 'low' ? ' low' : '') + l.marks.map((m) => ' m-' + m).join('')}
+                      style={{ left: `${l.x * 100}%`, top: `${l.y * 100}%`, fontSize: fs(l) }}>{l.marks.includes('star') ? '★ ' : ''}{l.text}</div>
+                  ))}
+                  {hlChunk && hlChunk.box && <div className="rd-hl" style={{ left: `${hlChunk.box.x * 100 - 1}%`, top: `${hlChunk.box.y * 100 - 0.6}%`, width: `${hlChunk.box.w * 100 + 2}%`, height: `${hlChunk.box.h * 100 + 1.2}%` }} />}
+                </div>
               </div>
+              {hint && <div className="rd-hint" aria-hidden="true">Pinch or double-tap to zoom · drag to move · tap a piece to fix it</div>}
             </div>
-          )}
-          <button className="btn ghost small" onClick={addLine}><Icon name="plus" size={18} />Add missing text</button>
+            {selLine && (
+              <div className="rd-edit-bar">
+                <input className="big-input" value={selLine.text} aria-label="Words of the selected piece" onChange={(e) => edit(selLine.id, { text: e.target.value })} />
+                <div className="row">
+                  <button className="btn ghost" onClick={() => removeLine(selLine.id)}><Icon name="trash" size={18} />Delete</button>
+                  <button className="btn primary" onClick={() => setSel(null)}>Done</button>
+                </div>
+              </div>
+            )}
+          </div>
         </>
       ) : (
         <p className="muted tiny">This is the text you added. Fix the words, and tick which parts to use.</p>
