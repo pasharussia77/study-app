@@ -338,6 +338,7 @@ try:
         btn('Test').click()
         for d in '1308': pg.get_by_role('dialog', name='Enter the code').get_by_role('button', name=d, exact=True).click()
         btn('New project').click()
+        pg.get_by_test_id('type-questions').click()  # the Test account now chooses the kind of project first
         pg.get_by_label('Project name').fill('Report'); btn('Create project').click()
         open_fold(); btn('Create diagnostic report').click()
         ok(pg.locator('[data-testid=copy-1]').count() == 0 and 'Copy report' in text(), 'report: a short report is one part')

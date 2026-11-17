@@ -63,10 +63,14 @@ function createFirebaseBackend() {
       });
       return () => unsub();
     },
-    async createProject(code, profileId, name) {
+    async createProject(code, profileId, name, kind = 'questions') {
       await signedIn();
-      const ref = await addDoc(projects(code), { profileId, name, text: '', createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+      const ref = await addDoc(projects(code), { profileId, name, kind, text: '', createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
       return ref.id;
+    },
+    async updateProject(code, id, patch) {
+      await signedIn();
+      await updateDoc(doc(db, 'families', code, 'projects', id), { ...patch, updatedAt: serverTimestamp() });
     },
     async getProject(code, id) {
       await signedIn();
@@ -186,11 +190,12 @@ function createMockBackend() {
       listeners.add(run); run();
       return () => listeners.delete(run);
     },
-    async createProject(code, profileId, name) {
+    async createProject(code, profileId, name, kind = 'questions') {
       const id = 'p' + (++n);
-      projs[id] = { id, code, profileId, name, text: '', createdAt: Date.now() };
+      projs[id] = { id, code, profileId, name, kind, text: '', createdAt: Date.now() };
       notify(); return id;
     },
+    async updateProject(code, id, patch) { Object.assign(projs[id], JSON.parse(JSON.stringify(patch))); notify(); },
     async getProject(code, id) { return projs[id] ? { ...projs[id] } : null; },
     async saveProjectText(code, id, text) { projs[id].text = text; notify(); },
     async deleteProject(code, id) { delete projs[id]; delete filesStore[id]; delete itemsStore[id]; notify(); },

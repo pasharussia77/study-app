@@ -1,0 +1,387 @@
+// "Reading" projects: material that is not a test yet (textbook pages, class notes, articles, pasted text).
+// Steps: photo/text -> typed copy of the page (same layout) -> chunks the student ticks -> the AI reports
+// information blocks -> fixed rules here build the questions.
+
+// The AI's JSON answer, with code fences and extra words around it removed. (items.js has one too, but it insists on an "items" list.)
+export function parseJson(text) {
+  const cleaned = String(text || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+  const start = cleaned.indexOf('{'), end = cleaned.lastIndexOf('}');
+  if (start === -1 || end === -1) throw new Error('The AI did not return an answer I could read. Try again.');
+  try { return JSON.parse(cleaned.slice(start, end + 1)); }
+  catch { throw new Error('The AI answer was cut off or garbled. Try again.'); }
+}
+
+export const COUNT_CHOICES = [5, 10, 15, 20];
+export const DEFAULT_COUNT = 10;
+export const MAX_COUNT = 40;
+export const BLOCK_TYPES = ['definition', 'fact', 'date', 'name', 'event', 'cause', 'list'];
+export const BLOCK_LABEL = { definition: 'Definition', fact: 'Fact', date: 'Date', name: 'Name', event: 'Event', cause: 'Cause and effect', list: 'List' };
+const MARKS = ['underline', 'box', 'circle', 'star'];
+
+const str = (x) => (x == null ? '' : String(x).trim());
+const num = (x, d = 0) => (isFinite(+x) && x !== null && x !== '' ? +x : d);
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+export const norm = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+
+// ---------------------------------------------------------------- typed copy of a page
+
+export function buildTranscribePrompt() {
+  return `You are making a typed copy of one page (a photo of a textbook page, an article, or handwritten class notes).
+The copy must keep the LAYOUT exactly as on the page, because where things sit shows the logic of the page.
+
+Return ONLY JSON: {"kind":"printed"|"handwritten"|"mixed","lines":[...],"figures":[...]}
+
+"lines": one entry for every line or phrase, in the place where it is written.
+- text: the exact words. Do not fix spelling or grammar, do not merge, reorder, shorten or explain. Keep bullets, dashes and numbers at the start of the text. Write an arrow you see as its own entry with text "→" or "↓" (or "←", "↑") at its position. If a word cannot be read, write [?].
+- x, y: the top-left corner of the text, as a fraction of the picture width and height (0 to 1).
+- w: its width as a fraction of the picture width. h: the height of one text line as a fraction of the picture height.
+- If a line has a big gap in the middle, or two phrases sit far apart on the same row, make two entries.
+- If there is empty space between two lines, the y values must show it. If a phrase is short and sits in the middle of the page, its x must show that. Short lines stay short.
+- marks: any of "underline", "box", "circle", "star" when that phrase is underlined, boxed, circled or starred. Leave marks out when there are none.
+- conf: "low" or "medium" when you are not sure you read it right. Leave conf out when you are sure.
+Keep the answer short: round x, y, w and h to 3 decimals and add nothing else.
+"figures": drawings, diagrams, tables or pictures you cannot type: {"x":..,"y":..,"w":..,"h":..,"label":"short description"}.
+Skip page numbers, running headers and footers, and ads.
+Do not add anything that is not on the page.`;
+}
+
+// Cleans the AI's answer: numbers clamped to the page, ids added, empty pieces dropped.
+export function parseTranscript(raw) {
+  const data = typeof raw === 'string' ? parseJson(raw) : raw;
+  const list = Array.isArray(data && data.lines) ? data.lines : [];
+  const lines = list.map((l, i) => {
+    const h = clamp(num(l.h, 0.025), 0.008, 0.2);
+    const x = clamp(num(l.x, 0.05), 0, 0.98);
+    const y = clamp(num(l.y, i * 0.03), 0, 0.99);
+    return {
+      id: 'l' + (i + 1), text: str(l.text), x, y,
+      w: clamp(num(l.w, 0.3), 0.01, 1 - x), h,
+      marks: (Array.isArray(l.marks) ? l.marks : []).filter((m) => MARKS.includes(m)),
+      conf: ['high', 'medium', 'low'].includes(l.conf) ? l.conf : 'high'
+    };
+  }).filter((l) => l.text);
+  lines.sort((a, b) => a.y - b.y || a.x - b.x);
+  const figures = (Array.isArray(data && data.figures) ? data.figures : []).map((f) => ({
+    x: clamp(num(f.x), 0, 0.99), y: clamp(num(f.y), 0, 0.99), w: clamp(num(f.w, 0.2), 0.02, 1), h: clamp(num(f.h, 0.2), 0.02, 1), label: str(f.label)
+  }));
+  const kind = ['printed', 'handwritten', 'mixed'].includes(data && data.kind) ? data.kind : 'printed';
+  return { kind, layout: true, lines, figures };
+}
+
+export async function transcribePhoto(code, dataUrl, log = () => {}) {
+  const { askAIDetailed } = await import('./ai.js'); // loaded when needed, so the rules above can be tested without the app
+  const prompt = buildTranscribePrompt();
+  const t0 = Date.now();
+  let res;
+  try {
+    res = await askAIDetailed(code, { messages: [{ role: 'user', content: [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: dataUrl } }] }], json: true, maxTokens: 4000 });
+  } catch (e) { log({ type: 'transcribe', ok: false, error: e.message, ms: Date.now() - t0 }); throw e; }
+  let t;
+  try { t = parseTranscript(res.text); } catch (e) { log({ type: 'transcribe', ok: false, error: e.message, raw: res.text }); throw new Error(e.message + ' If the page is very full, photograph it in two parts.'); }
+  if (!t.lines.length) { log({ type: 'transcribe', ok: false, error: 'no text', raw: res.text }); throw new Error('No text was found on this page.'); }
+  log({ type: 'transcribe', ok: true, ms: res.ms, usage: res.usage, lines: t.lines.length });
+  return t;
+}
+
+// Pasted or typed text: no positions, just paragraphs. Split into pages of a sensible size.
+export function splitTextPages(text, maxChars = 2200) {
+  const paras = String(text || '').replace(/\r/g, '').split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  const flat = [];
+  for (const p of paras) {
+    if (p.length <= maxChars) { flat.push(p); continue; }
+    let rest = p;
+    while (rest.length > maxChars) {
+      let cut = rest.lastIndexOf('. ', maxChars); if (cut < maxChars * 0.4) cut = rest.lastIndexOf('\n', maxChars); if (cut < maxChars * 0.4) cut = rest.lastIndexOf(' ', maxChars); if (cut < 1) cut = maxChars;
+      flat.push(rest.slice(0, cut + 1).trim()); rest = rest.slice(cut + 1).trim();
+    }
+    if (rest) flat.push(rest);
+  }
+  const pages = []; let cur = [], size = 0;
+  for (const p of flat) {
+    if (cur.length && size + p.length > maxChars) { pages.push(cur); cur = []; size = 0; }
+    cur.push(p); size += p.length;
+  }
+  if (cur.length) pages.push(cur);
+  return pages;
+}
+export function textTranscript(paragraphs) {
+  return { kind: 'text', layout: false, figures: [], lines: paragraphs.map((t, i) => ({ id: 'l' + (i + 1), text: t, marks: [], conf: 'high' })) };
+}
+
+// ---------------------------------------------------------------- rows, chunks, layout text
+
+const medianH = (lines) => { const hs = lines.map((l) => l.h).sort((a, b) => a - b); return hs[Math.floor(hs.length / 2)] || 0.02; };
+
+// Pieces that sit on the same row, left to right.
+export function toRows(lines) {
+  const sorted = [...lines].sort((a, b) => a.y - b.y || a.x - b.x);
+  const rows = [];
+  for (const l of sorted) {
+    const r = rows[rows.length - 1];
+    if (r && Math.abs(l.y - r.y) < Math.max(r.h, l.h) * 0.6) { r.lines.push(l); r.h = Math.max(r.h, l.h); }
+    else rows.push({ y: l.y, h: l.h, lines: [l] });
+  }
+  rows.forEach((r) => r.lines.sort((a, b) => a.x - b.x));
+  return rows;
+}
+
+// Groups of lines that belong together: a big empty gap starts a new chunk. Pasted text: one chunk per paragraph.
+export function makeChunks(t) {
+  const lines = (t && t.lines) || [];
+  if (!lines.length) return [];
+  if (!t.layout) return lines.map((l, i) => ({ id: 'c' + (i + 1), lines: [l], box: null }));
+  const med = medianH(lines);
+  const sorted = [...lines].sort((a, b) => a.y - b.y || a.x - b.x);
+  const chunks = []; let cur = null, bottom = 0;
+  for (const l of sorted) {
+    if (!cur || l.y - bottom > med * 1.4) { cur = { id: 'c' + (chunks.length + 1), lines: [] }; chunks.push(cur); bottom = l.y + l.h; }
+    cur.lines.push(l); bottom = Math.max(bottom, l.y + l.h);
+  }
+  chunks.forEach((c) => {
+    const x0 = Math.min(...c.lines.map((l) => l.x)), y0 = Math.min(...c.lines.map((l) => l.y));
+    const x1 = Math.max(...c.lines.map((l) => l.x + l.w)), y1 = Math.max(...c.lines.map((l) => l.y + l.h));
+    c.box = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  });
+  return chunks;
+}
+
+const COLS = 64;
+const wrap = (l, marks) => {
+  if (!marks) return l.text;
+  if (l.marks.includes('box')) return `[${l.text}]`;
+  if (l.marks.includes('circle')) return `(${l.text})`;
+  if (l.marks.includes('underline')) return `_${l.text}_`;
+  if (l.marks.includes('star')) return `*${l.text}`;
+  return l.text;
+};
+// The page as plain text with its spacing kept: left gaps become spaces, empty gaps between lines become blank lines.
+export function layoutText(t, { marks = false, off = [] } = {}) {
+  const lines = ((t && t.lines) || []).filter((l) => !off.includes(l.id));
+  if (!lines.length) return '';
+  if (!t.layout) return lines.map((l) => l.text).join('\n\n');
+  const med = medianH(lines);
+  const out = []; let prev = null;
+  for (const r of toRows(lines)) {
+    if (prev != null) { const blanks = Math.min(3, Math.floor((r.y - prev) / (med * 0.9))); for (let i = 0; i < blanks; i++) out.push(''); }
+    let s = '';
+    for (const l of r.lines) {
+      const col = Math.round(l.x * COLS);
+      if (s.length < col) s += ' '.repeat(col - s.length); else if (s) s += '  ';
+      s += wrap(l, marks);
+    }
+    out.push(s.replace(/\s+$/, ''));
+    prev = r.y + r.h;
+  }
+  return out.join('\n');
+}
+export const chunkPreview = (t, chunk) => layoutText({ ...t, lines: chunk.lines }, { marks: false });
+
+// ---------------------------------------------------------------- information blocks
+
+export function buildFactsPrompt(sourceText, wantBlocks, kind) {
+  return `Find the information blocks in the study material below, for a student who will be quizzed on it.
+Report ONLY what the text says. Never add anything from your own knowledge.
+
+Block types:
+- definition: a term and what it means
+- date: something with a date, year or time
+- name: a person, place or thing that is named, and what it did or is
+- event: something that happened, and its outcome
+- cause: a cause and its effect (or a reason and its result)
+- list: a group of items that belong together (parts, steps, causes, types). Set "ordered": true only if the text shows a sequence (numbers, steps, first/then, chronology, arrows).
+- fact: any other fact worth knowing
+
+For each block return:
+- type
+- source: the exact words from the text that this block comes from (copy them, one or two sentences or lines)
+- subject: what the block is about, in a few words
+- question: a clear question a student could answer from memory. It must make sense alone (never say "according to the text"). For a list, ask for the whole group.
+- value: the short exact answer, copied from the source (a date, a name, the meaning, the outcome). Leave "" for a list.
+- items: for a list, the items copied from the source (2 to 8). Otherwise [].
+- ordered: true or false (lists only)
+- important: true if the text marks it as important (boxed, underlined, circled, starred, bold, or stressed like "remember" or "important")
+
+How to read the layout: the text is shown with its spacing as on the page.${kind === 'handwritten' || kind === 'mixed' ? ' This page was handwritten notes, so lines may be short fragments like "1776 - independence". Treat those as blocks. Indented lines under a heading belong to that heading. An arrow (→) means the left part leads to or causes the right part.' : ''} Markers: [text] boxed, (text) circled, _text_ underlined, *text starred.
+Skip headings that stand alone, page numbers, captions and anything that is not study content.
+Find up to ${wantBlocks} blocks, as many as the text really supports. Do not pad.
+
+Return ONLY JSON: {"blocks":[...]}
+
+TEXT:
+${sourceText}`;
+}
+
+export function parseBlocks(raw) {
+  const data = typeof raw === 'string' ? parseJson(raw) : raw;
+  const list = Array.isArray(data && data.blocks) ? data.blocks : [];
+  const seen = new Set();
+  const out = [];
+  for (const b of list) {
+    const type = BLOCK_TYPES.includes(b.type) ? b.type : 'fact';
+    const source = str(b.source), question = str(b.question), value = str(b.value);
+    const items = (Array.isArray(b.items) ? b.items : []).map(str).filter(Boolean).slice(0, 8);
+    if (!source || !question) continue;
+    if (type === 'list' ? items.length < 2 : !value) continue;
+    const key = norm(question);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      type, source, subject: str(b.subject), question, value: type === 'list' ? '' : value, items: type === 'list' ? items : [],
+      ordered: type === 'list' && b.ordered === true, important: b.important === true,
+      grounded: type === 'list' ? items.every((it) => norm(source).includes(norm(it))) : norm(source).includes(norm(value))
+    });
+  }
+  return out;
+}
+
+export async function findBlocks(code, t, off, wantCount, log = () => {}) {
+  const sourceText = layoutText(t, { marks: true, off });
+  if (!sourceText.trim()) throw new Error('Nothing on this page is ticked as source material.');
+  const want = clamp(Math.ceil(wantCount * 0.7) + 2, 4, 30);
+  const { askAIDetailed } = await import('./ai.js');
+  const prompt = buildFactsPrompt(sourceText, want, t.kind);
+  const t0 = Date.now();
+  let res;
+  try { res = await askAIDetailed(code, { messages: [{ role: 'user', content: prompt }], json: true, maxTokens: 4000 }); }
+  catch (e) { log({ type: 'blocks', ok: false, error: e.message, ms: Date.now() - t0 }); throw e; }
+  let blocks;
+  try { blocks = parseBlocks(res.text); } catch (e) { log({ type: 'blocks', ok: false, error: e.message, raw: res.text }); throw new Error(e.message); }
+  log({ type: 'blocks', ok: true, ms: res.ms, usage: res.usage, made: blocks.length });
+  return blocks;
+}
+
+// ---------------------------------------------------------------- questions from blocks (fixed rules, no AI)
+
+function rng(seed) {
+  let h = 1779033703 ^ String(seed).length;
+  for (let i = 0; i < String(seed).length; i++) { h = Math.imul(h ^ String(seed).charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); }
+  let a = h >>> 0;
+  return () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+function shuffled(list, rand) { const a = [...list]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+const LETTER = (i) => String.fromCharCode(65 + i);
+const GROUPS = { date: ['date'], name: ['name'], definition: ['definition'], event: ['event', 'cause', 'fact'], cause: ['event', 'cause', 'fact'], fact: ['event', 'cause', 'fact'] };
+
+// Wrong answers come from other blocks of the same kind in the whole project.
+function distractors(block, all, n, rand) {
+  const kinds = GROUPS[block.type] || [];
+  const mine = norm(block.value);
+  const seen = new Set([mine]);
+  const pool = [];
+  for (const b of all) {
+    if (b === block || !kinds.includes(b.type) || !b.value) continue;
+    const k = norm(b.value);
+    if (!k || seen.has(k) || mine.includes(k) || k.includes(mine)) continue;
+    seen.add(k); pool.push(b.value);
+  }
+  return shuffled(pool, rand).slice(0, n);
+}
+function listDistractors(block, all, n, rand) {
+  const mine = new Set(block.items.map(norm));
+  const pool = []; const seen = new Set();
+  for (const b of all) {
+    if (b === block || b.type !== 'list') continue;
+    for (const it of b.items) { const k = norm(it); if (mine.has(k) || seen.has(k)) continue; seen.add(k); pool.push(it); }
+  }
+  return shuffled(pool, rand).slice(0, n);
+}
+
+function baseItem(block, extra, label, seq) {
+  const flagged = !block.grounded;
+  return {
+    type: 'qa', section: label, number: null, question: '', choices: [], correctLabel: null, answer: '', source: 'reading', studentAnswer: null,
+    markedWrong: null, confidence: 'high', note: flagged ? 'The answer was not found word for word in the page text. Check it.' : '', order: seq,
+    circled: null, printed: null, correction: '', aiReview: false, flagged, blockType: block.type, srcText: block.source, ...extra
+  };
+}
+
+function qaOf(b, label, seq) { return baseItem(b, { type: 'qa', question: b.question, answer: b.value }, label, seq); }
+function termOf(b, label, seq) {
+  if (b.type !== 'definition' || !b.subject || b.subject.split(/\s+/).length > 6) return null;
+  return baseItem(b, { type: 'term', question: b.subject, answer: b.value }, label, seq);
+}
+function mcOf(b, all, label, seq, rand) {
+  const d = distractors(b, all, 3, rand);
+  if (d.length < 2) return null;
+  const texts = shuffled([b.value, ...d], rand);
+  const choices = texts.map((text, i) => ({ label: LETTER(i), text }));
+  const correct = choices.find((c) => c.text === b.value);
+  return baseItem(b, { type: 'mc', question: b.question, choices, correctLabel: correct.label, answer: b.value }, label, seq);
+}
+function tfOf(b, all, label, seq, rand, which) {
+  const claim = (v) => (b.subject ? `${b.subject}: ${v}` : `${b.question} ${v}`);
+  const trueClaim = claim(b.value);
+  const makeFalse = which === 'false';
+  let statement = trueClaim, answer = 'True';
+  if (makeFalse) {
+    const d = distractors(b, all, 1, rand)[0];
+    if (!d) return null;
+    statement = claim(d); answer = 'False';
+  }
+  const choices = [{ label: 'A', text: 'True' }, { label: 'B', text: 'False' }];
+  return baseItem(b, { type: 'tf', question: statement, choices, correctLabel: makeFalse ? 'B' : 'A', answer, correction: makeFalse ? trueClaim : '' }, label, seq);
+}
+function listOf(b, all, label, seq, rand) {
+  const items = b.items.slice(0, 6);
+  if (b.ordered && items.length >= 3) {
+    let order = shuffled(items, rand);
+    if (order.every((t, i) => t === items[i])) order = [...order.slice(1), order[0]];
+    const choices = order.map((text, i) => ({ label: LETTER(i), text }));
+    const correctOrder = items.map((t) => choices.find((c) => c.text === t).label);
+    return baseItem(b, { type: 'order', question: b.question, choices, correctOrder, answer: items.map((t, i) => `${i + 1}. ${t}`).join('; ') }, label, seq);
+  }
+  const d = listDistractors(b, all, Math.min(3, Math.max(2, items.length - 1)), rand);
+  if (d.length < 2) return baseItem(b, { type: 'qa', question: b.question, answer: items.join('; ') }, label, seq);
+  const texts = shuffled([...items, ...d], rand);
+  const choices = texts.map((text, i) => ({ label: LETTER(i), text }));
+  const correctLabels = choices.filter((c) => items.includes(c.text)).map((c) => c.label);
+  return baseItem(b, { type: 'multi', question: b.question, choices, correctLabels, answer: items.join('; ') }, label, seq);
+}
+function listPickOf(b, all, label, seq, rand) {
+  const d = listDistractors(b, all, 3, rand);
+  if (d.length < 2) return null;
+  const right = b.items[Math.floor(rand() * b.items.length)];
+  const texts = shuffled([right, ...d], rand);
+  const choices = texts.map((text, i) => ({ label: LETTER(i), text }));
+  return baseItem(b, { type: 'mc', question: `Which one belongs to this group? ${b.subject || b.question}`, choices, correctLabel: choices.find((c) => c.text === right).label, answer: right }, label, seq);
+}
+function listTfOf(b, all, label, seq, rand) {
+  const wrong = listDistractors(b, all, 1, rand)[0];
+  if (!wrong) return null;
+  const subj = b.subject || 'this group';
+  const choices = [{ label: 'A', text: 'True' }, { label: 'B', text: 'False' }];
+  return baseItem(b, { type: 'tf', question: `${wrong} belongs to: ${subj}`, choices, correctLabel: 'B', answer: 'False', correction: `${subj}: ${b.items.join('; ')}` }, label, seq);
+}
+
+// Makes up to `count` questions for one page. Important blocks first. Round 1 is every block's main question,
+// then multiple choice, then true/false, then word cards, until the count is reached or the blocks run out.
+export function buildQuestions(pageBlocks, allBlocks, count, label, pageKey = 'p') {
+  const blocks = [...pageBlocks.map((b, i) => ({ b, i }))].sort((x, y) => (y.b.important ? 1 : 0) - (x.b.important ? 1 : 0) || x.i - y.i).map((x) => x.b);
+  const out = []; const used = new Set();
+  const push = (it) => { if (!it) return false; const k = norm(it.question) + '|' + it.type; if (used.has(k)) return false; used.add(k); it.order = out.length; out.push(it); return true; };
+  const rounds = [
+    (b, r) => (b.type === 'list' ? listOf(b, allBlocks, label, 0, r) : qaOf(b, label, 0)),
+    (b, r) => (b.type === 'list' ? listPickOf(b, allBlocks, label, 0, r) : mcOf(b, allBlocks, label, 0, r)),
+    (b, r) => (b.type === 'list' ? listTfOf(b, allBlocks, label, 0, r) : tfOf(b, allBlocks, label, 0, r, 'false')),
+    (b, r) => (b.type === 'list' ? null : (b.type === 'definition' ? termOf(b, label, 0) : tfOf(b, allBlocks, label, 0, r, 'true')))
+  ];
+  for (let r = 0; r < rounds.length && out.length < count; r++) {
+    for (let i = 0; i < blocks.length && out.length < count; i++) {
+      push(rounds[r](blocks[i], rng(`${pageKey}:${i}:${r}`)));
+    }
+  }
+  return out;
+}
+
+export function countNote(made, wanted) {
+  return made >= wanted ? '' : `Only ${made} question${made === 1 ? '' : 's'} could be made from what was found, not ${wanted}.`;
+}
+// A starting suggestion for one page, from how much ticked text it has. The student can change it.
+export function suggestCount(t, off = []) {
+  const words = (layoutText(t, { off }).match(/[A-Za-z0-9]+/g) || []).length;
+  return words < 80 ? 5 : words < 200 ? 10 : words < 350 ? 15 : 20;
+}
+export function cleanCount(v) {
+  const n = Math.round(+v);
+  return isFinite(n) ? clamp(n, 1, MAX_COUNT) : DEFAULT_COUNT;
+}

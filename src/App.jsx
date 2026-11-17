@@ -10,6 +10,7 @@ import Sources from './Sources.jsx';
 import ReportSheet from './Report.jsx';
 import { diagClear } from './diag.js';
 import Items from './Items.jsx';
+import ReadingProject from './ReadingProject.jsx';
 import Settings from './Settings.jsx';
 import Worn from './Worn.jsx';
 import FamilySettings from './FamilySettings.jsx';
@@ -94,6 +95,13 @@ export default function App() {
     <Shell>
       <Home code={code} profile={profile} onSwitch={goUp} onSettings={() => pushScreen({ screen: 'settings', profile })} onSpeechTest={() => pushScreen({ screen: 'speechtest', profile })}
         onOpen={(p) => pushScreen({ screen: 'project', profile, project: p })} />
+    </Shell>
+  );
+  if (screen === 'project' && project.kind === 'reading' && profile.test) return (
+    <Shell>
+      <ReadingProject key={project.id} code={code} projectId={project.id} profile={profile} onBack={goUp}
+        onStudy={(mode, deck) => pushScreen({ screen: 'study', profile, project, mode, deck })}
+        onReview={() => pushScreen({ screen: 'items', profile, project })} />
     </Shell>
   );
   if (screen === 'project') return (
@@ -272,12 +280,16 @@ function Home({ code, profile, onSwitch, onOpen, onSettings, onSpeechTest }) {
   const [projects, setProjects] = useState(null);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
+  const [kind, setKind] = useState(null); // 'questions' or 'reading'; only the Test account is asked
   const [err, setErr] = useState('');
+  const sheetRef = useRef(null);
+  useEffect(() => { if (adding) setTimeout(() => sheetRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60); }, [adding, kind]);
   useEffect(() => backend.watchProjects(code, profile.id, (list) => setProjects(list.sort((a, b) => b.createdAt - a.createdAt)), () => setErr('Could not load projects.')), [code, profile.id]);
   const add = async () => {
     const full = datedName(name);
-    setName(''); setAdding(false);
-    try { const id = await backend.createProject(code, profile.id, full); onOpen({ id, name: full }); }
+    const k = profile.test && kind === 'reading' ? 'reading' : 'questions';
+    setName(''); setAdding(false); setKind(null);
+    try { const id = await backend.createProject(code, profile.id, full, k); onOpen({ id, name: full, kind: k }); }
     catch { setErr('Could not create the project. Try again.'); }
   };
   return (
@@ -296,13 +308,6 @@ function Home({ code, profile, onSwitch, onOpen, onSettings, onSpeechTest }) {
         <TileArt kind="folder" />
         <h1>{profile.name}'s projects</h1>
       </header>
-      {profile.test && (
-        <div className="testtools">
-          <b><Icon name="flask" size={18} /> Speech recognition test</b>
-          <p className="muted tiny">A scripted test with the trickiest words, about 5 minutes. It ends with a report to send to Claude.</p>
-          <button className="btn ghost" onClick={onSpeechTest}><Icon name="mic" />Run the speech test</button>
-        </div>
-      )}
       {err && <p className="error" role="alert">{err}</p>}
       {projects && projects.length === 0 && !adding && (
         <div className="empty"><TileArt kind="folder" /><p>No projects yet.</p><p className="muted">Create one, paste your notes, and get flashcards.</p></div>
@@ -321,14 +326,29 @@ function Home({ code, profile, onSwitch, onOpen, onSettings, onSpeechTest }) {
           </li>
         ))}
       </ul>
-      {adding ? (
-        <div className="sheet">
-          <label className="muted" htmlFor="pname">Project name</label>
-          <input id="pname" autoFocus className="big-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Biology chapter 4" maxLength={60}
+      {adding && profile.test && !kind ? (
+        <div className="sheet" data-testid="type-choice" ref={sheetRef}>
+          <p className="label">What kind of study material do you have?</p>
+          <div className="rd-types">
+            <div className="rd-col">
+              <button className="btn primary rd-pick" onClick={() => setKind('questions')} data-testid="type-questions">Questions</button>
+              <ul className="rd-ex"><li>Worksheets</li><li>Quizzes</li><li>Matching</li><li>Word list</li><li>Term and definition lists</li></ul>
+            </div>
+            <div className="rd-col">
+              <button className="btn primary rd-pick" onClick={() => setKind('reading')} data-testid="type-reading">Reading</button>
+              <ul className="rd-ex"><li>Textbook pages</li><li>Class notes</li><li>Articles</li><li>Pasted text</li></ul>
+            </div>
+          </div>
+          <button className="btn ghost" onClick={() => { setAdding(false); setKind(null); }}>Cancel</button>
+        </div>
+      ) : adding ? (
+        <div className="sheet" ref={sheetRef}>
+          <label className="muted" htmlFor="pname">{kind === 'reading' ? 'Reading project name' : 'Project name'}</label>
+          <input id="pname" autoFocus className="big-input" value={name} onChange={(e) => setName(e.target.value)} placeholder={kind === 'reading' ? 'e.g. History chapter 4 notes' : 'e.g. Biology chapter 4'} maxLength={60}
             onKeyDown={(e) => e.key === 'Enter' && name.trim() && add()} />
           <p className="muted tiny">Today's date is added to the name.</p>
           <div className="row">
-            <button className="btn ghost" onClick={() => { setAdding(false); setName(''); }}>Cancel</button>
+            <button className="btn ghost" onClick={() => { setAdding(false); setName(''); setKind(null); }}>Cancel</button>
             <button className="btn primary" disabled={!name.trim()} onClick={add}>Create project</button>
           </div>
         </div>
@@ -451,6 +471,9 @@ function Project({ code, projectId, profile, onBack, onStudy, onReview }) {
             <b><Icon name="flask" size={18} /> Testing tools</b>
             <p className="muted tiny">Creates a report of what was read, how cards were made, and how your quiz went. Paste it to Claude.</p>
             <button className="btn ghost" onClick={() => setReporting(true)}>Create diagnostic report</button>
+            <b><Icon name="flask" size={18} /> Speech recognition test</b>
+            <p className="muted tiny">A scripted test with the trickiest words, about 5 minutes. It ends with a report to send to Claude.</p>
+            <button className="btn ghost" onClick={() => pushScreen({ screen: 'speechtest', profile })}><Icon name="mic" />Run the speech test</button>
           </div>
         )}
         <button className="link danger" onClick={del}><Icon name="trash" size={18} />Delete project</button>

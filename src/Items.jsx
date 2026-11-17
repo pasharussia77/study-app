@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { backend } from './firebase.js';
 import { TYPE_LABEL, crossCheck, reapplyItem, duplicateGroups, fixNumbers } from './items.js';
 import { inPageOrder } from './deck.js';
+import { BLOCK_LABEL } from './reading.js';
 import { useOverlay, goUp } from './nav.js';
 import { Icon } from './art.jsx';
 import { ScreenHead } from './Session.jsx';
@@ -9,7 +10,7 @@ import { ScreenHead } from './Session.jsx';
 const SOURCE_LABEL = {
   'printed key': 'Answer given in the material', 'circled by teacher': 'Circled by the teacher',
   'inferred from red X': 'Worked out from the red X', 'assumed correct (no red mark)': 'Assumed correct (no red mark)',
-  'handwritten answer key': 'Handwritten answer key', page: 'Taken from the page', 'set by you': 'Set by you', none: 'No answer yet'
+  'handwritten answer key': 'Handwritten answer key', page: 'Taken from the page', 'set by you': 'Set by you', none: 'No answer yet', reading: 'Made from the reading'
 };
 
 export default function Items({ code, projectId }) {
@@ -32,7 +33,7 @@ export default function Items({ code, projectId }) {
   const groups = useMemo(() => {
     const byFile = new Map();
     items.forEach((it) => { if (!byFile.has(it.fileId)) byFile.set(it.fileId, []); byFile.get(it.fileId).push(it); });
-    const out = files.filter((f) => byFile.has(f.id)).map((f, i) => ({ file: f, label: `Photo ${files.indexOf(f) + 1}`, list: byFile.get(f.id) }));
+    const out = files.filter((f) => byFile.has(f.id)).map((f, i) => ({ file: f, label: f.kind === 'page' ? `Page ${files.indexOf(f) + 1}` : `Photo ${files.indexOf(f) + 1}`, list: byFile.get(f.id) }));
     const known = new Set(files.map((f) => f.id));
     const fromText = items.filter((it) => it.fileId === 'text');
     if (fromText.length) out.unshift({ file: null, label: 'Typed or pasted text', list: fromText });
@@ -46,7 +47,7 @@ export default function Items({ code, projectId }) {
   const check = useMemo(() => crossCheck(files, items), [files, items]);
   const dups = useMemo(() => duplicateGroups(items), [items]);
   const dupCount = dups.reduce((n, g) => n + g.drop.length, 0);
-  const fromPhotos = items.filter((i) => i.fileId !== 'text' && i.source !== 'set by you').length;
+  const fromPhotos = items.filter((i) => i.fileId !== 'text' && i.source !== 'set by you' && i.source !== 'reading').length;
 
   // Works out the answers again from what is already stored. No AI is used.
   const reapply = async (hand) => {
@@ -116,7 +117,7 @@ export default function Items({ code, projectId }) {
         return (
           <div key={g.label} className="igroup">
             <div className="igroup-head">
-              {g.file && <button className="gthumb" aria-label={`Show ${g.label}`} onClick={() => setPhoto(g.file)}><img src={g.file.data} alt="" /></button>}
+              {g.file && g.file.data && <button className="gthumb" aria-label={`Show ${g.label}`} onClick={() => setPhoto(g.file)}><img src={g.file.data} alt="" /></button>}
               <b>{g.label}</b>
               <span className="muted tiny">{g.list.length} items</span>
             </div>
@@ -148,6 +149,7 @@ export default function Items({ code, projectId }) {
                   {it.type === 'tf' && it.correction && <p className="ichoices-answer" data-testid="correction">Correction: <b>{it.correction}</b></p>}
                   {(it.type === 'term' || it.type === 'qa') && <p className="ichoices-answer">Answer: <b>{it.answer || '—'}</b></p>}
                   {it.studentAnswer && it.type !== 'term' && it.type !== 'qa' && <p className="muted tiny">{it.source === 'handwritten answer key' ? 'Written on the page' : 'Student wrote'}: {it.studentAnswer}{it.markedWrong ? ' (marked wrong)' : ''}</p>}
+                  {it.srcText && <p className="muted tiny item-src" data-testid="item-src">{BLOCK_LABEL[it.blockType] ? BLOCK_LABEL[it.blockType] + ' · ' : ''}From the page: {it.srcText}</p>}
                   {it.flagged && <p className="needs">Needs a look{it.note ? ': ' + it.note : ''}</p>}
                   <button className="btn ghost small" onClick={() => setEditing(it)}>{it.flagged ? 'Check and fix' : 'Edit'}</button>
                 </li>
