@@ -296,6 +296,14 @@ ok(am.get('x5').lines.length === 0, 'a source not on the page is not shaded anyw
   ok(p.matched === 5 && Math.abs(p.lines[0].y - 0.1) < 0.001 && Math.abs(p.lines[4].y - 0.3) < 0.001, 'found lines take the engine\'s place, however far the AI was off');
   ok(p.lines[2].y > p.lines[1].y && p.lines[2].y < p.lines[3].y, 'a line the engine missed goes between its neighbours');
   ok(p.fixed.has('l1') && !p.fixed.has('l3'), 'found lines are kept fixed');
+  const hy = { lines: [
+    { id: 'a', text: 'many people are in a state,', x: 0.1, y: 0.40, w: 0.37, h: 0.018 },
+    { id: 'b', text: 'the government conducts', x: 0.1, y: 0.42, w: 0.37, h: 0.018 },
+    { id: 'c', text: 'The first census was con-', x: 0.1, y: 0.44, w: 0.22, h: 0.018 },
+    { id: 'd', text: 'ducted in 1790. When will', x: 0.1, y: 0.46, w: 0.37, h: 0.018 },
+    { id: 'e', text: 'the next census occur?', x: 0.1, y: 0.48, w: 0.22, h: 0.018 }], figures: [] };
+  const hp = placeByOcr(hy, [], 1000, 1000);
+  ok(Math.abs(hp.lines[2].w - 0.37) < 0.005 && hp.lines[4].w === 0.22, 'a line ending with a hyphen runs the full column width; a short last line stays short');
 }
 
 {
