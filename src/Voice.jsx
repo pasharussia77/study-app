@@ -7,7 +7,7 @@ import { describeQuestion, utterance, maxAttempts, countsRight, matchChoice, det
 import { speak, warm, stopSpeaking, startListening, transcribe, beep, primeMic, VOICES, getVoice, setVoice } from './voice.js';
 import { useStats, StatsSheet, CardPicker, TypePicker, RoundDone, ScreenHead, PlayTop, StartFab } from './Session.jsx';
 import { FitBody } from './Scroller.jsx';
-import { numberParts } from './deck.js';
+import { numberParts, spreadGroups } from './deck.js';
 import { Icon, Scenery, TileArt } from './art.jsx';
 import { diagLog } from './diag.js';
 import { useOverlay, back } from './nav.js';
@@ -234,7 +234,7 @@ export default function Voice({ cards, code, projectId, onExit }) {
   const start = (which) => {
     const q = filtered(which, sumNow());
     if (!q.length) return;
-    const d = mix ? shuffle(q) : q;
+    const d = spreadGroups(mix ? shuffle(q) : q);
     const read = readAloud;
     cfg.current = { ask, readAloud: read };
     lastKind.current = null;

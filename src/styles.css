@@ -765,3 +765,7 @@ html.is-dark img { filter: invert(1) hue-rotate(180deg); }
 .seg.modes button { padding: 12px 6px; min-height: 52px; gap: 6px; font-size: .95rem; flex-direction: column; }
 .copy-parts { margin-top: 6px; }
 .copy-parts summary { cursor: pointer; padding: 8px 0; }
+.add-row.two { grid-template-columns: 1fr 1fr; gap: 8px; }
+.add-row.two .btn { gap: 10px; padding: 10px 12px; min-height: 56px; font-size: .98rem; line-height: 1.2; text-align: left; }
+.add-row.two .btn .ic { width: 34px; height: 34px; padding: 7px; flex: none; }
+.rd-left-out { margin: 4px 0 0; }

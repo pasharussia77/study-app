@@ -199,7 +199,8 @@ Block types:
 - name: a person, place or thing that is named, and what it did or is
 - event: something that happened, and its outcome
 - cause: a cause and its effect (or a reason and its result)
-- list: a group of items that belong together (parts, steps, causes, types). Set "ordered": true only if the text shows a sequence (numbers, steps, first/then, chronology, arrows).
+- list: a group of items that belong together (parts, steps, causes, types). Set "ordered": true only if the text shows a sequence (numbers, steps, first/then, chronology).
+- An arrow diagram (A ↓ B ↓ C, or A → B → C) usually links one thing to its details, not separate items of a list or steps in order. Make a fact block for each link instead (for example "Legislative ↓ Makes federal laws ↓ Congress" gives: Legislative branch → makes federal laws, and Legislative branch → Congress). Only treat arrows as an order when they clearly show steps or time.
 - fact: any other fact worth knowing
 
 For each block return:
@@ -314,7 +315,7 @@ Problem kinds:
 - wrong: the fact itself looks wrong compared with what you know (be sure; if you are not sure, do not report it)
 - trivial: so simple or common that a student at this level would not need to study it
 - vague: the question or its answer is too general to be a useful fact on its own (for example the answer \"different responsibilities\" or \"a new plan\" says almost nothing)
-- duplicate: it asks the same thing as an earlier question with the same answer (put the earlier question's number in why, for example \"same as 3\")
+- Several questions on the same fact in different forms (question, fill in the blank, true/false, choices) are made ON PURPOSE. Never report a question for that.
 Some source sentences were read from a photo of handwriting by a program, so a word can be misread. If a word looks like a misread of a likelier word (for example \"Moves federal laws\" where \"Makes federal laws\" is meant), report it as unclear and name the likely word in why.
 Do not report a question just because the wording could be nicer. A question with no problem is NOT reported.
 For each problem return: n (the question number), kind (unclear, mismatch, wrong or trivial), why (at most 12 words, plain).
@@ -331,6 +332,7 @@ export function parseChecks(raw, count) {
   for (const c of data.checks) {
     const n = Number(c && c.n);
     if (!Number.isInteger(n) || n < 1 || n > count) continue;
+    if (c && c.kind === 'duplicate') continue; // the same fact in other forms is on purpose
     const kind = CHECK_KIND[c.kind] ? c.kind : 'unclear';
     const why = str(c.why).slice(0, 140);
     out.set(n - 1, { kind, why });
@@ -403,7 +405,7 @@ function baseItem(block, extra, label, seq) {
   return {
     type: 'qa', section: label, number: null, question: '', choices: [], correctLabel: null, answer: '', source: 'reading', studentAnswer: null,
     markedWrong: null, confidence: 'high', note: flagged ? 'The answer was not found word for word in the page text. Check it.' : '', order: seq,
-    circled: null, printed: null, correction: '', aiReview: false, flagged, blockType: block.type, srcText: block.source, ...extra
+    circled: null, printed: null, correction: '', aiReview: false, flagged, blockType: block.type, blockId: block.id || '', srcText: block.source, ...extra
   };
 }
 
@@ -505,25 +507,38 @@ export function buildQuestions(pageBlocks, allBlocks, perFact, label, pageKey = 
   const pool = allBlocks.filter((b) => b.on !== false);
   const blocks = pageBlocks.filter((b) => b.on !== false);
   const per = clamp(Math.round(+perFact) || 1, 1, 3);
-  const out = []; const used = new Set();
-  const push = (it) => {
+  const used = new Set();
+  const ok = (it) => {
     if (!it) return false;
     if (it.type !== 'tf' && it.type !== 'multi' && it.type !== 'order' && norm(it.question).includes(norm(it.answer))) return false; // never give the answer away
     const k = norm(it.question) + '|' + norm(it.answer); // the same wording and answer is never asked twice, in any form
-    if (used.has(k)) return false; used.add(k); it.order = out.length; out.push(it); return true;
+    if (used.has(k)) return false; used.add(k); return true;
   };
-  blocks.forEach((b, i) => {
+  const perBlock = blocks.map((b, i) => {
     const r = rng(`${pageKey}:${b.id || i}`);
-    const forms = formsFor(b);
-    let made = 0; const types = new Set();
-    for (const f of forms) {
-      if (made >= per) break;
+    const mine = []; const types = new Set();
+    for (const f of formsFor(b)) {
+      if (mine.length >= per) break;
       const kind = f === 'tf-true' || f === 'tf-false' ? 'tf' : f === 'cloze' ? 'qa' : f === 'clozemc' ? 'mc' : f;
       if (types.has(kind)) continue;
       const it = make(f, b, pool, label, r);
-      if (it && push(it)) { made++; types.add(kind); }
+      if (ok(it)) { mine.push(it); types.add(kind); }
     }
+    return mine;
   });
+  // Round by round: every block's first question, then every block's second, so two questions on one block never sit side by side.
+  const out = [];
+  for (let round = 0; round < per; round++) {
+    for (const mine of perBlock) {
+      const it = mine[round]; if (!it) continue;
+      if (out.length && out[out.length - 1].blockId === it.blockId) { // only this block has questions left: put it where it does not touch its own
+        const at = out.findIndex((x, j) => x.blockId !== it.blockId && (j === 0 || out[j - 1].blockId !== it.blockId));
+        if (at >= 0) { out.splice(at, 0, it); continue; }
+      }
+      out.push(it);
+    }
+  }
+  out.forEach((it, j) => { it.order = j; });
   return out;
 }
 // The forms a block can take, best first.
@@ -562,7 +577,7 @@ const aiLine = (e) => `${new Date(e.t || 0).toLocaleTimeString('en-US', { timeZo
 export function readingReport(files, items, perFact, detail = 'normal', events = []) {
   const out = ['=== READING PROJECT ===', `Questions per block: ${perFact} · detail: ${DETAIL_LABEL[detail] || detail}`];
   files.forEach((f, i) => {
-    const mine = items.filter((x) => x.fileId === f.id);
+    const mine = items.filter((x) => x.fileId === f.id).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     const types = {}; mine.forEach((x) => { types[x.type] = (types[x.type] || 0) + 1; });
     out.push('', `--- Page ${i + 1} (${f.source || 'photo'}${f.from ? ', ' + f.from : ''}) status=${f.status || ''} approved=${!!f.checked}${f.error ? ' error=' + f.error : ''}`);
     if (f.transcript) {
@@ -580,7 +595,7 @@ export function readingReport(files, items, perFact, detail = 'normal', events =
       if (!all.length) return;
       all.forEach((e, k) => { if (k < all.length - 1) out.push(`AI ${kind} (earlier) ${aiLine(e)}`); });
       const e = all[all.length - 1];
-      out.push(`AI ${kind} (latest) ${aiLine(e)}${e.detail ? ` | detail ${e.detail}, asked for about ${e.want}` : ''}`);
+      out.push(`AI ${kind} (latest) ${aiLine(e)}${e.detail ? ` | detail ${e.detail}${e.want != null ? ', asked for about ' + e.want : ''}` : ''}`);
       if (e.sent) out.push('  text sent to the AI:', indent(e.sent));
       if (e.raw) out.push('  the AI\'s answer:', indent(e.raw.length > 12000 ? e.raw.slice(0, 12000) + `\n[... cut, ${e.raw.length - 12000} more characters]` : e.raw));
     });

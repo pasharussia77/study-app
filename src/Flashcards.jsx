@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { backend } from './firebase.js';
 import { shuffle } from './parse.js';
 import { defaultPick, queueFor } from './stats.js';
-import { cardFaces, numberParts } from './deck.js';
+import { cardFaces, numberParts, spreadGroups } from './deck.js';
 import { useStats, StatsSheet, CardPicker, TypePicker, RoundDone, ScreenHead, PlayTop, StartFab } from './Session.jsx';
 import { Icon, Scenery, TileArt } from './art.jsx';
 import { diagLog } from './diag.js';
@@ -32,7 +32,7 @@ export default function Flashcards({ cards, code, projectId, onExit }) {
     const q = filtered(which, sumNow());
     if (!q.length) return;
     diagLog(projectId, { type: 'session_start', mode: 'flashcards', shows: hasTerm ? (first === 'term' ? 'word first' : 'definition first') : 'question first', pick: which + (kind !== 'all' ? ', only ' + kind : ''), shuffle: mix, deckSize: q.length });
-    setDeck(mix ? shuffle(q) : q); setI(0); setFlipped(false); setRound({ right: 0, wrong: 0 }); setPhase('play');
+    setDeck(spreadGroups(mix ? shuffle(q) : q)); setI(0); setFlipped(false); setRound({ right: 0, wrong: 0 }); setPhase('play');
   };
   const reset = async () => { await backend.resetStats(code, projectId); setKind('all'); begin('all'); };
   const mark = (right) => {

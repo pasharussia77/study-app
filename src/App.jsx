@@ -469,7 +469,7 @@ function Project({ code, projectId, profile, onBack, onStudy, onReview }) {
         {profile?.test && (
           <div className="testtools">
             <b><Icon name="flask" size={18} /> Testing tools</b>
-            <p className="muted tiny">Creates a report of what was read, how cards were made, and how your quiz went. Paste it to Claude.</p>
+            <p className="muted tiny">Creates a report of what was read, how cards were made, and how your quiz went. Send it to Claude.</p>
             <button className="btn ghost" onClick={() => setReporting(true)}>Create diagnostic report</button>
             <b><Icon name="flask" size={18} /> Speech recognition test</b>
             <p className="muted tiny">A scripted test with the trickiest words, about 5 minutes. It ends with a report to send to Claude.</p>

@@ -1,6 +1,6 @@
 // Rule tests for Reading projects (layout, chunks, blocks, question builder). Run with: npm test
 import { parseJson, parseTranscript, makeChunks, layoutText, parseBlocks, buildQuestions, splitTextPages, textTranscript, cleanCount, toRows, suggestCount, countQuestions, readingReport, parseBlocksDetailed, buildCheckPrompt, parseChecks, struckIds, buildFactsPrompt } from '../src/reading.js';
-import { buildDeck } from '../src/deck.js';
+import { buildDeck, spreadGroups } from '../src/deck.js';
 
 let pass = 0, fail = 0;
 const ok = (cond, name) => { if (cond) pass++; else { fail++; console.log('FAIL: ' + name); } };
@@ -160,7 +160,16 @@ const tfq = buildQuestions(pg6, pg6, 3, 'P', 'z').find((x) => x.type === 'tf' &&
 ok(tfq && tfq.correction && /1787|a new Constitution|1789|different/.test(tfq.correction), 'a false statement keeps the true sentence as its correction');
 const rp6 = readingReport([{ id: 'f1', source: 'photo', status: 'typed', checked: true, transcript: { kind: 'handwritten', lines: [{ id: 'l1', text: 'x', marks: [], conf: 'high' }], figures: [] }, off: [], blocks: pg6 }], buildQuestions(pg6, pg6, 2, 'P', 'z').map((x, i) => ({ ...x, id: 'i' + i, fileId: 'f1' })), 2, 'all');
 ok(/Q1 /.test(rp6) && /choices: A\./.test(rp6) && /from: "In 1787/.test(rp6) && /same wording and answer asked twice: 0/.test(rp6), 'report lists each question in full with choices, answer and source sentence');
-ok(buildCheckPrompt([{ type: 'qa', question: 'Q', answer: 'A', srcText: 'S' }]).includes('vague') && buildCheckPrompt([{ type: 'qa', question: 'Q', answer: 'A', srcText: 'S' }]).includes('duplicate'), 'AI check also looks for vague and duplicate questions');
+ok(buildCheckPrompt([{ type: 'qa', question: 'Q', answer: 'A', srcText: 'S' }]).includes('vague') && /ON PURPOSE/.test(buildCheckPrompt([{ type: 'qa', question: 'Q', answer: 'A', srcText: 'S' }])), 'AI check looks for vague questions and leaves other forms of the same fact alone');
+ok(parseChecks('{"checks":[{"n":2,"kind":"duplicate","why":"same as 1"},{"n":1,"kind":"vague","why":"x"}]}', 2).size === 1, 'a duplicate flag from the AI check is ignored');
+ok(/arrow diagram/i.test(buildFactsPrompt('x', 5, 'handwritten', 'normal')), 'block finder is told arrow diagrams link one thing to its details');
+for (const per of [2, 3]) {
+  const q8 = buildQuestions(pg6, pg6, per, 'P', 'z');
+  ok(q8.every((x, j) => j === 0 || x.blockId !== q8[j - 1].blockId), `per ${per}: two questions on one block never sit side by side`);
+  ok(q8.every((x, j) => x.order === j), `per ${per}: order follows the spread-out list`);
+}
+const one8 = buildQuestions([pg6[0]], pg6, 3, 'P', 'z');
+ok(one8.length >= 2, 'a page with one block still gets its questions');
 
 const ev7 = [{ t: 1, type: 'transcribe', fileId: 'f1', ok: true, ms: 900, usage: { prompt_tokens: 10, completion_tokens: 20 }, lines: 1, raw: '{"lines":[RAWT]}' },
   { t: 2, type: 'blocks', fileId: 'f1', ok: true, ms: 800, detail: 'all', want: 9, sent: 'SENT TEXT', raw: '{"blocks":[RAWB]}' },
@@ -168,6 +177,11 @@ const ev7 = [{ t: 1, type: 'transcribe', fileId: 'f1', ok: true, ms: 900, usage:
 const rp7 = readingReport([{ id: 'f1', source: 'photo', status: 'typed', checked: true, transcript: { kind: 'handwritten', lines: [{ id: 'l1', text: 'gained', marks: ['strike'], conf: 'high', x: 0.1, y: 0.2, w: 0.3, h: 0.04 }], figures: [] }, off: ['l1'], blocks: pg6 }], [], 2, 'all', ev7);
 ok(/l1 \| 0\.1,0\.2,0\.3,0\.04 \| strike \| high \| NO \| gained/.test(rp7), 'report lists every piece with place, marks and whether it is used');
 ok(rp7.includes('RAWT') && rp7.includes('SENT TEXT') && rp7.includes('RAWB') && rp7.includes('{"checks":[]}') && /Check again/.test(rp7) && /FAILED: boom/.test(rp7), 'report holds the AI answers, the text sent to the block finder and failed calls');
+
+const cards9 = ['a', 'a', 'a', 'b', 'b', 'c', 'c', 'd'].map((g, i) => ({ key: 'k' + i, group: g }));
+const sp9 = spreadGroups(cards9);
+ok(sp9.length === 8 && new Set(sp9.map((c) => c.key)).size === 8 && sp9.every((c, j) => j === 0 || c.group !== sp9[j - 1].group), 'shuffled cards are moved so one block never comes twice in a row');
+ok(spreadGroups([{ key: 'x', group: '' }, { key: 'y', group: '' }]).length === 2, 'cards without a block are left alone');
 
 console.log(`reading: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

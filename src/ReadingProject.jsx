@@ -291,7 +291,7 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
         })}
       </ul>
 
-      <div className="add-row">
+      <div className="add-row two">
         <button className="btn ghost" disabled={!!busy} onClick={() => cam.current.click()}><Icon name="camera" />Take photo</button>
         <button className="btn ghost" disabled={!!busy} onClick={() => gallery.current.click()}><Icon name="image" />Photos</button>
         <button className="btn ghost" disabled={!!busy} onClick={() => doc.current.click()}><Icon name="file" />PDF or text file</button>
@@ -345,7 +345,7 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
       {itemList.length > 0 && stale && withBlocks.length > 0 && <p className="muted tiny" data-testid="out-of-date">Out of date: these questions were made from earlier blocks. Tap "Make {willMake} question{willMake === 1 ? '' : 's'}" to refresh them.</p>}
       <div className="testtools">
         <b><Icon name="flask" size={18} /> Testing tools</b>
-        <p className="muted tiny">Creates a report of the pages, the blocks found and the questions made. Paste it to Claude.</p>
+        <p className="muted tiny">Creates a report of the pages, the blocks found and the questions made. Send it to Claude.</p>
         <button className="btn ghost" onClick={() => setReporting(true)}>Create diagnostic report</button>
         <b><Icon name="flask" size={18} /> Speech recognition test</b>
         <p className="muted tiny">A scripted test with the trickiest words, about 5 minutes. It ends with a report to send to Claude.</p>
@@ -535,10 +535,13 @@ function PageEditor({ code, projectId, projectName, file, index, onClose }) {
     setSel(id); persist();
   };
 
+  // A part counts as used when its normal text is used; crossed-out words in it stay left out and never come back with the part.
+  const struck = new Set(struckIds(t));
+  const plainIds = (c) => { const ids = c.lines.filter((l) => !struck.has(l.id)).map((l) => l.id); return ids.length ? ids : c.lines.map((l) => l.id); };
+  const chunkOn = (c) => plainIds(c).some((id) => !off.includes(id));
   const toggleChunk = (c) => {
     const ids = c.lines.map((l) => l.id);
-    const on = ids.every((id) => !off.includes(id));
-    setOff(on ? [...new Set([...off, ...ids])] : off.filter((id) => !ids.includes(id))); persist();
+    setOff(chunkOn(c) ? [...new Set([...off, ...ids])] : off.filter((id) => !plainIds(c).includes(id))); persist();
   };
   const allOn = () => { setOff(struckIds(t)); persist(); }; // crossed-out parts stay unselected
   const showChunk = (c) => { setHl(hl === c.id ? null : c.id); if (layout) topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
@@ -623,13 +626,15 @@ function PageEditor({ code, projectId, projectName, file, index, onClose }) {
       </div>
       <ul className="rd-chunks">
         {chunks.map((c, i) => {
-          const on = c.lines.every((l) => !off.includes(l.id));
+          const on = chunkOn(c);
+          const leftOut = on && c.lines.some((l) => struck.has(l.id) && off.includes(l.id));
           return (
             <li key={c.id} className={'rd-chunk' + (on ? '' : ' off') + (hl === c.id ? ' hl' : '')} data-testid="chunk">
               <label className="rd-tick"><input type="checkbox" checked={on} onChange={() => toggleChunk(c)} aria-label={`Use part ${i + 1}`} /><span>Part {i + 1}</span></label>
               {layout
                 ? <button className="rd-body" onClick={() => showChunk(c)} aria-label={`Show part ${i + 1} on the page`}><pre>{chunkPreview(t, c)}</pre></button>
                 : <textarea className="rd-text" value={c.lines[0].text} aria-label={`Text of part ${i + 1}`} onChange={(e) => edit(c.lines[0].id, { text: e.target.value })} />}
+              {leftOut && <p className="muted tiny rd-left-out" data-testid="left-out">Crossed-out words are left out.</p>}
               {!layout && <div className="rd-chunk-actions"><button className="link inline danger" onClick={() => removeLine(c.lines[0].id)}>Delete</button></div>}
             </li>
           );

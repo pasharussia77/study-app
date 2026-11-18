@@ -34,7 +34,7 @@ export function buildDeck(textCards, items, files = []) {
     if (it.off) continue; // unticked in the review: kept in the list, left out of study
     if (!it.answer || !it.question) { notReady++; continue; }
     const key = 'i' + cardKey({ term: it.id, definition: it.answer });
-    const base = { key, type: it.type, prompt: it.question, answer: it.answer, itemId: it.id, number: it.number, section: it.section, correction: it.type === 'tf' && it.correction ? it.correction : '' };
+    const base = { key, type: it.type, prompt: it.question, answer: it.answer, itemId: it.id, group: it.blockId ? it.fileId + ':' + it.blockId : '', number: it.number, section: it.section, correction: it.type === 'tf' && it.correction ? it.correction : '' };
     if (it.type === 'term') deck.push({ ...base, term: it.question, definition: it.answer });
     else if (it.type === 'qa') deck.push(base);
     else if (it.type === 'multi' || it.type === 'order') {
@@ -75,4 +75,24 @@ export function deckTypes(deck) {
   const counts = {};
   deck.forEach((c) => { counts[c.type] = (counts[c.type] || 0) + 1; });
   return counts;
+}
+
+// After shuffling: moves cards so two questions on the same information block do not come one after the other (when possible).
+export function spreadGroups(list) {
+  const a = [...list];
+  const g = (x) => (x && x.group) || null;
+  const same = (x, y) => !!g(x) && g(x) === g(y);
+  const clashAt = (pos, card, skip) => [pos - 1, pos + 1].some((n) => n !== skip && n >= 0 && n < a.length && same(card, a[n]));
+  for (let i = 1; i < a.length; i++) {
+    if (!same(a[i], a[i - 1])) continue;
+    for (let k = 0; k < a.length; k++) {
+      if (k === i || k === i - 1) continue;
+      // put a[k] at i and a[i] at k, only if neither then touches its own block
+      const ci = a[i], ck = a[k];
+      a[i] = ck; a[k] = ci;
+      if (!clashAt(i, ck, -1) && !clashAt(k, ci, -1)) break;
+      a[i] = ci; a[k] = ck;
+    }
+  }
+  return a;
 }
