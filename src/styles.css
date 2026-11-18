@@ -794,3 +794,5 @@ html.is-dark img { filter: invert(1) hue-rotate(180deg); }
 .rd-area { border-width: 1px; }
 .rd-area.on { border-width: 1.5px; box-shadow: 0 0 0 2px rgba(255, 255, 255, .6); }
 .rd-blocks-head { gap: 8px; } .rd-blocks-head h1 { font-size: 1.05rem; }
+.rd-area { border-width: 1px; box-sizing: border-box; border-radius: 3px; }
+.rd-area.on { border-width: 1.5px; box-shadow: none; animation: none; }

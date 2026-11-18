@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Icon } from './art.jsx';
 import { useOverlay } from './nav.js';
 
@@ -6,7 +6,7 @@ import { useOverlay } from './nav.js';
 const HUES = [212, 28, 140, 330, 265, 50, 185, 0, 95, 300];
 export const blockColor = (n) => {
   const h = HUES[n % HUES.length];
-  return { line: `hsl(${h} 80% 42%)`, fill: `hsla(${h} 95% 55% / .22)`, h };
+  return { line: `hsl(${h} 70% 45%)`, fill: `hsla(${h} 95% 55% / .22)`, soft: `hsla(${h} 70% 45% / .45)`, pale: `hsla(${h} 95% 60% / .09)`, h };
 };
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
@@ -25,6 +25,19 @@ export default function BlockMap({ file, blocks, areas, activeId, onPick, pageLa
   const gest = useRef(null);
   const lastTap = useRef(null);
   const viewRef = useRef(view); viewRef.current = view;
+  // where each line of text really sits once drawn, so the boxes fit the words exactly
+  const pageRef = useRef(null);
+  const [boxes, setBoxes] = useState({});
+  useLayoutEffect(() => {
+    const pg = pageRef.current; if (!pg || !pg.offsetWidth) return;
+    const W = pg.offsetWidth, H = pg.offsetHeight, out = {};
+    pg.querySelectorAll('[data-lid]').forEach((el) => {
+      // the text itself, without the small side padding of the piece
+      const pad = parseFloat(getComputedStyle(el).paddingLeft) || 0;
+      out[el.dataset.lid] = { x: (el.offsetLeft + pad) / W, y: el.offsetTop / H, w: Math.max(el.offsetWidth - 2 * pad, 1) / W, h: el.offsetHeight / H };
+    });
+    setBoxes(out);
+  }, [vpW, file.id, lines.length]); // eslint-disable-line
   useOverlay(full, () => setFull(false));
   useEffect(() => { setView({ s: 1, x: 0, y: 0 }); }, [full, file.id]);
   useEffect(() => {
@@ -116,21 +129,25 @@ export default function BlockMap({ file, blocks, areas, activeId, onPick, pageLa
         <button className="rd-ic" onClick={() => setFull(!full)} aria-label={full ? 'Close full screen' : 'Full screen'} data-testid="map-full"><Icon name={full ? 'x' : 'expand'} size={20} /></button>
       </div>
       <div ref={vpRef} className="rd-vp" style={{ height: vpH || undefined }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
-        <div className="rd-page" style={{ paddingBottom: `${ratio * 100}%`, transform: `translate(${view.x}px, ${view.y}px) scale(${view.s})` }}>
+        <div ref={pageRef} className="rd-page" style={{ paddingBottom: `${ratio * 100}%`, transform: `translate(${view.x}px, ${view.y}px) scale(${view.s})` }}>
           {file.data && <img className="rd-photo" src={file.data} alt="Original page" draggable="false" />}
           <div className="rd-typed" style={{ opacity: file.data ? fade : 1 }}>
             {(t.figures || []).map((f, i) => <div key={i} className="rd-fig" style={{ left: `${f.x * 100}%`, top: `${f.y * 100}%`, width: `${f.w * 100}%`, height: `${f.h * 100}%` }}><span>{f.label || 'Picture'}</span></div>)}
             {lines.map((l) => (
-              <div key={l.id} className={'rd-piece' + ((file.off || []).includes(l.id) ? ' off' : '') + (l.marks || []).map((m) => ' m-' + m).join('')}
+              <div key={l.id} data-lid={l.id} className={'rd-piece' + ((file.off || []).includes(l.id) ? ' off' : '') + (l.marks || []).map((m) => ' m-' + m).join('')}
                 style={{ left: `${l.x * 100}%`, top: `${l.y * 100}%`, fontSize: fs(l) }}>{l.text}</div>
             ))}
           </div>
           {shown.map(({ b, n }) => {
             const c = blockColor(n); const on = b.id === activeId;
-            return (areas.get(b.id) || { rects: [] }).rects.map((r, k) => (
+            return (areas.get(b.id) || { rects: [] }).rects.map((r0, k) => {
+              const m = boxes[r0.line];
+              const r = m ? { x: m.x + m.w * r0.a, w: m.w * (r0.b - r0.a), y: m.y, h: m.h } : r0;
+              return (
               <div key={b.id + k} className={'rd-area' + (on ? ' on' : '')} data-testid="area" data-bid={b.id}
-                style={{ left: `${r.x * 100 - 0.6}%`, top: `${r.y * 100 - 0.4}%`, width: `${r.w * 100 + 1.2}%`, height: `${r.h * 100 + 0.8}%`, borderColor: c.line, background: c.fill }} />
-            ));
+                style={{ left: `${r.x * 100 - 0.2}%`, top: `${r.y * 100}%`, width: `${Math.max(r.w * 100 + 0.1, 0.5)}%`, height: `${r.h * 100}%`, borderColor: on ? c.line : c.soft, background: on ? c.fill : c.pale }} />
+              );
+            });
           })}
         </div>
       </div>

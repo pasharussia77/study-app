@@ -191,8 +191,12 @@ export function blockAreas(t, blocks) {
     order.forEach((l, i) => { if (!/[a-z0-9]/i.test(l.text) && /[↓↑→←⇒]/.test(l.text) && keep.has((order[i - 1] || {}).id) && keep.has((order[i + 1] || {}).id)) { keep.add(l.id); hits.set(l.id, { a: 0, b: l.text.length }); } });
     const rects = order.filter((l) => keep.has(l.id)).map((l) => {
       const h = hits.get(l.id); const len = Math.max(String(l.text).length, 1);
+      // never reach into the line below: the box stops just above the next line that sits under this one
+      const lw = l.w || 0.5;
+      const below = lines.filter((o) => o !== l && o.y > l.y && o.x < l.x + lw && o.x + (o.w || 0.5) > l.x).map((o) => o.y - l.y);
+      const room = below.length ? Math.min(...below) : Infinity;
       const w = l.w || Math.min(0.9, len * (l.h || 0.025) * 0.5);
-      return { x: l.x + w * (h.a / len), y: l.y, w: Math.max(w * ((h.b - h.a) / len), 0.01), h: l.h || 0.025, line: l.id };
+      return { x: l.x + w * (h.a / len), y: l.y, w: Math.max(w * ((h.b - h.a) / len), 0.01), h: Math.min(l.h || 0.025, room * 0.92), line: l.id, a: h.a / len, b: h.b / len };
     });
     out.set(b.id, { rects, lines: rects.map((r) => r.line) });
   }
