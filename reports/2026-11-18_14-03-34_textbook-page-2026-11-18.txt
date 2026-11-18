@@ -1,0 +1,215 @@
+FAMILY STUDY DIAGNOSTIC REPORT
+Created: Nov 18, 2026, 9:03 AM ET
+App version: 0.20.11 – Nov 18, 2026, 8:24 AM ET
+Account: Test (testing account)
+Project: Textbook page. – 2026-11-18
+Device: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Mobile Safari/537.36 | screen 384x854 | online true
+AI helper: model gpt-5.6-luna, key present: yes
+
+=== YOUR NOTES (written first so a cut-off paste cannot lose them) ===
+(none)
+
+=== READING PROJECT: pages, the AI's answers, blocks and questions are in the READING PROJECT part below ===
+
+=== 5. PROGRESS NOW ===
+Everything studyable (typed + photo items with an answer): total 16, covered 4, remaining 12, correct 3, incorrect 1
+
+=== 6. STUDY SESSIONS (most recent activity) ===
+[9:01:51 AM] START written quiz: shows word, answers by choosing, cards: all, shuffle off, 16 in this round
+[9:02:06 AM] START written quiz: shows word, answers by choosing, cards: all, shuffle off, 16 in this round
+[9:02:16 AM] START written quiz: shows word, answers by choosing, cards: all, shuffle off, 16 in this round
+[9:02:19 AM] quiz qa (choice) | Q: "What is the larger house of Congress?" | correct answer: "the House of Representatives" | given: "The speaker of the House" | WRONG
+[9:02:31 AM] quiz qa (choice) | Q: "How many representatives are in the House?" | correct answer: "435 representatives" | given: "435 representatives" | RIGHT
+[9:02:37 AM] quiz qa (choice) | Q: "What determines the number of representatives a state has?" | correct answer: "the number of people, population, in the state" | given: "one representative for every 500,000 people" | WRONG
+[9:02:52 AM] quiz qa (choice) | Q: "How many people does each representative represent?" | correct answer: "one representative for every 500,000 people" | given: "one representative for every 500,000 people" | RIGHT
+[9:03:18 AM] START flashcards: shows word first, cards: all, shuffle off, 16 in this round
+[9:03:23 AM] flashcards (qa) | Q: "What is the larger house of Congress?" | correct answer: "the House of Representatives" | RIGHT
+
+=== READING PROJECT ===
+Questions per block: 1 · detail: normal
+
+--- Page 1 (photo) status=typed approved=true
+page text: kind=printed pieces=33 unselected=0 low-confidence=0 figures=2
+       THE LEGISLATIVE BRANCH
+
+                     The House of Representatives
+                            (See Article I, Section 2)
+           The larger house of Congress is the House of Representatives. There are 435 representatives
+       in the House. The number of representatives a state has is based on the number of people,
+       population, in the state. There is one representative for every 500,000 people. So if a state
+       two million people, that state would be able to send four representatives to Washington, D.C.
+          The term of office
+      for a representative is two
+      years. In order to stay in
+      office, he or she must be
+      reelected every two years.
+          To find out how
+      many people are in a state,
+      the government conducts
+      a census, or count of the
+      people, every ten years.
+      The first census was con-
+      ducted in 1790. When will
+      the next census occur?
+         In order to be a
+      representative, there are
+      certain requirements to be
+    met. A representative must be at least 25 years old, must be a citizen of the United States for at
+    least seven years, and must live in the state from which he or she is elected.
+        Within the House, there are several leaders. The speaker of the House is the presiding
+    officer. The speaker is selected by the members of the House and is usually a member of the
+    majority party. The speaker of the House is second in line to take over the presidency, after the
+    vice president, in the event of an emergency.
+       The House of Representatives has the sole power to begin impeachment proceedings
+   against a government official. To impeach is to accuse an official of some wrongdoing or misuse
+   of power. The House begins the process by accusing the official, but the trial is carried out by the
+   Senate. More about impeachment will be discussed in later chapters.
+pieces (id | x,y,w,h | marks | confidence | used | text):
+  l1 | 0.109,0.126,0.302,0.025 | - | high | yes | THE LEGISLATIVE BRANCH
+  l2 | 0.332,0.173,0.335,0.025 | - | high | yes | The House of Representatives
+  l3 | 0.434,0.198,0.205,0.018 | - | high | yes | (See Article I, Section 2)
+  l4 | 0.175,0.227,0.766,0.019 | - | high | yes | The larger house of Congress is the House of Representatives. There are 435 representatives
+  l5 | 0.106,0.245,0.792,0.019 | - | high | yes | in the House. The number of representatives a state has is based on the number of people,
+  l6 | 0.106,0.263,0.786,0.019 | - | high | yes | population, in the state. There is one representative for every 500,000 people. So if a state
+  l7 | 0.106,0.281,0.795,0.019 | - | high | yes | two million people, that state would be able to send four representatives to Washington, D.C.
+  l8 | 0.164,0.304,0.172,0.019 | - | high | yes | The term of office
+  l9 | 0.098,0.323,0.241,0.019 | - | high | yes | for a representative is two
+  l10 | 0.099,0.342,0.237,0.019 | - | high | yes | years. In order to stay in
+  l11 | 0.098,0.361,0.239,0.019 | - | high | yes | office, he or she must be
+  l12 | 0.098,0.381,0.243,0.019 | - | high | yes | reelected every two years.
+  l13 | 0.151,0.398,0.183,0.019 | - | high | yes | To find out how
+  l14 | 0.098,0.417,0.239,0.019 | - | high | yes | many people are in a state,
+  l15 | 0.097,0.436,0.238,0.019 | - | high | yes | the government conducts
+  l16 | 0.097,0.455,0.239,0.019 | - | high | yes | a census, or count of the
+  l17 | 0.097,0.474,0.239,0.019 | - | high | yes | people, every ten years.
+  l18 | 0.097,0.493,0.241,0.019 | - | high | yes | The first census was con-
+  l19 | 0.097,0.512,0.239,0.019 | - | high | yes | ducted in 1790. When will
+  l20 | 0.097,0.531,0.238,0.019 | - | high | yes | the next census occur?
+  l21 | 0.138,0.547,0.197,0.019 | - | high | yes | In order to be a
+  l22 | 0.098,0.566,0.239,0.019 | - | high | yes | representative, there are
+  l23 | 0.098,0.585,0.239,0.019 | - | high | yes | certain requirements to be
+  l24 | 0.061,0.604,0.866,0.019 | - | high | yes | met. A representative must be at least 25 years old, must be a citizen of the United States for at
+  l25 | 0.062,0.624,0.715,0.019 | - | high | yes | least seven years, and must live in the state from which he or she is elected.
+  l26 | 0.127,0.646,0.795,0.019 | - | high | yes | Within the House, there are several leaders. The speaker of the House is the presiding
+  l27 | 0.055,0.665,0.855,0.019 | - | high | yes | officer. The speaker is selected by the members of the House and is usually a member of the
+  l28 | 0.055,0.684,0.871,0.019 | - | high | yes | majority party. The speaker of the House is second in line to take over the presidency, after the
+  l29 | 0.055,0.704,0.476,0.019 | - | high | yes | vice president, in the event of an emergency.
+  l30 | 0.114,0.725,0.828,0.019 | - | high | yes | The House of Representatives has the sole power to begin impeachment proceedings
+  l31 | 0.04,0.744,0.883,0.019 | - | high | yes | against a government official. To impeach is to accuse an official of some wrongdoing or misuse
+  l32 | 0.04,0.763,0.897,0.019 | - | high | yes | of power. The House begins the process by accusing the official, but the trial is carried out by the
+  l33 | 0.04,0.782,0.579,0.019 | - | high | yes | Senate. More about impeachment will be discussed in later chapters.
+  figure 1 | 0.335,0.31,0.627,0.255 | photograph of the chamber of the House of Representatives
+  figure 2 | 0.456,0.576,0.38,0.021 | caption: The chamber of the House of Representatives
+AI transcribe (latest) 8:58:19 AM: ok, 13.2 s, tokens in/out 2789/1429, 33 pieces
+  the AI's answer:
+    {"kind":"printed","lines":[{"text":"THE LEGISLATIVE BRANCH","x":0.109,"y":0.126,"w":0.302,"h":0.025},{"text":"The House of Representatives","x":0.332,"y":0.173,"w":0.335,"h":0.025},{"text":"(See Article I, Section 2)","x":0.434,"y":0.198,"w":0.205,"h":0.018},{"text":"The larger house of Congress is the House of Representatives. There are 435 representatives","x":0.175,"y":0.227,"w":0.766,"h":0.019},{"text":"in the House. The number of representatives a state has is based on the number of people,","x":0.106,"y":0.245,"w":0.792,"h":0.019},{"text":"population, in the state. There is one representative for every 500,000 people. So if a state","x":0.106,"y":0.263,"w":0.786,"h":0.019},{"text":"two million people, that state would be able to send four representatives to Washington, D.C.","x":0.106,"y":0.281,"w":0.795,"h":0.019},{"text":"The term of office","x":0.164,"y":0.304,"w":0.172,"h":0.019},{"text":"for a representative is two","x":0.098,"y":0.323,"w":0.241,"h":0.019},{"text":"years. In order to stay in","x":0.099,"y":0.342,"w":0.237,"h":0.019},{"text":"office, he or she must be","x":0.098,"y":0.361,"w":0.239,"h":0.019},{"text":"reelected every two years.","x":0.098,"y":0.381,"w":0.243,"h":0.019},{"text":"To find out how","x":0.151,"y":0.398,"w":0.183,"h":0.019},{"text":"many people are in a state,","x":0.098,"y":0.417,"w":0.239,"h":0.019},{"text":"the government conducts","x":0.097,"y":0.436,"w":0.238,"h":0.019},{"text":"a census, or count of the","x":0.097,"y":0.455,"w":0.239,"h":0.019},{"text":"people, every ten years.","x":0.097,"y":0.474,"w":0.239,"h":0.019},{"text":"The first census was con-","x":0.097,"y":0.493,"w":0.241,"h":0.019},{"text":"ducted in 1790. When will","x":0.097,"y":0.512,"w":0.239,"h":0.019},{"text":"the next census occur?","x":0.097,"y":0.531,"w":0.238,"h":0.019},{"text":"In order to be a","x":0.138,"y":0.547,"w":0.197,"h":0.019},{"text":"representative, there are","x":0.098,"y":0.566,"w":0.239,"h":0.019},{"text":"certain requirements to be","x":0.098,"y":0.585,"w":0.239,"h":0.019},{"text":"met. A representative must be at least 25 years old, must be a citizen of the United States for at","x":0.061,"y":0.604,"w":0.866,"h":0.019},{"text":"least seven years, and must live in the state from which he or she is elected.","x":0.062,"y":0.624,"w":0.715,"h":0.019},{"text":"Within the House, there are several leaders. The speaker of the House is the presiding","x":0.127,"y":0.646,"w":0.795,"h":0.019},{"text":"officer. The speaker is selected by the members of the House and is usually a member of the","x":0.055,"y":0.665,"w":0.855,"h":0.019},{"text":"majority party. The speaker of the House is second in line to take over the presidency, after the","x":0.055,"y":0.684,"w":0.871,"h":0.019},{"text":"vice president, in the event of an emergency.","x":0.055,"y":0.704,"w":0.476,"h":0.019},{"text":"The House of Representatives has the sole power to begin impeachment proceedings","x":0.114,"y":0.725,"w":0.828,"h":0.019},{"text":"against a government official. To impeach is to accuse an official of some wrongdoing or misuse","x":0.04,"y":0.744,"w":0.883,"h":0.019},{"text":"of power. The House begins the process by accusing the official, but the trial is carried out by the","x":0.04,"y":0.763,"w":0.897,"h":0.019},{"text":"Senate. More about impeachment will be discussed in later chapters.","x":0.04,"y":0.782,"w":0.579,"h":0.019}],"figures":[{"x":0.335,"y":0.31,"w":0.627,"h":0.255,"label":"photograph of the chamber of the House of Representatives"},{"x":0.456,"y":0.576,"w":0.38,"h":0.021,"label":"caption: The chamber of the House of Representatives"}]}
+AI blocks (latest) 8:59:25 AM: ok, 9.6 s, tokens in/out 1026/1195, 16 blocks sent | detail normal, asked for about 30
+  text sent to the AI:
+           THE LEGISLATIVE BRANCH
+    
+                         The House of Representatives
+                                (See Article I, Section 2)
+               The larger house of Congress is the House of Representatives. There are 435 representatives
+           in the House. The number of representatives a state has is based on the number of people,
+           population, in the state. There is one representative for every 500,000 people. So if a state
+           two million people, that state would be able to send four representatives to Washington, D.C.
+              The term of office
+          for a representative is two
+          years. In order to stay in
+          office, he or she must be
+          reelected every two years.
+              To find out how
+          many people are in a state,
+          the government conducts
+          a census, or count of the
+          people, every ten years.
+          The first census was con-
+          ducted in 1790. When will
+          the next census occur?
+             In order to be a
+          representative, there are
+          certain requirements to be
+        met. A representative must be at least 25 years old, must be a citizen of the United States for at
+        least seven years, and must live in the state from which he or she is elected.
+            Within the House, there are several leaders. The speaker of the House is the presiding
+        officer. The speaker is selected by the members of the House and is usually a member of the
+        majority party. The speaker of the House is second in line to take over the presidency, after the
+        vice president, in the event of an emergency.
+           The House of Representatives has the sole power to begin impeachment proceedings
+       against a government official. To impeach is to accuse an official of some wrongdoing or misuse
+       of power. The House begins the process by accusing the official, but the trial is carried out by the
+       Senate. More about impeachment will be discussed in later chapters.
+  the AI's answer:
+    {"blocks":[{"type":"name","source":"The larger house of Congress is the House of Representatives.","subject":"House of Representatives","question":"What is the larger house of Congress?","value":"the House of Representatives","items":[],"ordered":false,"important":false},{"type":"fact","source":"There are 435 representatives in the House.","subject":"House membership","question":"How many representatives are in the House?","value":"435 representatives","items":[],"ordered":false,"important":false},{"type":"cause","source":"The number of representatives a state has is based on the number of people, population, in the state.","subject":"State representation","question":"What determines the number of representatives a state has?","value":"the number of people, population, in the state","items":[],"ordered":false,"important":false},{"type":"fact","source":"There is one representative for every 500,000 people.","subject":"Representation ratio","question":"How many people does each representative represent?","value":"one representative for every 500,000 people","items":[],"ordered":false,"important":false},{"type":"date","source":"The term of office for a representative is two years.","subject":"Representative term","question":"How long is the term of office for a representative?","value":"two years","items":[],"ordered":false,"important":false},{"type":"cause","source":"In order to stay in office, he or she must be reelected every two years.","subject":"Reelection","question":"What must a representative do to stay in office?","value":"be reelected every two years","items":[],"ordered":false,"important":false},{"type":"definition","source":"To find out how many people are in a state, the government conducts a census, or count of the people, every ten years.","subject":"Census","question":"What is a census?","value":"count of the people","items":[],"ordered":false,"important":false},{"type":"date","source":"To find out how many people are in a state, the government conducts a census, or count of the people, every ten years.","subject":"Census frequency","question":"How often does the government conduct a census?","value":"every ten years","items":[],"ordered":false,"important":false},{"type":"date","source":"The first census was conducted in 1790.","subject":"First census","question":"When was the first census conducted?","value":"1790","items":[],"ordered":false,"important":false},{"type":"list","source":"A representative must be at least 25 years old, must be a citizen of the United States for at least seven years, and must live in the state from which he or she is elected.","subject":"Requirements for representatives","question":"What are the requirements to be a representative?","value":"","items":["be at least 25 years old","be a citizen of the United States for at least seven years","live in the state from which he or she is elected"],"ordered":false,"important":false},{"type":"name","source":"The speaker of the House is the presiding officer.","subject":"Speaker of the House","question":"Who is the presiding officer of the House?","value":"The speaker of the House","items":[],"ordered":false,"important":false},{"type":"fact","source":"The speaker is selected by the members of the House and is usually a member of the majority party.","subject":"Speaker selection","question":"How is the speaker of the House selected, and what party does the speaker usually belong to?","value":"selected by the members of the House and is usually a member of the majority party","items":[],"ordered":false,"important":false},{"type":"fact","source":"The speaker of the House is second in line to take over the presidency, after the vice president, in the event of an emergency.","subject":"Presidential succession","question":"Who is second in line to take over the presidency after the vice president?","value":"The speaker of the House","items":[],"ordered":false,"important":false},{"type":"name","source":"The House of Representatives has the sole power to begin impeachment proceedings against a government official.","subject":"House impeachment power","question":"Which body has the sole power to begin impeachment proceedings against a government official?","value":"The House of Representatives","items":[],"ordered":false,"important":false},{"type":"definition","source":"To impeach is to accuse an official of some wrongdoing or misuse of power.","subject":"Impeachment","question":"What does it mean to impeach an official?","value":"to accuse an official of some wrongdoing or misuse of power","items":[],"ordered":false,"important":false},{"type":"event","source":"The House begins the process by accusing the official, but the trial is carried out by the Senate.","subject":"Impeachment process","question":"What roles do the House and Senate have in the impeachment process?","value":"The House begins the process by accusing the official, but the trial is carried out by the Senate","items":[],"ordered":false,"important":false}]}
+AI check (latest) 9:00:57 AM: ok, 3.0 s, tokens in/out 1154/141, 16 questions checked, 0 flagged
+  the AI's answer:
+    {"checks":[]}
+blocks: 16 found, 16 selected
+  the AI sent 16 blocks, the app dropped 0
+  [x] name: House of Representatives → the House of Representatives  <= "The larger house of Congress is the House of Representatives."
+  [x] fact: House membership → 435 representatives  <= "There are 435 representatives in the House."
+  [x] cause: State representation → the number of people, population, in the state  <= "The number of representatives a state has is based on the number of people, population, in the state."
+  [x] fact: Representation ratio → one representative for every 500,000 people  <= "There is one representative for every 500,000 people."
+  [x] fact: Representative term → two years  <= "The term of office for a representative is two years."
+  [x] cause: Reelection → be reelected every two years  <= "In order to stay in office, he or she must be reelected every two years."
+  [x] definition: Census → count of the people  <= "To find out how many people are in a state, the government conducts a census, or count of the people, every ten years."
+  [x] fact: Census frequency → every ten years  <= "To find out how many people are in a state, the government conducts a census, or count of the people, every ten years."
+  [x] date: First census → 1790  <= "The first census was conducted in 1790."
+  [x] list: Requirements for representatives: be at least 25 years old, be a citizen of the United States for at least seven years, live in the state from which he or she is elected  <= "A representative must be at least 25 years old, must be a citizen of the United States for at least seven years, and must live in the state from which he or she is elected."
+  [x] name: Speaker of the House → The speaker of the House  <= "The speaker of the House is the presiding officer."
+  [x] fact: Speaker selection → selected by the members of the House and is usually a member of the majority party  <= "The speaker is selected by the members of the House and is usually a member of the majority party."
+  [x] fact: Presidential succession → The speaker of the House  <= "The speaker of the House is second in line to take over the presidency, after the vice president, in the event of an emergency."
+  [x] name: House impeachment power → The House of Representatives  <= "The House of Representatives has the sole power to begin impeachment proceedings against a government official."
+  [x] definition: Impeachment → to accuse an official of some wrongdoing or misuse of power  <= "To impeach is to accuse an official of some wrongdoing or misuse of power."
+  [x] event: Impeachment process → The House begins the process by accusing the official, but the trial is carried out by the Senate  <= "The House begins the process by accusing the official, but the trial is carried out by the Senate."
+questions: 16 {"qa":14,"term":2}
+AI check: done, 0 flagged, 0 unselected by you
+same wording and answer asked twice: 0
+  Q1 qa: What is the larger house of Congress?
+      answer: the House of Representatives
+      from: "The larger house of Congress is the House of Representatives."
+  Q2 qa: How many representatives are in the House?
+      answer: 435 representatives
+      from: "There are 435 representatives in the House."
+  Q3 qa: What determines the number of representatives a state has?
+      answer: the number of people, population, in the state
+      from: "The number of representatives a state has is based on the number of people, population, in the state."
+  Q4 qa: How many people does each representative represent?
+      answer: one representative for every 500,000 people
+      from: "There is one representative for every 500,000 people."
+  Q5 qa: How long is the term of office for a representative?
+      answer: two years
+      from: "The term of office for a representative is two years."
+  Q6 qa: What must a representative do to stay in office?
+      answer: be reelected every two years
+      from: "In order to stay in office, he or she must be reelected every two years."
+  Q7 term: Census
+      answer: count of the people
+      from: "To find out how many people are in a state, the government conducts a census, or count of the people, every ten years."
+  Q8 qa: How often does the government conduct a census?
+      answer: every ten years
+      from: "To find out how many people are in a state, the government conducts a census, or count of the people, every ten years."
+  Q9 qa: When was the first census conducted?
+      answer: 1790
+      from: "The first census was conducted in 1790."
+  Q10 qa: What are the requirements to be a representative?
+      answer: be at least 25 years old; be a citizen of the United States for at least seven years; live in the state from which he or she is elected
+      from: "A representative must be at least 25 years old, must be a citizen of the United States for at least seven years, and must live in the state from which he or she is elected."
+  Q11 qa: Who is the presiding officer of the House?
+      answer: The speaker of the House
+      from: "The speaker of the House is the presiding officer."
+  Q12 qa: How is the speaker of the House selected, and what party does the speaker usually belong to?
+      answer: selected by the members of the House and is usually a member of the majority party
+      from: "The speaker is selected by the members of the House and is usually a member of the majority party."
+  Q13 qa: Who is second in line to take over the presidency after the vice president?
+      answer: The speaker of the House
+      from: "The speaker of the House is second in line to take over the presidency, after the vice president, in the event of an emergency."
+  Q14 qa: Which body has the sole power to begin impeachment proceedings against a government official?
+      answer: The House of Representatives
+      from: "The House of Representatives has the sole power to begin impeachment proceedings against a government official."
+  Q15 term: Impeachment
+      answer: to accuse an official of some wrongdoing or misuse of power
+      from: "To impeach is to accuse an official of some wrongdoing or misuse of power."
+  Q16 qa: What roles do the House and Senate have in the impeachment process?
+      answer: The House begins the process by accusing the official, but the trial is carried out by the Senate
+      from: "The House begins the process by accusing the official, but the trial is carried out by the Senate."
