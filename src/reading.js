@@ -1,5 +1,5 @@
 // "Reading" projects: material that is not a test yet (textbook pages, class notes, articles, pasted text).
-// Steps: photo/text -> typed copy of the page (same layout) -> chunks the student ticks -> the AI reports
+// Steps: photo/text -> typed copy of the page (same layout) -> chunks the student selects -> the AI reports
 // information blocks -> fixed rules here build the questions.
 
 // The AI's JSON answer, with code fences and extra words around it removed. (items.js has one too, but it insists on an "items" list.)
@@ -45,7 +45,7 @@ Skip page numbers, running headers and footers, and ads.
 Do not add anything that is not on the page.`;
 }
 
-// Crossed-out pieces start unticked: the writer scratched them out, so they are not study material (the student can tick them back).
+// Crossed-out pieces start unselected: the writer scratched them out, so they are not study material (the student can select them back).
 export const struckIds = (t) => ((t && t.lines) || []).filter((l) => l.marks.includes('strike')).map((l) => l.id);
 
 // Cleans the AI's answer: numbers clamped to the page, ids added, empty pieces dropped.
@@ -281,7 +281,7 @@ export function parseBlocksDetailed(raw) {
 
 export async function findBlocks(code, t, off, log = () => {}, detail = 'normal') {
   const sourceText = layoutText(t, { marks: true, off });
-  if (!sourceText.trim()) throw new Error('Nothing on this page is ticked as source material.');
+  if (!sourceText.trim()) throw new Error('Nothing on this page is selected as source material.');
   const want = 30;
   const { askAIDetailed } = await import('./ai.js');
   const prompt = buildFactsPrompt(sourceText, want, t.kind, detail);
@@ -298,7 +298,7 @@ export async function findBlocks(code, t, off, log = () => {}, detail = 'normal'
 
 // ---------------------------------------------------------------- AI check of the made questions (reading projects)
 
-const CHECK_KIND = { unclear: 'Not clear', mismatch: 'Answer does not fit', wrong: 'May be factually wrong', trivial: 'Too trivial to study' };
+const CHECK_KIND = { unclear: 'Not clear', mismatch: 'Answer does not fit', wrong: 'May be factually wrong', trivial: 'Too trivial to study', vague: 'Too vague', duplicate: 'Same as another question' };
 export const checkLabel = (k) => CHECK_KIND[k] || 'Look at this one';
 
 function choiceLine(q) {
@@ -313,6 +313,8 @@ Problem kinds:
 - mismatch: the answer does not answer the question, or is not supported by the source sentence
 - wrong: the fact itself looks wrong compared with what you know (be sure; if you are not sure, do not report it)
 - trivial: so simple or common that a student at this level would not need to study it
+- vague: the question or its answer is too general to be a useful fact on its own (for example the answer \"different responsibilities\" or \"a new plan\" says almost nothing)
+- duplicate: it asks the same thing as an earlier question with the same answer (put the earlier question's number in why, for example \"same as 3\")
 Some source sentences were read from a photo of handwriting by a program, so a word can be misread. If a word looks like a misread of a likelier word (for example \"Moves federal laws\" where \"Makes federal laws\" is meant), report it as unclear and name the likely word in why.
 Do not report a question just because the wording could be nicer. A question with no problem is NOT reported.
 For each problem return: n (the question number), kind (unclear, mismatch, wrong or trivial), why (at most 12 words, plain).
@@ -405,6 +407,40 @@ function baseItem(block, extra, label, seq) {
   };
 }
 
+
+// The sentence of the page that holds the block's answer: used for fill-in-the-blank and true/false in real sentences.
+function sentenceOf(b) {
+  const v = String(b.value || '').trim();
+  if (!v || !b.source) return null;
+  const text = String(b.source).replace(/[•·▪●]/g, ' ').replace(/\s+/g, ' ').trim();
+  const parts = text.split(/(?<=[.!?])\s+/);
+  const low = v.toLowerCase();
+  const sent = parts.find((x) => x.toLowerCase().includes(low));
+  if (!sent || sent.split(/\s+/).length < 4) return null;
+  return sent;
+}
+function swapIn(sentence, value, replacement) {
+  const i = sentence.toLowerCase().indexOf(String(value).toLowerCase());
+  if (i < 0) return null;
+  const all = sentence.toLowerCase().split(String(value).toLowerCase()).length - 1;
+  if (all !== 1) return null; // the answer shows up twice: a blank would be ambiguous
+  return sentence.slice(0, i) + replacement + sentence.slice(i + String(value).length);
+}
+function clozeOf(b, label, seq) {
+  const sent = sentenceOf(b); if (!sent) return null;
+  const q = swapIn(sent, b.value, '_____'); if (!q) return null;
+  return baseItem(b, { type: 'qa', question: 'Fill in the blank: ' + q, answer: b.value }, label, seq);
+}
+function clozeMcOf(b, all, label, seq, rand) {
+  const sent = sentenceOf(b); if (!sent) return null;
+  const q = swapIn(sent, b.value, '_____'); if (!q) return null;
+  const d = distractors(b, all, 3, rand);
+  if (d.length < 2) return null;
+  const texts = shuffled([b.value, ...d], rand);
+  const choices = texts.map((text, i) => ({ label: LETTER(i), text }));
+  return baseItem(b, { type: 'mc', question: 'Fill in the blank: ' + q, choices, correctLabel: choices.find((c) => c.text === b.value).label, answer: b.value }, label, seq);
+}
+
 function qaOf(b, label, seq) { return baseItem(b, { type: 'qa', question: b.question, answer: b.value }, label, seq); }
 function termOf(b, label, seq) {
   if (b.plain || b.type !== 'definition' || !b.subject || b.subject.split(/\s+/).length > 6) return null;
@@ -419,18 +455,17 @@ function mcOf(b, all, label, seq, rand) {
   return baseItem(b, { type: 'mc', question: b.question, choices, correctLabel: correct.label, answer: b.value }, label, seq);
 }
 function tfOf(b, all, label, seq, rand, which) {
-  if (!b.subject || !saysMore(b.subject, b.value)) return null;
-  const claim = (v) => (b.subject ? `${b.subject}: ${v}` : `${b.question} ${v}`);
-  const trueClaim = claim(b.value);
+  const sent = sentenceOf(b); if (!sent) return null; // a true/false needs a real sentence, not a label
   const makeFalse = which === 'false';
-  let statement = trueClaim, answer = 'True';
+  let statement = sent, answer = 'True';
   if (makeFalse) {
     const d = distractors(b, all, 1, rand)[0];
     if (!d) return null;
-    statement = claim(d); answer = 'False';
+    statement = swapIn(sent, b.value, d); answer = 'False';
+    if (!statement) return null;
   }
   const choices = [{ label: 'A', text: 'True' }, { label: 'B', text: 'False' }];
-  return baseItem(b, { type: 'tf', question: statement, choices, correctLabel: makeFalse ? 'B' : 'A', answer, correction: makeFalse ? trueClaim : '' }, label, seq);
+  return baseItem(b, { type: 'tf', question: statement, choices, correctLabel: makeFalse ? 'B' : 'A', answer, correction: makeFalse ? sent : '' }, label, seq);
 }
 function listOf(b, all, label, seq, rand, form = '') {
   const items = b.items.slice(0, 6);
@@ -464,8 +499,8 @@ function listTfOf(b, all, label, seq, rand) {
   return baseItem(b, { type: 'tf', question: `${wrong} belongs to: ${subj}`, choices, correctLabel: 'B', answer: 'False', correction: `${subj}: ${b.items.join('; ')}` }, label, seq);
 }
 
-// One question per ticked block, so no fact is asked twice. The type is chosen to suit the block.
-// With perFact 2 or 3, extra questions on the same fact are added in other forms (the student's choice).
+// One question per selected block, so no fact is asked twice. The type is chosen to suit the block.
+// With perFact 2 or 3, extra questions on the same fact are added in other forms with different wording (fill in the blank, true/false in a real sentence).
 export function buildQuestions(pageBlocks, allBlocks, perFact, label, pageKey = 'p') {
   const pool = allBlocks.filter((b) => b.on !== false);
   const blocks = pageBlocks.filter((b) => b.on !== false);
@@ -474,7 +509,7 @@ export function buildQuestions(pageBlocks, allBlocks, perFact, label, pageKey = 
   const push = (it) => {
     if (!it) return false;
     if (it.type !== 'tf' && it.type !== 'multi' && it.type !== 'order' && norm(it.question).includes(norm(it.answer))) return false; // never give the answer away
-    const k = norm(it.question) + '|' + it.type + '|' + norm(it.answer);
+    const k = norm(it.question) + '|' + norm(it.answer); // the same wording and answer is never asked twice, in any form
     if (used.has(k)) return false; used.add(k); it.order = out.length; out.push(it); return true;
   };
   blocks.forEach((b, i) => {
@@ -483,7 +518,7 @@ export function buildQuestions(pageBlocks, allBlocks, perFact, label, pageKey = 
     let made = 0; const types = new Set();
     for (const f of forms) {
       if (made >= per) break;
-      const kind = f === 'tf-true' || f === 'tf-false' ? 'tf' : f;
+      const kind = f === 'tf-true' || f === 'tf-false' ? 'tf' : f === 'cloze' ? 'qa' : f === 'clozemc' ? 'mc' : f;
       if (types.has(kind)) continue;
       const it = make(f, b, pool, label, r);
       if (it && push(it)) { made++; types.add(kind); }
@@ -493,17 +528,19 @@ export function buildQuestions(pageBlocks, allBlocks, perFact, label, pageKey = 
 }
 // The forms a block can take, best first.
 function formsFor(b) {
-  if (b.plain) return ['qa', 'mc']; // subject label is weak: no word card or true/false made from it
+  if (b.plain) return ['qa', 'clozemc', 'cloze']; // subject label is weak: no word card or true/false made from it
   if (b.type === 'list') return b.ordered && b.items.length >= 3 ? ['order', 'multi', 'listmc', 'listtf'] : ['multi', 'listmc', 'listtf'];
-  if (b.type === 'definition') return ['term', 'mc', 'qa', 'tf-false'];
-  if (b.type === 'date' || b.type === 'name') return ['mc', 'qa', 'tf-false'];
-  return ['qa', 'mc', 'tf-false'];
+  if (b.type === 'definition') return ['term', 'mc', 'cloze', 'tf-false'];
+  if (b.type === 'date' || b.type === 'name') return ['mc', 'qa', 'cloze', 'tf-false'];
+  return ['qa', 'clozemc', 'tf-false', 'cloze'];
 }
 function make(form, b, all, label, r) {
   switch (form) {
     case 'qa': return qaOf(b, label, 0);
     case 'term': return termOf(b, label, 0);
     case 'mc': return mcOf(b, all, label, 0, r);
+    case 'cloze': return clozeOf(b, label, 0);
+    case 'clozemc': return clozeMcOf(b, all, label, 0, r);
     case 'tf-false': return tfOf(b, all, label, 0, r, 'false');
     case 'tf-true': return tfOf(b, all, label, 0, r, 'true');
     case 'order': { const it = listOf(b, all, label, 0, r, 'order'); return it && it.type === 'order' ? it : null; }
@@ -513,13 +550,13 @@ function make(form, b, all, label, r) {
     default: return null;
   }
 }
-// How many questions the ticked blocks would make (shown before making them).
+// How many questions the selected blocks would make (shown before making them).
 export function countQuestions(pages, perFact) {
   const all = pages.flatMap((p) => p.blocks || []);
   return pages.reduce((n, p) => n + buildQuestions(p.blocks || [], all, perFact, 'x', p.id).length, 0);
 }
 
-// Text for the diagnostic report: each page's typed copy, the blocks found and the questions made.
+// Text for the diagnostic report: each page's text, the blocks found and the questions made.
 export function readingReport(files, items, perFact, detail = 'normal') {
   const out = ['=== READING PROJECT ===', `Questions per block: ${perFact} · detail: ${DETAIL_LABEL[detail] || detail}`];
   files.forEach((f, i) => {
@@ -528,12 +565,12 @@ export function readingReport(files, items, perFact, detail = 'normal') {
     out.push('', `--- Page ${i + 1} (${f.source || 'photo'}${f.from ? ', ' + f.from : ''}) status=${f.status || ''} approved=${!!f.checked}${f.error ? ' error=' + f.error : ''}`);
     if (f.transcript) {
       const t = f.transcript;
-      out.push(`typed copy: kind=${t.kind} pieces=${t.lines.length} unticked=${(f.off || []).length} low-confidence=${t.lines.filter((l) => l.conf !== 'high').length} figures=${(t.figures || []).length}`);
+      out.push(`page text: kind=${t.kind} pieces=${t.lines.length} unselected=${(f.off || []).length} low-confidence=${t.lines.filter((l) => l.conf !== 'high').length} figures=${(t.figures || []).length}`);
       out.push(layoutText(t, { marks: 'all' }));
-      if ((f.off || []).length) out.push('unticked: ' + t.lines.filter((l) => (f.off || []).includes(l.id)).map((l) => l.text).join(' | '));
+      if ((f.off || []).length) out.push('unselected: ' + t.lines.filter((l) => (f.off || []).includes(l.id)).map((l) => l.text).join(' | '));
     }
     const bl = f.blocks || [];
-    out.push(`blocks: ${bl.length} found, ${bl.filter((b) => b.on !== false).length} ticked`);
+    out.push(`blocks: ${bl.length} found, ${bl.filter((b) => b.on !== false).length} selected`);
     if (f.blocksInfo) {
       const d = f.blocksInfo.dropped || [];
       out.push(`  the AI sent ${f.blocksInfo.asked} blocks, the app dropped ${d.length}${d.length ? ':' : ''}`);
@@ -542,8 +579,16 @@ export function readingReport(files, items, perFact, detail = 'normal') {
     bl.forEach((b) => out.push(`  [${b.on === false ? ' ' : 'x'}] ${b.type}${b.important ? ' !' : ''}${b.grounded ? '' : ' (not in source)'}: ${blockLine(b)}  <= "${b.source}"`));
     out.push(`questions: ${mine.length} ${JSON.stringify(types)}`);
     const unchecked = mine.filter((x) => x.aiChecked !== true).length;
-    out.push(unchecked ? `AI check: not done for ${unchecked} of ${mine.length} questions` : `AI check: done, ${mine.filter((x) => x.aiNote).length} flagged, ${mine.filter((x) => x.off).length} unticked by you`);
-    mine.forEach((x) => out.push(`  ${x.off ? '[ ] ' : ''}${x.type}: ${x.question} => ${x.answer}${x.flagged ? ' [flagged]' : ''}${x.aiNote ? ` [AI ${x.aiKind || 'check'}: ${x.aiNote}]` : ''}`));
+    out.push(unchecked ? `AI check: not done for ${unchecked} of ${mine.length} questions` : `AI check: done, ${mine.filter((x) => x.aiNote).length} flagged, ${mine.filter((x) => x.off).length} unselected by you`);
+    const seen = new Map(); let dups = 0;
+    mine.forEach((x) => { const k = norm(x.question) + '|' + norm(x.answer); if (seen.has(k)) dups++; seen.set(k, 1); });
+    out.push(`same wording and answer asked twice: ${dups}`);
+    mine.forEach((x, n) => {
+      out.push(`  Q${n + 1} ${x.off ? '[ ] ' : ''}${x.type}: ${x.question}${x.flagged ? ' [flagged]' : ''}${x.aiNote ? ` [AI ${x.aiKind || 'check'}: ${x.aiNote}]` : ''}`);
+      if (x.choices && x.choices.length && x.type !== 'tf') out.push('      choices: ' + x.choices.map((c) => c.label + '. ' + c.text).join(' | '));
+      out.push(`      answer: ${x.answer}${x.correction ? ' (true version: ' + x.correction + ')' : ''}`);
+      if (x.srcText) out.push(`      from: "${String(x.srcText).replace(/\s+/g, ' ')}"`);
+    });
   });
   return out.join('\n');
 }
@@ -551,7 +596,7 @@ export function readingReport(files, items, perFact, detail = 'normal') {
 export function countNote(made, wanted) {
   return made >= wanted ? '' : `Only ${made} question${made === 1 ? '' : 's'} could be made from what was found, not ${wanted}.`;
 }
-// A starting suggestion for one page, from how much ticked text it has. The student can change it.
+// A starting suggestion for one page, from how much selected text it has. The student can change it.
 export function suggestCount(t, off = []) {
   const words = (layoutText(t, { off }).match(/[A-Za-z0-9]+/g) || []).length;
   return words < 80 ? 5 : words < 200 ? 10 : words < 350 ? 15 : 20;

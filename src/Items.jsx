@@ -49,7 +49,7 @@ export default function Items({ code, projectId }) {
   const aiFlagged = items.filter((i) => i.aiNote).length;
   const unchecked = isReading ? items.filter((i) => i.srcText && i.aiChecked !== true).length : 0;
   const tickedCount = items.filter((i) => !i.off).length;
-  const toggleTick = async (it) => { try { await backend.updateItem(code, projectId, it.id, { off: !it.off }); } catch (e) { setDone('Could not save the tick: ' + e.message); } };
+  const toggleTick = async (it) => { try { await backend.updateItem(code, projectId, it.id, { off: !it.off }); } catch (e) { setDone('Could not save the selection: ' + e.message); } };
   const checkAgain = async () => {
     setDone(''); setWorking('Checking the questions…');
     try { const n = await recheckItems(code, projectId, items, backend, (e) => diagLog(projectId, { ...e, fileId: 'check' })); setDone(n ? `The AI check flagged ${n}.` : 'The AI check found no problems.'); }
@@ -102,7 +102,7 @@ export default function Items({ code, projectId }) {
       <ScreenHead onBack={goUp} backLabel="Project" icon={<span className="head-ic"><Icon name="list" size={26} /></span>} title="Study items" />
       {!loaded ? <p className="muted" data-testid="items-loading">Loading…</p> : (
       <>
-      <p className="muted" data-testid="items-summary">{items.length} item{items.length === 1 ? '' : 's'}{flaggedCount ? ` · ${flaggedCount} need a look` : ' · all look fine'}{isReading ? ` · ${tickedCount} of ${items.length} ticked${aiFlagged ? ` · ${aiFlagged} flagged by the AI check` : ''}` : ''}</p>
+      <p className="muted" data-testid="items-summary">{items.length} item{items.length === 1 ? '' : 's'}{flaggedCount ? ` · ${flaggedCount} need a look` : ' · all look fine'}{isReading ? ` · ${tickedCount} of ${items.length} selected${aiFlagged ? ` · ${aiFlagged} flagged by the AI check` : ''}` : ''}</p>
       {unchecked > 0 && (
         <div className="hint" data-testid="check-missing">
           The AI check has not been done for {unchecked} question{unchecked === 1 ? '' : 's'}.
@@ -270,7 +270,7 @@ function EditSheet({ item, onClose, code, projectId }) {
         )}
         {isMulti && (
           <fieldset className="radios">
-            <legend className="muted tiny">Tick every correct choice</legend>
+            <legend className="muted tiny">Select every correct choice</legend>
             {choices.map((c, i) => (
               <label key={c.label} className={'radio' + (many.includes(c.label) ? ' on' : '')}>
                 <input type="checkbox" checked={many.includes(c.label)} aria-label={`Choice ${c.label} is correct`} onChange={() => setMany(many.includes(c.label) ? many.filter((x) => x !== c.label) : [...many, c.label])} />

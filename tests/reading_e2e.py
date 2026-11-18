@@ -77,13 +77,13 @@ try:
         # C. Add a photo: it is typed up
         pg.evaluate('(d) => { window.__mockAI = [d]; }', TRANSCRIPT)
         pg.set_input_files('[data-testid=in-photos]', {'name': 'page.png', 'mimeType': 'image/png', 'buffer': PNG})
-        try: pg.get_by_text('Typed up 1 page').wait_for(timeout=8000)
+        try: pg.get_by_text('Read 1 page').wait_for(timeout=8000)
         except Exception: print('PAGE TEXT:', text()[-600:]); print('ERRORS:', errors); raise
-        ok('Check the typed copy' in text(), 'a typed page waits for the student to check it')
+        ok('Check the page text' in text(), 'a typed page waits for the student to check it')
         ok(not btn('Make questions').is_enabled() if pg.get_by_test_id('make-questions').count() else True, 'questions cannot be made before a page is checked')
         shot('2-pages')
 
-        # D. The editor: layout, chunks, edit, tick, lock, zoom
+        # D. The editor: layout, chunks, edit, select, lock, zoom
         btn('Open page 1').click()
         pg.get_by_test_id('page-copy').wait_for()
         ok(pg.get_by_test_id('piece').count() == 5, 'five pieces on the typed copy')
@@ -98,7 +98,7 @@ try:
         btn('Done').click()
         ok('alliances (treaties)' in pg.get_by_test_id('page-copy').inner_text(), 'a piece can be fixed in place')
         pg.get_by_label('Use part 3').uncheck()
-        ok(pg.locator('.rd-piece.off').count() == 1, 'an unticked part is greyed out on the page')
+        ok(pg.locator('.rd-piece.off').count() == 1, 'an unselected part is greyed out on the page')
         pg.get_by_label('Show part 1 on the page').click()
         ok(pg.locator('.rd-hl').count() == 1, 'tapping a part highlights it on the page')
         # locked by default: dragging a selected piece does not move it
@@ -129,9 +129,9 @@ try:
         tr1 = pg.get_by_test_id('page-copy').evaluate('e => e.style.transform')
         ok(tr0 != tr1, 'dragging moves around the zoomed page (' + tr1 + ')')
         ok(pg.locator('.rd-hint').count() == 0, 'the how-to goes away after the first move')
-        pg.get_by_label('Fade between the original and the typed copy').fill('50')
+        pg.get_by_label('Fade between the original and the page text').fill('50')
         shot('3-editor-zoomed')
-        pg.get_by_label('Fade between the original and the typed copy').fill('100')
+        pg.get_by_label('Fade between the original and the page text').fill('100')
         btn('Fit').click()
         pg.evaluate("""() => { const v = document.querySelector('[data-testid=viewport]'); const r = v.getBoundingClientRect();
           const ev = (type, id, x, y) => v.dispatchEvent(new PointerEvent(type, { pointerId: id, clientX: r.left + x, clientY: r.top + y, bubbles: true, isPrimary: id === 11 }));
@@ -167,19 +167,19 @@ try:
         pg.get_by_text('6 information blocks found.').wait_for()
         ok(pg.evaluate('() => window.__allMessages.length') == 2, 'one AI call to type up, one to find the blocks')
         last = pg.evaluate('() => JSON.stringify(window.__lastMessages)')
-        ok('extra note' in last and 'war starts' not in last, 'only ticked parts go to the AI (and edits are included)')
+        ok('extra note' in last and 'war starts' not in last, 'only selected parts go to the AI (and edits are included)')
         ok('[1914' in last and '_Causes of WWI_' in last, 'marks are passed on (box and underline)')
         card = pg.get_by_test_id('blocks-card').inner_text()
-        ok('6 information blocks found' in card and '6 ticked' in card, 'the count of blocks is shown: ' + card[:60])
+        ok('6 information blocks found' in card and '6 selected' in card, 'the count of blocks is shown: ' + card[:60])
         ok(pg.get_by_test_id('make-questions').inner_text().strip().endswith('Make 6 questions'), 'one question per block by default')
         shot('4-blocks-found')
 
-        # F. Review the blocks: untick one
+        # F. Review the blocks: unselect one
         pg.get_by_test_id('review-blocks').click()
         ok(pg.get_by_test_id('block').count() == 6, 'all blocks are listed')
         pg.get_by_test_id('block').nth(0).get_by_role('checkbox').uncheck()
-        pg.get_by_text('5 ticked · 5 questions').wait_for()
-        ok(True, 'unticking a block lowers the count of questions')
+        pg.get_by_text('5 selected · 5 questions').wait_for()
+        ok(True, 'unselecting a block lowers the count of questions')
         shot('5-blocks')
         btn('Done').click()
 
@@ -198,7 +198,7 @@ try:
         ok('· 5' in pg.get_by_test_id('review-tile').inner_text() and pg.get_by_role('button', name='Review questions (5)').count() == 0, 'one Review questions tile with the count, no second button')
         pg.get_by_test_id('make-questions').scroll_into_view_if_needed(); shot('6b-card')
         pg.get_by_test_id('review-tile').scroll_into_view_if_needed(); shot('6c-tile')
-        ok('5 of 6 blocks ticked · 5 questions' in text(), 'page shows its blocks and questions')
+        ok('5 of 6 blocks selected · 5 questions' in text(), 'page shows its blocks and questions')
         shot('6-made')
 
         # H. Review screen
@@ -217,7 +217,7 @@ try:
         ok(btn('Run the speech test').count() == 1, 'speech test is in reading projects too')
         btn('Create diagnostic report').click()
         rep = pg.get_by_test_id('report').input_value()
-        ok('READING PROJECT' in rep and 'blocks: 6 found, 5 ticked' in rep and 'extra note' in rep, 'the report includes the reading part')
+        ok('READING PROJECT' in rep and 'blocks: 6 found, 5 selected' in rep and 'extra note' in rep, 'the report includes the reading part')
         shot('8-report')
         pg.get_by_role('dialog', name='Diagnostic report').get_by_role('button', name='Close').click()
 

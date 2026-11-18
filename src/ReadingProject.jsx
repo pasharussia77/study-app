@@ -15,10 +15,10 @@ import {
 } from './reading.js';
 
 const hash = (s) => { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0; return String(h); };
-// What the questions were made from: the ticked text of the page. If it changes, the questions are out of date.
+// What the questions were made from: the selected text of the page. If it changes, the questions are out of date.
 export const stampOf = (f) => (f.transcript ? hash(layoutText(f.transcript, { off: f.off || [] })) : '');
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
-// Which ticked blocks the questions were made from, and how many per block.
+// Which selected blocks the questions were made from, and how many per block.
 const blocksSig = (f) => hash(JSON.stringify((f.blocks || []).map((b) => [b.id, b.on !== false])));
 const blocksFresh = (f) => !!f.blocks && f.blocksStamp === stampOf(f);
 
@@ -80,7 +80,7 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
 
   // ---- adding pages
   const typeUp = async (id, data) => {
-    setBusy('Typing up the page… this can take a minute.');
+    setBusy('Reading the page… this can take a minute.');
     try {
       const t = await transcribePhoto(code, data, log(id));
       await backend.updateFile(code, projectId, id, { transcript: t, transcriptRev: Date.now(), status: 'typed', error: '', checked: false, off: struckIds(t), blocks: null, blocksInfo: null, blocksStamp: '', qStamp: '' });
@@ -101,7 +101,7 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
         const id = await backend.addFile(code, projectId, { kind: 'page', source: 'photo', data, w: width, h: height, status: 'new', checked: false, off: [] });
         if (await typeUp(id, data)) ok++;
       }
-      if (ok) setMsg({ kind: 'ok', text: `Typed up ${ok} page${ok === 1 ? '' : 's'}. Open each page to check the typed copy.` });
+      if (ok) setMsg({ kind: 'ok', text: `Read ${ok} page${ok === 1 ? '' : 's'}. Open each page to check the page text.` });
     } catch (e) { setMsg({ kind: 'error', text: e.message }); }
     setBusy('');
   };
@@ -125,10 +125,10 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
           for (let i = 0; i < r.images.length; i++) {
             const { w, h } = await imgSize(r.images[i].data);
             const id = await backend.addFile(code, projectId, { kind: 'page', source: 'photo', data: r.images[i].data, w, h, status: 'new', checked: false, off: [], from: file.name });
-            setBusy(`Typing up page ${i + 1} of ${r.images.length}…`);
+            setBusy(`Reading page ${i + 1} of ${r.images.length}…`);
             if (await typeUp(id, r.images[i].data)) ok++;
           }
-          if (ok) setMsg({ kind: 'ok', text: `Typed up ${ok} scanned page${ok === 1 ? '' : 's'}. Open each page to check the typed copy.` });
+          if (ok) setMsg({ kind: 'ok', text: `Read ${ok} scanned page${ok === 1 ? '' : 's'}. Open each page to check the page text.` });
         } else await addText(r.text, file.name);
       } else await addText(await readTextFile(file), file.name);
     } catch (err) { setMsg({ kind: 'error', text: err.message }); }
@@ -182,11 +182,11 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
     setBusy('');
   };
 
-  // ---- step 2: make the questions from the ticked blocks (no AI for the questions, then one AI check)
+  // ---- step 2: make the questions from the selected blocks (no AI for the questions, then one AI check)
   const makeQuestions = async (fresh = null) => {
     const pages = fresh || withBlocks;
     const every = pages.flatMap((f) => f.blocks || []);
-    const ticked = every.filter((b) => b.on !== false).length;
+    const nSel = every.filter((b) => b.on !== false).length;
     setMsg(null); setBusy('Making questions, then checking them…');
     let total = 0, flagged = 0, checkFailed = false;
     try {
@@ -204,7 +204,7 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
       }
     } catch (e) { setBusy(''); setMsg({ kind: 'error', text: e.message }); return; }
     setBusy('');
-    setMsg({ kind: 'ok', review: true, text: `Made ${total} question${total === 1 ? '' : 's'} from ${ticked} information block${ticked === 1 ? '' : 's'}. ` + (checkFailed ? 'The AI check did not work, so none are checked yet. Tap "Check again".' : flagged ? `The AI check flagged ${flagged}. Look at them in the review.` : 'The AI check found no problems.') });
+    setMsg({ kind: 'ok', review: true, text: `Made ${total} question${total === 1 ? '' : 's'} from ${nSel} information block${nSel === 1 ? '' : 's'}. ` + (checkFailed ? 'The AI check did not work, so none are checked yet. Tap "Check again".' : flagged ? `The AI check flagged ${flagged}. Look at them in the review.` : 'The AI check found no problems.') });
   };
 
   // Less / More: find the blocks again at another detail level, then make the questions again.
@@ -243,13 +243,13 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
 
   const stateOf = (f) => {
     if (f.status === 'error' && !f.transcript) return { text: 'Could not type up', cls: 'bad' };
-    if (!f.transcript) return { text: 'Not typed yet', cls: 'warn' };
-    if (!f.checked) return { text: 'Check the typed copy', cls: 'warn' };
+    if (!f.transcript) return { text: 'Not read yet', cls: 'warn' };
+    if (!f.checked) return { text: 'Check the page text', cls: 'warn' };
     if (!f.blocks) return { text: 'Approved · find blocks next', cls: '' };
     if (!blocksFresh(f)) return { text: 'Changed · find blocks again', cls: 'warn' };
     const on = f.blocks.filter((b) => b.on !== false).length;
     const made = itemList.filter((x) => x.fileId === f.id).length;
-    return { text: `${on} of ${f.blocks.length} blocks ticked${made ? ` · ${made} questions` : ''}`, cls: made ? 'good' : '' };
+    return { text: `${on} of ${f.blocks.length} blocks selected${made ? ` · ${made} questions` : ''}`, cls: made ? 'good' : '' };
   };
   const needCheck = fileList.filter((f) => f.transcript && !f.checked).length;
 
@@ -271,7 +271,7 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
       )}
 
       <div className="label">Pages</div>
-      {fileList.length === 0 && <div className="empty"><p>No pages yet.</p><p className="muted">Add a photo, a PDF or some text. Each page is typed up first, so you can check it.</p></div>}
+      {fileList.length === 0 && <div className="empty"><p>No pages yet.</p><p className="muted">Add a photo, a PDF or some text. Each page is read first, so you can check it.</p></div>}
       <ul className="list">
         {fileList.map((f, i) => {
           const s = stateOf(f);
@@ -309,7 +309,7 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
           {msg.blocks && <button className="link inline" onClick={() => setBlocksOpen(true)}>Review blocks</button>}
         </div>
       )}
-      {needCheck > 0 && <p className="hint"><Icon name="alert" size={20} />{needCheck} page{needCheck === 1 ? ' needs' : 's need'} a look. Open it, check the typed copy, then tap "Approve this page".</p>}
+      {needCheck > 0 && <p className="hint"><Icon name="alert" size={20} />{needCheck} page{needCheck === 1 ? ' needs' : 's need'} a look. Open it, check the page text, then tap "Approve this page".</p>}
 
       {toFind.length > 0 && (
         <button className="btn primary" disabled={!!busy} onClick={findAll} data-testid="find-blocks">
@@ -318,7 +318,7 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
       )}
       {withBlocks.length > 0 && (
         <div className="rd-card" data-testid="blocks-card">
-          <p className="rd-big"><b>{allBlocks.length}</b> information block{allBlocks.length === 1 ? '' : 's'} found · <b>{tickedBlocks}</b> ticked</p>
+          <p className="rd-big"><b>{allBlocks.length}</b> information block{allBlocks.length === 1 ? '' : 's'} found · <b>{tickedBlocks}</b> selected</p>
           <button className="btn ghost" onClick={() => setBlocksOpen(true)} data-testid="review-blocks"><Icon name="list" />Review blocks</button>
           <p className="muted tiny rd-qline" data-testid="q-line">{itemList.length} question{itemList.length === 1 ? '' : 's'} · Detail: {DETAIL_LABEL[detail]}</p>
           <div className="rd-make">
@@ -345,7 +345,7 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
       {itemList.length > 0 && stale && withBlocks.length > 0 && <p className="muted tiny" data-testid="out-of-date">Out of date: these questions were made from earlier blocks. Tap "Make {willMake} question{willMake === 1 ? '' : 's'}" to refresh them.</p>}
       <div className="testtools">
         <b><Icon name="flask" size={18} /> Testing tools</b>
-        <p className="muted tiny">Creates a report of the typed pages, the blocks found and the questions made. Paste it to Claude.</p>
+        <p className="muted tiny">Creates a report of the pages, the blocks found and the questions made. Paste it to Claude.</p>
         <button className="btn ghost" onClick={() => setReporting(true)}>Create diagnostic report</button>
         <b><Icon name="flask" size={18} /> Speech recognition test</b>
         <p className="muted tiny">A scripted test with the trickiest words, about 5 minutes. It ends with a report to send to Claude.</p>
@@ -359,7 +359,7 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
           <div className="sheet rd-sheet">
             <label htmlFor="rd-paste">Paste the text</label>
             <textarea id="rd-paste" className="material" autoFocus value={paste} onChange={(e) => setPaste(e.target.value)} placeholder="Paste a chapter, an article, a play scene or your notes. Blank lines separate paragraphs." />
-            <p className="muted tiny">Long text is split into pages. You can check and untick parts next.</p>
+            <p className="muted tiny">Long text is split into pages. You can check and unselect parts next.</p>
             <div className="row">
               <button className="btn ghost" onClick={() => { setPasting(false); setPaste(''); }}>Cancel</button>
               <button className="btn primary" disabled={!paste.trim()} onClick={addPasted}>Add text</button>
@@ -371,7 +371,7 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
   );
 }
 
-// ------------------------------------------------------------------ all blocks, ticked or not
+// ------------------------------------------------------------------ all blocks, selected or not
 
 function BlocksView({ files, allFiles, perFact, willMake, onToggle, onClose }) {
   const all = files.flatMap((f) => f.blocks || []);
@@ -379,8 +379,8 @@ function BlocksView({ files, allFiles, perFact, willMake, onToggle, onClose }) {
   return (
     <section className="rd rd-blocks">
       <ScreenHead onBack={onClose} backLabel="Pages" icon={<span className="head-ic"><Icon name="list" size={26} /></span>} title="Information blocks" />
-      <p className="muted" data-testid="blocks-summary">{all.length} found · {on} ticked · {willMake} question{willMake === 1 ? '' : 's'} at {perFact} per block</p>
-      <p className="muted tiny">Untick a block you don't need. Each ticked block gets {perFact === 1 ? 'one question' : `up to ${perFact} questions`}.</p>
+      <p className="muted" data-testid="blocks-summary">{all.length} found · {on} selected · {willMake} question{willMake === 1 ? '' : 's'} at {perFact} per block</p>
+      <p className="muted tiny">Unselect a block you don't need. Each selected block gets {perFact === 1 ? 'one question' : `up to ${perFact} questions`}.</p>
       {files.map((f) => {
         const list = f.blocks || [];
         const allOn = list.every((b) => b.on !== false);
@@ -389,7 +389,7 @@ function BlocksView({ files, allFiles, perFact, willMake, onToggle, onClose }) {
             <div className="igroup-head">
               <b>Page {allFiles.indexOf(f) + 1}</b>
               <span className="muted tiny">{list.filter((b) => b.on !== false).length} of {list.length}</span>
-              <button className="link inline" onClick={() => onToggle(f, '*', !allOn)}>{allOn ? 'Untick all' : 'Tick all'}</button>
+              <button className="link inline" onClick={() => onToggle(f, '*', !allOn)}>{allOn ? 'Unselect all' : 'Select all'}</button>
             </div>
             <ul className="rd-chunks">
               {list.map((b) => (
@@ -439,7 +439,7 @@ function PageEditor({ code, projectId, projectName, file, index, onClose }) {
   useOverlay(full, () => setFull(false));
   useEffect(() => { setView({ s: 1, x: 0, y: 0 }); }, [full]);
 
-  // a fresh typed copy (typed again) replaces what is on screen
+  // a fresh reading replaces what is on screen
   useEffect(() => { setLines((file.transcript && file.transcript.lines) || []); setOff(file.off || []); setSel(null); setHl(null); }, [file.transcriptRev]); // eslint-disable-line
   useEffect(() => {
     const el = vpRef.current; if (!el) return;
@@ -540,14 +540,14 @@ function PageEditor({ code, projectId, projectName, file, index, onClose }) {
     const on = ids.every((id) => !off.includes(id));
     setOff(on ? [...new Set([...off, ...ids])] : off.filter((id) => !ids.includes(id))); persist();
   };
-  const allOn = () => { setOff([]); persist(); };
+  const allOn = () => { setOff(struckIds(t)); persist(); }; // crossed-out parts stay unselected
   const showChunk = (c) => { setHl(hl === c.id ? null : c.id); if (layout) topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
 
   const confirmed = async () => {
     try { await flush(); await backend.updateFile(code, projectId, file.id, { checked: true }); onClose(); } catch (e) { setNote(e.message); }
   };
   const retype = async () => {
-    if (!confirm('Read the image again? This replaces the typed copy, including your changes.')) return;
+    if (!confirm('Read the image again? This replaces the page text, including your changes.')) return;
     setBusy('Reading the image again…'); setNote('');
     try {
       const nt = await transcribePhoto(code, file.data, (e) => diagLog(projectId, { ...e, fileId: file.id }));
@@ -576,7 +576,7 @@ function PageEditor({ code, projectId, projectName, file, index, onClose }) {
               {file.data ? (
                 <div className="rd-fade">
                   <button className="rd-end" onClick={() => setFade(0)}>Photo</button>
-                  <input type="range" min="0" max="100" value={Math.round(fade * 100)} onChange={(e) => setFade(e.target.value / 100)} aria-label="Fade between the original and the typed copy" />
+                  <input type="range" min="0" max="100" value={Math.round(fade * 100)} onChange={(e) => setFade(e.target.value / 100)} aria-label="Fade between the original and the page text" />
                   <button className="rd-end" onClick={() => setFade(1)}>Typed</button>
                 </div>
               ) : <span className="rd-fade" />}
@@ -612,13 +612,13 @@ function PageEditor({ code, projectId, projectName, file, index, onClose }) {
           </div>
         </>
       ) : (
-        <p className="muted tiny">This is the text you added. Fix the words, and tick which parts to use.</p>
+        <p className="muted tiny">This is the text you added. Fix the words, and select which parts to use.</p>
       )}
 
       <div className="label">Use as source material</div>
-      <p className="muted tiny">Ticked parts are used for questions. Unticked parts are greyed out.</p>
+      <p className="muted tiny">Selected parts are used for questions. Unselected parts are greyed out.</p>
       <div className="row">
-        <button className="btn ghost small" onClick={allOn}>Tick all</button>
+        <button className="btn ghost small" onClick={allOn}>Select all</button>
         {!layout && <button className="btn ghost small" onClick={addLine}><Icon name="plus" size={18} />Add paragraph</button>}
       </div>
       <ul className="rd-chunks">

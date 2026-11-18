@@ -26,7 +26,7 @@ ok(rows[1].indexOf('- alliances') > rows[0].indexOf('Causes'), 'indented lines a
 ok(rows.some((r) => r === ''), 'empty space between lines shows as blank lines');
 ok(/^\s{20,}war starts$/.test(rows[rows.length - 1]), 'two words in the middle stay in the middle');
 ok(layoutText(t, { marks: true }).includes('[1914 - Franz Ferdinand shot]') && layoutText(t, { marks: true }).includes('_Causes of WWI_'), 'marks are shown for the AI');
-ok(!layoutText(t, { off: ['l1'] }).includes('Causes of WWI'), 'unticked lines are left out');
+ok(!layoutText(t, { off: ['l1'] }).includes('Causes of WWI'), 'unselected lines are left out');
 ok(toRows(parseTranscript({ lines: [{ text: 'a', x: 0.1, y: 0.1, w: 0.1, h: 0.03 }, { text: 'b', x: 0.6, y: 0.102, w: 0.1, h: 0.03 }] }).lines).length === 1, 'two phrases on one row stay one row');
 
 // The AI's answer arrives as text, maybe inside code fences
@@ -58,7 +58,7 @@ ok(blocks.length === 8, 'bad and duplicate blocks are dropped (got ' + blocks.le
 ok(blocks.find((b) => b.value === '1999').grounded === false, 'a value that is not in its source is marked not grounded');
 ok(blocks.find((b) => b.value === '1783').grounded === true, 'a value found in its source is grounded');
 
-ok(blocks.every((b) => b.id && b.on === true), 'blocks get an id and start ticked');
+ok(blocks.every((b) => b.id && b.on === true), 'blocks get an id and start selected');
 // Blocks that say nothing are dropped: Congress -> Congress, answer given away in the question
 const empty = parseBlocks({ blocks: [
   { type: 'name', source: 'Congress', subject: 'Congress', question: 'Which body makes laws?', value: 'Congress' },
@@ -85,14 +85,14 @@ const byFact = {}; two.forEach((q) => { (byFact[q.srcText] ||= []).push(q.type);
 ok(Object.values(byFact).every((ts) => new Set(ts.map((t) => t)).size === ts.length), 'extra questions on a fact use a different form');
 const three = buildQuestions(blocks, blocks, 3, 'Page 1', 'a');
 ok(three.length >= two.length && Object.values(three.reduce((m, q) => ((m[q.srcText] = (m[q.srcText] || 0) + 1), m), {})).every((n) => n <= 3), 'three per fact at most');
-const ticked = blocks.map((b, i) => ({ ...b, on: i % 2 === 0 }));
-ok(buildQuestions(ticked, ticked, 1, 'P', 'a').length === ticked.filter((b) => b.on).length, 'unticked blocks make no questions');
+const sel = blocks.map((b, i) => ({ ...b, on: i % 2 === 0 }));
+ok(buildQuestions(sel, sel, 1, 'P', 'a').length === sel.filter((b) => b.on).length, 'unselected blocks make no questions');
 ok(JSON.stringify(buildQuestions(blocks, blocks, 1, 'Page 1', 'a')) === JSON.stringify(qs), 'same blocks give the same questions');
 const cong = parseBlocks({ blocks: [{ type: 'name', source: 'Legislative -> Congress', subject: 'Legislative branch', question: 'Which body is the legislative branch?', value: 'Congress' }] });
 ok(!buildQuestions(cong, cong, 3, 'P', 'z').some((q) => /^congress: congress$/i.test(q.question)), 'never "Congress: Congress"');
 ok(countQuestions([{ id: 'p1', blocks }], 1) === blocks.length, 'the count of questions is known before making them');
 const rep = readingReport([{ id: 'f1', source: 'photo', status: 'typed', checked: true, transcript: t, off: ['l5'], blocks }], qs.map((q) => ({ ...q, fileId: 'f1' })), 1);
-ok(rep.includes('Page 1') && rep.includes('blocks: 8 found') && rep.includes('war starts') && rep.includes('unticked: war starts'), 'the report shows typed copy, blocks and questions');
+ok(rep.includes('Page 1') && rep.includes('blocks: 8 found') && rep.includes('war starts') && rep.includes('unselected: war starts'), 'the report shows typed copy, blocks and questions');
 
 // They fit the existing deck builder
 const items = qs.map((q, i) => ({ ...q, id: 'i' + i, fileId: 'f1' }));
@@ -117,13 +117,13 @@ const plainQs = buildQuestions(pd.blocks, pd.blocks, 3, 'Page 1', 'pp');
 ok(plainQs.filter((q) => q.srcText === pd.blocks[0].source && (q.type === 'term' || q.type === 'tf')).length === 0, 'a plain block never makes a word card or true/false');
 // 0.20.4: crossed-out pieces
 const tr = parseTranscript({ kind: 'handwritten', lines: [{ text: 'gained new powers', x: .1, y: .2, w: .3, h: .03, marks: ['strike'] }, { text: 'decided to write', x: .5, y: .2, w: .3, h: .03 }] });
-ok(tr.lines[0].marks.includes('strike') && struckIds(tr).length === 1 && struckIds(tr)[0] === tr.lines[0].id, 'crossed-out piece keeps its strike mark and is listed to start unticked');
-ok(/~~gained new powers~~/.test(layoutText(tr, { marks: 'all' })) && !/gained/.test(layoutText(tr, { off: struckIds(tr) })), 'report shows ~~crossed out~~ text; unticked it is left out of the source text');
-ok(/gained new powers/.test(layoutText(tr, { marks: true })) && !/~~/.test(layoutText(tr, { marks: true })), 'ticked back, crossed-out text goes to the block finder as plain text');
+ok(tr.lines[0].marks.includes('strike') && struckIds(tr).length === 1 && struckIds(tr)[0] === tr.lines[0].id, 'crossed-out piece keeps its strike mark and is listed to start unselected');
+ok(/~~gained new powers~~/.test(layoutText(tr, { marks: 'all' })) && !/gained/.test(layoutText(tr, { off: struckIds(tr) })), 'report shows ~~crossed out~~ text; unselected it is left out of the source text');
+ok(/gained new powers/.test(layoutText(tr, { marks: true })) && !/~~/.test(layoutText(tr, { marks: true })), 'selected back, crossed-out text goes to the block finder as plain text');
 ok(/MAIN POINTS/.test(buildFactsPrompt('x', 30, 'printed', 'main')) && /EVERY DETAIL/.test(buildFactsPrompt('x', 30, 'printed', 'all')) && !/Detail level/.test(buildFactsPrompt('x', 30, 'printed')), 'detail level changes the block prompt');
 ok(/handwriting/.test(buildCheckPrompt([{ type: 'qa', question: 'Q', answer: 'A', srcText: 'S' }])), 'check prompt warns about handwriting misreads');
 
-// 0.20.3: AI check of questions and unticked questions
+// 0.20.3: AI check of questions and unselected questions
 const cq = [{ type: 'qa', question: 'What does the Legislative branch do?', answer: 'Moves federal laws', srcText: 'Moves federal laws' }, { type: 'mc', question: 'When?', answer: '1787', srcText: 'In 1787', choices: [{ label: 'A', text: '1787' }, { label: 'B', text: '1789' }] }];
 const cp = buildCheckPrompt(cq);
 ok(/CHECK THESE QUESTIONS/.test(cp) && /1\. \[qa\]/.test(cp) && /2\. \[mc\]/.test(cp) && /Choices: A\. 1787/.test(cp) && /Source sentence: In 1787/.test(cp), 'check prompt lists every question with answer and source');
@@ -133,7 +133,34 @@ ok(parseChecks('{"checks":[]}', 2).size === 0, 'empty check answer means no prob
 let badCheck = false; try { parseChecks('not json', 2); } catch { badCheck = true; }
 ok(badCheck, 'an unreadable check answer throws (so the app shows "check did not work")');
 const dk = buildDeck([], [{ id: 'a', fileId: 'f1', type: 'qa', question: 'Q1', answer: 'A1' }, { id: 'b', fileId: 'f1', type: 'qa', question: 'Q2', answer: 'A2', off: true }], [{ id: 'f1', createdAt: 1 }]);
-ok(dk.deck.length === 1 && dk.deck[0].prompt === 'Q1' && dk.notReady === 0, 'an unticked question is left out of the deck');
+ok(dk.deck.length === 1 && dk.deck[0].prompt === 'Q1' && dk.notReady === 0, 'an unselected question is left out of the deck');
+
+// 0.20.6: other forms use different wording, true/false is a real sentence, no duplicates, report lists questions in full
+const B6 = (id, type, subject, value, question, source, extra = {}) => ({ id, type, subject, value, question, source, grounded: true, on: true, ...extra });
+const pg6 = [
+  B6('b2', 'date', "Delegates' meeting", '1787', 'When did delegates meet in Philadelphia to revise the Articles?', 'In 1787, delegates met in Philadelphia to revise the Articles.'),
+  B6('b3', 'event', 'Decision', 'a new Constitution', 'What did the delegates decide to write?', 'They decided to write a new Constitution.'),
+  B6('b5', 'date', 'New government', '1789', 'When did the new government begin operating?', 'The new government began operating in 1789.'),
+  B6('b6', 'fact', 'Branches', 'different responsibilities', 'What did the Constitution assign to the three branches?', 'The constitution assigned different responsibilities to three branches.'),
+  B6('b8', 'fact', 'Legislative function', 'Makes federal laws', 'What does the Legislative branch do?', 'Makes federal laws'),
+];
+for (const per of [2, 3]) {
+  const q6 = buildQuestions(pg6, pg6, per, 'P', 'z');
+  const keys = q6.map((x) => x.question.toLowerCase() + '|' + String(x.answer).toLowerCase());
+  ok(new Set(keys).size === keys.length, `per ${per}: no question has the same wording and answer as another`);
+  const stems = q6.filter((x) => x.type !== 'tf').map((x) => x.question);
+  ok(new Set(stems).size === stems.length, `per ${per}: no two questions share the same stem`);
+  ok(q6.filter((x) => x.type === 'tf').every((x) => !/^[^.?!]{1,40}: /.test(x.question) && x.question.split(' ').length >= 5), `per ${per}: true/false is a full sentence, not a label`);
+  ok(q6.some((x) => /^Fill in the blank: .*_____/.test(x.question)), `per ${per}: fill in the blank is used`);
+  ok(q6.every((x) => x.type === 'tf' || !x.question.includes(String(x.answer)) || x.type === 'order' || x.type === 'multi'), `per ${per}: the answer is never in the question`);
+}
+const q1 = buildQuestions(pg6, pg6, 1, 'P', 'z');
+ok(q1.length === pg6.length && q1.every((x) => !/Fill in the blank/.test(x.question) || x.type === 'mc'), 'one per block stays one per block');
+const tfq = buildQuestions(pg6, pg6, 3, 'P', 'z').find((x) => x.type === 'tf' && x.answer === 'False');
+ok(tfq && tfq.correction && /1787|a new Constitution|1789|different/.test(tfq.correction), 'a false statement keeps the true sentence as its correction');
+const rp6 = readingReport([{ id: 'f1', source: 'photo', status: 'typed', checked: true, transcript: { kind: 'handwritten', lines: [{ id: 'l1', text: 'x', marks: [], conf: 'high' }], figures: [] }, off: [], blocks: pg6 }], buildQuestions(pg6, pg6, 2, 'P', 'z').map((x, i) => ({ ...x, id: 'i' + i, fileId: 'f1' })), 2, 'all');
+ok(/Q1 /.test(rp6) && /choices: A\./.test(rp6) && /from: "In 1787/.test(rp6) && /same wording and answer asked twice: 0/.test(rp6), 'report lists each question in full with choices, answer and source sentence');
+ok(buildCheckPrompt([{ type: 'qa', question: 'Q', answer: 'A', srcText: 'S' }]).includes('vague') && buildCheckPrompt([{ type: 'qa', question: 'Q', answer: 'A', srcText: 'S' }]).includes('duplicate'), 'AI check also looks for vague and duplicate questions');
 
 console.log(`reading: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
