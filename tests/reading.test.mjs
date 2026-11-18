@@ -212,5 +212,19 @@ const again2 = remakeQuestion({ ...firstQ, ...again1 }, blk, pg6, [firstQ], 2);
 ok(again2 && !(again2.question === firstQ.question && again2.answer === firstQ.answer), 'Make again never repeats another question on the same block');
 ok(remakeQuestion(firstQ, null, pg6, [], 1) === null, 'Make again without a block says no');
 
+// 0.20.11
+const p11 = parseBlocksDetailed(JSON.stringify({ blocks: [
+  { type: 'date', source: 'In 1787, delegates met in Philadelphia to revise the Articles.', subject: 'meeting', question: 'When did delegates meet in Philadelphia?', value: 'In 1787', items: [] },
+  { type: 'date', source: 'The new government began operating in 1789.', subject: 'new government', question: 'When did the new government begin operating?', value: '1789', items: [] },
+  { type: 'fact', source: 'The constitution gave congress the power to levy federal taxes and regulate trade among the states.', subject: 'taxes', question: 'What power about taxes did Congress get?', value: 'to levy federal taxes', items: [] },
+  { type: 'fact', source: 'The constitution gave congress the power to levy federal taxes and regulate trade among the states.', subject: 'trade', question: 'What power about trade did Congress get?', value: 'regulate trade among the states', items: [] },
+  { type: 'fact', source: 'They decided to write a new constitution.', subject: 'decision', question: 'What did they decide to write?', value: 'a new constitution', items: [] },
+  { type: 'fact', source: 'The constitution assigned different responsibilities to three branches.', subject: 'branches', question: 'What did the constitution assign?', value: 'different responsibilities', items: [] }
+] }));
+ok(p11.blocks[0].value === '1787' && p11.blocks[0].type === 'date', 'a date answer "In 1787" is kept as "1787"');
+const q11 = buildQuestions(p11.blocks, p11.blocks, 3, 'P', 'w');
+ok(q11.every((x) => !/\bin In\b|^1789, delegates/.test(x.question)), 'swapping dates keeps the sentence whole');
+ok(q11.filter((x) => x.choices && x.type !== 'tf').every((x) => x.choices.filter((c) => c.text !== x.answer).every((c) => !x.question.toLowerCase().includes(c.text.toLowerCase()))), 'a wrong choice is never already written in the question');
+
 console.log(`reading: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

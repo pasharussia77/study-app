@@ -6,6 +6,7 @@ import { isChoiceOnly, withNumber, spreadGroups } from './deck.js';
 import { useStats, StatsSheet, CardPicker, TypePicker, RoundDone, ScreenHead, PlayTop, StartFab } from './Session.jsx';
 import { Icon, Scenery, TileArt } from './art.jsx';
 import { diagLog } from './diag.js';
+import { alike } from './reading.js';
 import { useOverlay, back } from './nav.js';
 import { OrderBoard } from './OrderBoard.jsx';
 
@@ -34,7 +35,10 @@ function plan(c, cards, ask, how) {
   if (how === 'choice') {
     const pool = cards.filter((x) => x.type === c.type && x.key !== c.key).map((x) => (reversed ? x.term : x.answer)).filter((t) => normalize(t) !== normalize(expected));
     const uniq = [...new Map(pool.map((t) => [normalize(t), t])).values()];
-    if (uniq.length >= 1) { mode = 'choice'; options = shuffle([expected, ...shuffle(uniq).slice(0, 3)]); }
+    // Wrong choices: never text already in the question, and alike answers first (a date for a date, about the same length).
+    const fit = uniq.filter((t) => !normalize(shown).includes(normalize(t)));
+    const picks = [...shuffle(fit.filter((t) => alike(expected, t))), ...shuffle(fit.filter((t) => !alike(expected, t)))].slice(0, 3);
+    if (picks.length >= 1) { mode = 'choice'; options = shuffle([expected, ...picks]); }
   }
   return { mode, shown, expected, label, options };
 }
@@ -183,7 +187,7 @@ export default function Quiz({ cards, code, projectId, onExit }) {
       )}
 
       {mode === 'choice' && (
-        <div className="stack" role="group" aria-label="Answer choices">
+        <div className="stack" role="group" aria-label="Answer choices" key={'choices' + i}>
           {q.options.map((o) => {
             const isRight = normalize(o) === normalize(q.expected);
             const picked = !!result && o === result.given;

@@ -79,7 +79,7 @@ export default function Flashcards({ cards, code, projectId, onExit }) {
         <span className="kind" data-testid="kind">{flipped ? f.bl : f.fl}</span>
         <span className="flip-hint"><Icon name={flipped ? 'swap' : 'tap'} size={16} />{flipped ? 'Tap to flip back' : 'Tap to flip'}</span>
       </div>
-      <button className={'flip' + (flipped ? ' flipped' : '')} onClick={() => setFlipped(!flipped)} aria-label={flipped ? 'Show front' : 'Show back'} data-testid="card">
+      <button key={'card' + i} className={'flip' + (flipped ? ' flipped' : '')} onClick={() => setFlipped(!flipped)} aria-label={flipped ? 'Show front' : 'Show back'} data-testid="card">
         <span className="face face-front" aria-hidden={flipped}>
           <FitBody key={'f' + deck[i].key + i} hasList={!!f.extra} dep={i}>
             {num && <span className="card-num" data-testid="card-num">{num}</span>}

@@ -248,7 +248,7 @@ export function blockLine(b) {
 export function parseBlocks(raw) { return parseBlocksDetailed(raw).blocks; }
 
 // A short answer that is a date: a year, a decade, a month, a day of the month, a century or an era.
-export const dateLike = (v) => String(v || '').trim().split(/\s+/).length <= 5 && /\b(1\d{3}|20\d{2})s?\b|\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\b|\b\d{1,2}(st|nd|rd|th)\b|\bcentury\b|\b\d+\s*(bc|ad|bce|ce)\b/i.test(String(v || ''));
+export const dateLike = (v) => String(v || '').trim().split(/\s+/).length <= 4 && /\b(1\d{3}|20\d{2})s?\b|\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\b|\b\d{1,2}(st|nd|rd|th)\b|\bcentury\b|\b\d+\s*(bc|ad|bce|ce)\b/i.test(String(v || ''));
 export function parseBlocksDetailed(raw) {
   const data = typeof raw === 'string' ? parseJson(raw) : raw;
   const list = Array.isArray(data && data.blocks) ? data.blocks : [];
@@ -263,6 +263,7 @@ export function parseBlocksDetailed(raw) {
     let items = (Array.isArray(b.items) ? b.items : []).map(str).filter(Boolean).slice(0, 8);
     if (type === 'list' && items.length === 1) { type = 'fact'; value = value || items[0]; items = []; } // one item is not a list
     if (type !== 'list' && !value && items.length >= 2) type = 'list'; // labelled as a fact but sent as a list
+    if (type === 'date') value = value.replace(/^(in|on|by|around|about|during|since|from|at|until|before|after)\s+/i, ''); // "In 1787" -> "1787"
     if (type === 'date' && !dateLike(value)) type = 'fact'; // a "date" whose answer is not a short date
     if (!source || !question) { drop('no source or question', b); continue; }
     if (type === 'list' ? items.length < 2 : !value) { drop(type === 'list' ? 'list with under 2 items' : 'no answer', b); continue; }
@@ -384,13 +385,14 @@ const GROUPS = { date: ['date'], name: ['name'], definition: ['definition'], eve
 // Wrong answers must look like the right one: a date for a date, and about the same length, so the answer is not given away and a swapped sentence still reads well.
 const words = (v) => String(v || '').trim().split(/\s+/).filter(Boolean).length;
 export const alike = (a, b) => dateLike(a) === dateLike(b) && Math.max(words(a), words(b)) <= 2 * Math.min(words(a), words(b)) + 1;
-function distractors(block, all, n, rand) {
+function distractors(block, all, n, rand, avoid = '') {
   const kinds = GROUPS[block.type] || [];
   const mine = norm(block.value);
   const seen = new Set([mine]);
   const pool = [];
   for (const b of all) {
     if (b === block || !kinds.includes(b.type) || !b.value || !alike(block.value, b.value)) continue;
+    if (avoid && norm(avoid).includes(norm(b.value))) continue; // already written in the question: it would give itself away
     const k = norm(b.value);
     if (!k || seen.has(k) || mine.includes(k) || k.includes(mine)) continue;
     seen.add(k); pool.push(b.value);
@@ -445,7 +447,7 @@ function clozeOf(b, label, seq) {
 function clozeMcOf(b, all, label, seq, rand) {
   const sent = sentenceOf(b); if (!sent) return null;
   const q = swapIn(sent, b.value, '_____'); if (!q) return null;
-  const d = distractors(b, all, 3, rand);
+  const d = distractors(b, all, 3, rand, sent);
   if (d.length < 2) return null;
   const texts = shuffled([b.value, ...d], rand);
   const choices = texts.map((text, i) => ({ label: LETTER(i), text }));
@@ -458,7 +460,7 @@ function termOf(b, label, seq) {
   return baseItem(b, { type: 'term', question: b.subject, answer: b.value }, label, seq);
 }
 function mcOf(b, all, label, seq, rand) {
-  const d = distractors(b, all, 3, rand);
+  const d = distractors(b, all, 3, rand, b.question);
   if (d.length < 2) return null;
   const texts = shuffled([b.value, ...d], rand);
   const choices = texts.map((text, i) => ({ label: LETTER(i), text }));
@@ -470,7 +472,7 @@ function tfOf(b, all, label, seq, rand, which) {
   const makeFalse = which === 'false';
   let statement = sent, answer = 'True';
   if (makeFalse) {
-    const d = distractors(b, all, 1, rand)[0];
+    const d = distractors(b, all, 1, rand, sent)[0];
     if (!d) return null;
     statement = swapIn(sent, b.value, d); answer = 'False';
     if (!statement) return null;
