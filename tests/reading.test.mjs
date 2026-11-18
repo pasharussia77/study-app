@@ -272,6 +272,9 @@ ok(am.get('x5').lines.length === 0, 'a source not on the page is not shaded anyw
   ok(u.lines.every((l, i, arr) => i === 0 || Math.abs(l.y - arr[i - 1].y) >= 0.012) && u.lines[3].y === 0.4, 'lines on top of each other are moved apart; lines far below stay');
   const side = untangle([{ id: 'l1', x: 0.05, y: 0.3, w: 0.3, h: 0.02 }, { id: 'l2', x: 0.5, y: 0.3, w: 0.4, h: 0.02 }]);
   ok(side.pushed === 0, 'lines side by side at one height are left alone');
+  const L = (id, y, h = 0.019) => ({ id, x: 0.1, y, w: 0.3, h });
+  const ord = untangle([L('a', 0.455), L('b', 0.4735), L('c', 0.486, 0.024), L('d', 0.5), L('e', 0.524, 0.021)], new Set(['a', 'c', 'e']));
+  ok(ord.lines[1].y > ord.lines[0].y && ord.lines[1].y < ord.lines[2].y && ord.lines[3].y > ord.lines[2].y && ord.lines[3].y < ord.lines[4].y, 'a missed line stays between the found lines read before and after it (reading order wins)');
 }
 
 // 0.20.16: places from the text-reading engine

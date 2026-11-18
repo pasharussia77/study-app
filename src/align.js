@@ -121,6 +121,20 @@ export function untangle(lines, fixed = new Set()) {
     }
     // never send a line far down the page: a small overlap is better than a line in the wrong place
     if (nl.y - l.y > 3 * h) { nl = { ...l }; }
+    // reading order wins: a line never lands below the next line the engine found in its own column.
+    // It goes in the gap between the line read before it and that found line.
+    const idx = lines.indexOf(l);
+    let ceil = null;
+    for (let j = idx + 1; j < lines.length; j++) {
+      const q = lines[j];
+      if (fixed.has(q.id) && q.y != null && xOverlap(q, nl) > 0.2 * Math.min(q.w || 0.3, nl.w || 0.3)) { ceil = q.y; break; }
+    }
+    if (ceil != null && nl.y > ceil - 0.5 * h) {
+      const prev = idx > 0 ? lines[idx - 1] : null;
+      const pp = prev && prev.y != null ? (out.find((o) => o.id === prev.id) || prev) : null;
+      const floor = pp ? pp.y : ceil - 2 * h;
+      nl = { ...nl, y: ceil > floor ? floor + (ceil - floor) / 2 : ceil - 0.5 * h };
+    }
     out.push(nl);
   }
   const at = new Map(out.map((l) => [l.id, l]));
