@@ -317,10 +317,10 @@ const all = all47.map((it, i) => ({ ...it, id: 'r' + i, fileId: 'f' + (1 + Math.
 const longRaw = 'x'.repeat(4000);
 const evs = photoFiles.map((f) => ({ t: Date.now(), type: 'photo_read', fileId: f.id, ignore: 'none', ok: true, raw: longRaw, ms: 9000, usage: { prompt_tokens: 3400, completion_tokens: 1500 }, made: 8 }));
 const rep = buildReport({ version: '0.15.0', device: 'test', health: { model: 'm', hasKey: true }, profile: { name: 'Test', test: true }, project: { name: 'Ch5' }, text: '', parsed: { cards: [], skipped: 0, skippedLines: [] }, sum: { total: 47, covered: 0, remainingCount: 47, correct: 0, incorrect: 0 }, files: photoFiles, items: all, check: null, events: evs, notes: '' });
-ok(rep.length < 16000, 'report for 47 items is short (' + rep.length + ' characters)');
+ok(rep.length < 60000 && splitReport(rep).every((x) => x.length < 11000), 'report for 47 items fits in parts of under 11000 characters (' + rep.length + ' characters)');
 ok(rep.includes('#10 tf') && rep.includes('fix: George Washington'), 'report: a true/false line carries its correction');
 ok(rep.includes('#46 order') && rep.includes('#41 multi'), 'report: new types are in it');
-ok(!rep.includes('xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'), 'report: raw AI text is cut short');
+ok(rep.includes('x'.repeat(300)), 'report: the raw AI answer is kept in full (up to 8000 characters)');
 const parts = splitReport(rep, 10000);
 ok(parts.length >= 2 && parts.every((p) => p.length <= 10300), 'report splits into parts of at most about 10,000 characters (' + parts.map((p) => p.length) + ')');
 ok(parts[0].startsWith('PART 1 of ' + parts.length) && parts[0].includes('more follows'), 'first part says it is first and that more follows');

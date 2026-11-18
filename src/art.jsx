@@ -1,10 +1,13 @@
 // All drawn artwork for the app: icons, the logo, the sunset landscapes, avatars and the mastery ring.
 // Everything is inline SVG, so nothing extra is downloaded and it stays sharp on any screen.
 import React, { useEffect, useId } from 'react';
-import { T, toneHex, skyTopHex } from './theme.js';
+import { T, toneHex, skyTopHex, barHex } from './theme.js';
 
 /* ---------- line icons ---------- */
 const PATHS = {
+  sun: 'M12 8a4 4 0 1 0 0 8a4 4 0 1 0 0-8M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6',
+  moon: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z',
+  phone: 'M8 2.5h8a2 2 0 0 1 2 2v15a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-15a2 2 0 0 1 2-2zM11 18.5h2',
   left: 'M15 5l-7 7 7 7',
   right: 'M9 5l7 7-7 7',
   down: 'M5 9l7 7 7-7',
@@ -97,7 +100,7 @@ function useThemeColor(color) {
     const m = document.querySelector('meta[name="theme-color"]');
     if (!m) return undefined;
     const old = m.getAttribute('content');
-    m.setAttribute('content', toneHex(color));
+    m.setAttribute('content', barHex(toneHex(color)));
     return () => m.setAttribute('content', skyTopHex());
   }, [color]);
 }

@@ -3,7 +3,7 @@ import { backend } from './firebase.js';
 import { compressImage, readTextFile, readPdf } from './material.js';
 import { buildDeck } from './deck.js';
 import { shortName, niceDate } from './parse.js';
-import { diagLog } from './diag.js';
+import { diagLog, diagGet } from './diag.js';
 import { useOverlay } from './nav.js';
 import { Icon } from './art.jsx';
 import { ScreenHead, useStats, StatsStrip } from './Session.jsx';
@@ -352,7 +352,7 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
         <button className="btn ghost" onClick={onSpeechTest}><Icon name="mic" />Run the speech test</button>
       </div>
       <button className="link danger" onClick={del}><Icon name="trash" size={18} />Delete project</button>
-      {reporting && <ReportSheet code={code} project={p} profile={profile} text="" deck={deck} extra={readingReport(fileList, itemList, perFact, detail)} onClose={() => setReporting(false)} />}
+      {reporting && <ReportSheet code={code} project={p} profile={profile} text="" deck={deck} extra={readingReport(fileList, itemList, perFact, detail, diagGet(p.id))} onClose={() => setReporting(false)} />}
 
       {pasting && (
         <div className="rd-modal" role="dialog" aria-label="Paste text">

@@ -162,5 +162,12 @@ const rp6 = readingReport([{ id: 'f1', source: 'photo', status: 'typed', checked
 ok(/Q1 /.test(rp6) && /choices: A\./.test(rp6) && /from: "In 1787/.test(rp6) && /same wording and answer asked twice: 0/.test(rp6), 'report lists each question in full with choices, answer and source sentence');
 ok(buildCheckPrompt([{ type: 'qa', question: 'Q', answer: 'A', srcText: 'S' }]).includes('vague') && buildCheckPrompt([{ type: 'qa', question: 'Q', answer: 'A', srcText: 'S' }]).includes('duplicate'), 'AI check also looks for vague and duplicate questions');
 
+const ev7 = [{ t: 1, type: 'transcribe', fileId: 'f1', ok: true, ms: 900, usage: { prompt_tokens: 10, completion_tokens: 20 }, lines: 1, raw: '{"lines":[RAWT]}' },
+  { t: 2, type: 'blocks', fileId: 'f1', ok: true, ms: 800, detail: 'all', want: 9, sent: 'SENT TEXT', raw: '{"blocks":[RAWB]}' },
+  { t: 3, type: 'check', fileId: 'f1', ok: true, ms: 700, asked: 2, flagged: 0, raw: '{"checks":[]}' }, { t: 4, type: 'check', fileId: 'check', ok: false, error: 'boom' }];
+const rp7 = readingReport([{ id: 'f1', source: 'photo', status: 'typed', checked: true, transcript: { kind: 'handwritten', lines: [{ id: 'l1', text: 'gained', marks: ['strike'], conf: 'high', x: 0.1, y: 0.2, w: 0.3, h: 0.04 }], figures: [] }, off: ['l1'], blocks: pg6 }], [], 2, 'all', ev7);
+ok(/l1 \| 0\.1,0\.2,0\.3,0\.04 \| strike \| high \| NO \| gained/.test(rp7), 'report lists every piece with place, marks and whether it is used');
+ok(rp7.includes('RAWT') && rp7.includes('SENT TEXT') && rp7.includes('RAWB') && rp7.includes('{"checks":[]}') && /Check again/.test(rp7) && /FAILED: boom/.test(rp7), 'report holds the AI answers, the text sent to the block finder and failed calls');
+
 console.log(`reading: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

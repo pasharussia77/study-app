@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { PALETTES, DEFAULT_THEME, BASE_HUE, applyTheme, cleanTheme } from './theme.js';
+import { PALETTES, DEFAULT_THEME, BASE_HUE, MODES, applyTheme, cleanTheme } from './theme.js';
 import { Icon } from './art.jsx';
 import { ScreenHead } from './Session.jsx';
 import { goUp } from './nav.js';
@@ -81,6 +81,15 @@ export default function Settings({ profile, theme: initial, onChange }) {
         </div>
       </fieldset>
 
+      <fieldset className="seg modes" aria-label="Screen">
+        <legend>Screen</legend>
+        {MODES.map((m) => (
+          <button key={m.id} className={m.id === t.mode ? 'on' : ''} aria-pressed={m.id === t.mode} onClick={() => update({ ...latest.current, mode: m.id })} data-testid={'mode-' + m.id}>
+            <Icon name={m.id === 'dark' ? 'moon' : m.id === 'light' ? 'sun' : 'phone'} size={20} />{m.name}
+          </button>
+        ))}
+      </fieldset>
+
       <div className="crack-box">
         <div className="crack-head"><b>Cracked screen</b><span className="muted tiny">{t.crack === 0 ? 'None' : Math.round(t.crack * 100) + '%'}</span></div>
         <input type="range" min="0" max="100" step="1" value={Math.round(t.crack * 100)} aria-label="Cracked screen"
@@ -90,7 +99,7 @@ export default function Settings({ profile, theme: initial, onChange }) {
       </div>
 
       <button className="btn ghost" disabled={atDefault} onClick={() => update({ ...latest.current, x: DEFAULT_THEME.x, y: DEFAULT_THEME.y })}><Icon name="repeat" />Put the dot back</button>
-      <p className="muted tiny center">Saved for {profile.name}. Only {profile.name} sees these colors. The family screens always keep the default colors.</p>
+      <p className="muted tiny center">Saved for {profile.name}. Only {profile.name} sees these colors. The family screens keep the default colors, with light or dark as last chosen on this phone.</p>
     </section>
   );
 }

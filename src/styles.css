@@ -757,3 +757,9 @@ html::-webkit-scrollbar { display: none; }
 .rd-per .rd-chip { flex: 0 0 44px; width: 44px; height: 44px; min-width: 0; min-height: 0; padding: 0; }
 .tile-count { font-weight: 600; opacity: .7; white-space: nowrap; }
 .btn.rd-reread { width: 100%; font-size: 1.15rem; padding: 20px; background: #fff; border: 2px solid var(--violet); color: var(--violet-deep); }
+
+/* dark mode: one filter turns every screen dark; photos are turned back so they look real */
+html.is-dark { filter: invert(1) hue-rotate(180deg); background: #fff; }
+html.is-dark img { filter: invert(1) hue-rotate(180deg); }
+.seg.modes { grid-template-columns: 1fr 1fr 1fr; margin: 18px 0; }
+.seg.modes button { padding: 12px 6px; min-height: 52px; gap: 6px; font-size: .95rem; flex-direction: column; }

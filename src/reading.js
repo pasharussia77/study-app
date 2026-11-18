@@ -82,7 +82,7 @@ export async function transcribePhoto(code, dataUrl, log = () => {}) {
   let t;
   try { t = parseTranscript(res.text); } catch (e) { log({ type: 'transcribe', ok: false, error: e.message, raw: res.text }); throw new Error(e.message + ' If the page is very full, photograph it in two parts.'); }
   if (!t.lines.length) { log({ type: 'transcribe', ok: false, error: 'no text', raw: res.text }); throw new Error('No text was found on this page.'); }
-  log({ type: 'transcribe', ok: true, ms: res.ms, usage: res.usage, lines: t.lines.length });
+  log({ type: 'transcribe', ok: true, ms: res.ms, usage: res.usage, lines: t.lines.length, raw: res.text, finish: res.finish });
   return t;
 }
 
@@ -288,10 +288,10 @@ export async function findBlocks(code, t, off, log = () => {}, detail = 'normal'
   const t0 = Date.now();
   let res;
   try { res = await askAIDetailed(code, { messages: [{ role: 'user', content: prompt }], json: true, maxTokens: 4000 }); }
-  catch (e) { log({ type: 'blocks', ok: false, error: e.message, ms: Date.now() - t0 }); throw e; }
+  catch (e) { log({ type: 'blocks', ok: false, error: e.message, ms: Date.now() - t0, detail, want, sent: sourceText }); throw e; }
   let blocks, info;
   try { const r = parseBlocksDetailed(res.text); blocks = r.blocks; info = { asked: r.asked, dropped: r.dropped }; } catch (e) { log({ type: 'blocks', ok: false, error: e.message, raw: res.text }); throw new Error(e.message); }
-  log({ type: 'blocks', ok: true, ms: res.ms, usage: res.usage, made: blocks.length, asked: info.asked, detail });
+  log({ type: 'blocks', ok: true, ms: res.ms, usage: res.usage, made: blocks.length, asked: info.asked, detail, want, sent: sourceText, raw: res.text, finish: res.finish });
   blocks.info = info; // read by the caller and saved with the page for the report
   return blocks;
 }
@@ -347,7 +347,7 @@ export async function checkQuestions(code, list, log = () => {}) {
   catch (e) { log({ type: 'check', ok: false, error: e.message, ms: Date.now() - t0 }); throw e; }
   let flags;
   try { flags = parseChecks(res.text, list.length); } catch (e) { log({ type: 'check', ok: false, error: e.message, raw: res.text }); throw e; }
-  log({ type: 'check', ok: true, ms: res.ms, usage: res.usage, asked: list.length, flagged: flags.size });
+  log({ type: 'check', ok: true, ms: res.ms, usage: res.usage, asked: list.length, flagged: flags.size, raw: res.text, finish: res.finish });
   return flags;
 }
 
@@ -557,7 +557,9 @@ export function countQuestions(pages, perFact) {
 }
 
 // Text for the diagnostic report: each page's text, the blocks found and the questions made.
-export function readingReport(files, items, perFact, detail = 'normal') {
+const indent = (x) => String(x).split('\n').map((l) => '    ' + l).join('\n');
+const aiLine = (e) => `${new Date(e.t || 0).toLocaleTimeString('en-US', { timeZone: 'America/New_York' })}: ${e.ok ? 'ok' : 'FAILED: ' + e.error}${e.ms ? `, ${(e.ms / 1000).toFixed(1)} s` : ''}${e.usage ? `, tokens in/out ${e.usage.prompt_tokens ?? '?'}/${e.usage.completion_tokens ?? '?'}` : ''}${e.finish ? ', finish ' + e.finish : ''}${e.lines != null ? `, ${e.lines} pieces` : ''}${e.asked != null ? `, ${e.asked} ${e.type === 'check' ? 'questions checked' : 'blocks sent'}` : ''}${e.flagged != null ? `, ${e.flagged} flagged` : ''}`;
+export function readingReport(files, items, perFact, detail = 'normal', events = []) {
   const out = ['=== READING PROJECT ===', `Questions per block: ${perFact} · detail: ${DETAIL_LABEL[detail] || detail}`];
   files.forEach((f, i) => {
     const mine = items.filter((x) => x.fileId === f.id);
@@ -568,7 +570,21 @@ export function readingReport(files, items, perFact, detail = 'normal') {
       out.push(`page text: kind=${t.kind} pieces=${t.lines.length} unselected=${(f.off || []).length} low-confidence=${t.lines.filter((l) => l.conf !== 'high').length} figures=${(t.figures || []).length}`);
       out.push(layoutText(t, { marks: 'all' }));
       if ((f.off || []).length) out.push('unselected: ' + t.lines.filter((l) => (f.off || []).includes(l.id)).map((l) => l.text).join(' | '));
+      out.push('pieces (id | x,y,w,h | marks | confidence | used | text):');
+      t.lines.forEach((l) => out.push(`  ${l.id} | ${[l.x, l.y, l.w, l.h].map((v) => (v == null ? '-' : Math.round(v * 1000) / 1000)).join(',')} | ${(l.marks || []).join(',') || '-'} | ${l.conf || '-'} | ${(f.off || []).includes(l.id) ? 'NO' : 'yes'} | ${l.text}`));
+      (t.figures || []).forEach((g, k) => out.push(`  figure ${k + 1} | ${[g.x, g.y, g.w, g.h].map((v) => (v == null ? '-' : Math.round(v * 1000) / 1000)).join(',')} | ${g.label || g.text || ''}`));
     }
+    const mineEv = events.filter((e) => e.fileId === f.id && ['transcribe', 'blocks', 'check'].includes(e.type));
+    ['transcribe', 'blocks', 'check'].forEach((kind) => {
+      const all = mineEv.filter((e) => e.type === kind);
+      if (!all.length) return;
+      all.forEach((e, k) => { if (k < all.length - 1) out.push(`AI ${kind} (earlier) ${aiLine(e)}`); });
+      const e = all[all.length - 1];
+      out.push(`AI ${kind} (latest) ${aiLine(e)}${e.detail ? ` | detail ${e.detail}, asked for about ${e.want}` : ''}`);
+      if (e.sent) out.push('  text sent to the AI:', indent(e.sent));
+      if (e.raw) out.push('  the AI\'s answer:', indent(e.raw.length > 12000 ? e.raw.slice(0, 12000) + `\n[... cut, ${e.raw.length - 12000} more characters]` : e.raw));
+    });
+    if (!mineEv.length) out.push('AI calls: none recorded on this phone for this page (the log is kept per phone; "Start fresh log" clears it)');
     const bl = f.blocks || [];
     out.push(`blocks: ${bl.length} found, ${bl.filter((b) => b.on !== false).length} selected`);
     if (f.blocksInfo) {
@@ -590,6 +606,11 @@ export function readingReport(files, items, perFact, detail = 'normal') {
       if (x.srcText) out.push(`      from: "${String(x.srcText).replace(/\s+/g, ' ')}"`);
     });
   });
+  const again = events.filter((e) => e.type === 'check' && e.fileId === 'check');
+  if (again.length) {
+    out.push('', '--- "Check again" calls (all pages)');
+    again.forEach((e) => { out.push(`AI check ${aiLine(e)}`); if (e.raw) out.push('  the AI\'s answer:', indent(e.raw)); });
+  }
   return out.join('\n');
 }
 

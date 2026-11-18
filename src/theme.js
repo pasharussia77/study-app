@@ -11,7 +11,8 @@ export const PALETTES = [
   { id: 'forest', name: 'Forest', hue: -112 },     // greens
   { id: 'ember', name: 'Ember', hue: 122 }         // coral and orange
 ];
-export const DEFAULT_THEME = { palette: 'twilight', x: 0.5, y: 0.5, crack: 0 };
+export const DEFAULT_THEME = { palette: 'twilight', x: 0.5, y: 0.5, crack: 0, mode: 'light' };
+export const MODES = [{ id: 'light', name: 'Light' }, { id: 'dark', name: 'Dark' }, { id: 'auto', name: 'Same as phone' }];
 export const BASE_HUE = 257; // hue of the original violet, used to draw the palette swatches
 
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
@@ -20,7 +21,8 @@ export const cleanTheme = (t) => {
   const n = (v, d) => (typeof v === 'number' && isFinite(v) ? clamp(v) : d);
   let x = n(t?.x, DEFAULT_THEME.x); const y = n(t?.y, DEFAULT_THEME.y);
   if (x === 0.6 && y === 0.5) x = DEFAULT_THEME.x; // an earlier version used 0.6 as its "original colours" spot
-  return { palette: p, x, y, crack: n(t?.crack, 0) };
+  const mode = MODES.some((m) => m.id === t?.mode) ? t.mode : 'light';
+  return { palette: p, x, y, crack: n(t?.crack, 0), mode };
 };
 
 /* ---------- colour maths ---------- */
@@ -88,12 +90,28 @@ function wavesImage(t) {
 }
 
 let current = DEFAULT_THEME;
+// Dark mode: the whole page is turned to dark with one filter (photos are turned back), so every screen follows without its own dark colours.
+const darkQuery = typeof matchMedia !== 'undefined' ? matchMedia('(prefers-color-scheme: dark)') : null;
+let currentMode = 'light';
+export const isDark = () => currentMode === 'dark' || (currentMode === 'auto' && !!darkQuery && darkQuery.matches);
+// The status bar colour for a light colour: in dark mode the same colour with its lightness turned over, like the page.
+export const barHex = (hex) => { if (!isDark()) return hex; const [h, s, l] = hexToHsl(hex); return hslToHex((h + 360) % 360, s, 100 - l); };
+function setDarkClass() {
+  if (typeof document === 'undefined') return;
+  document.documentElement.classList.toggle('is-dark', isDark());
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', barHex(skyTopHex()));
+}
+if (darkQuery && darkQuery.addEventListener) darkQuery.addEventListener('change', setDarkClass);
 export const currentTheme = () => current;
 export const skyTopHex = () => toneHex(SKY[0], current);
 
 export function applyTheme(input) {
   const t = cleanTheme(input);
   current = t;
+  // The family screens use the light or dark choice of the last student on this phone, so the screen does not flash when switching.
+  if (input === DEFAULT_THEME) { try { currentMode = localStorage.getItem('study:mode') || 'light'; } catch { currentMode = 'light'; } }
+  else { currentMode = t.mode; try { localStorage.setItem('study:mode', t.mode); } catch {} }
   const root = document.documentElement.style;
   const set = (k, v) => root.setProperty(k, v);
   set('--hue', String(+(hueOf(t) + warmthOf(t.y) * 8).toFixed(2)));
@@ -108,8 +126,7 @@ export function applyTheme(input) {
   set('--k', String(+t.crack.toFixed(3)));
   document.documentElement.classList.toggle('is-worn', wornOf(t.x) > 0.01);
   document.documentElement.classList.toggle('is-cracked', t.crack > 0.004);
-  const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', skyTopHex());
+  setDarkClass();
 }
 
 // Screens that belong to the whole family always start with the default colours; the app then applies a student's own colours inside their area.
