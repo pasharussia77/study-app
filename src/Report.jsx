@@ -7,6 +7,7 @@ import { summarize } from './stats.js';
 import { crossCheck } from './items.js';
 import { useOverlay } from './nav.js';
 import { APP_VERSION } from './version.js';
+import { sendReport } from './ai.js';
 
 const WORKER_URL = 'https://study-api.pasharussia77.workers.dev';
 
@@ -19,6 +20,7 @@ export default function ReportSheet({ code, project, profile, text, deck, onClos
   const [events, setEvents] = useState(() => diagGet(project.id));
   const [copied, setCopied] = useState('');
   const [done, setDone] = useState([]); // which parts were copied
+  const [sent, setSent] = useState(null); // { busy } or { ok, text }
 
   useEffect(() => backend.watchFiles(code, project.id, setFiles), [code, project.id]);
   useEffect(() => backend.watchStats(code, project.id, setStats), [code, project.id]);
@@ -45,6 +47,20 @@ export default function ReportSheet({ code, project, profile, text, deck, onClos
     catch { setCopied('Could not copy automatically. Press and hold in the box, choose Select all, then Copy.'); }
   };
 
+  const send = async () => {
+    setSent({ busy: true });
+    try {
+      await sendReport(code, project.name, report);
+      const at = new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' });
+      setSent({ ok: true, text: `Sent at ${at}. Now write "report sent" in the chat with Claude.` });
+    } catch (e) { setSent({ ok: false, text: 'Could not send: ' + e.message + ' You can download it or copy it instead.' }); }
+  };
+  const download = () => {
+    const url = URL.createObjectURL(new Blob([report], { type: 'text/plain' }));
+    const a = document.createElement('a'); a.href = url; a.download = `report ${project.name}.txt`.replace(/[\\/:*?"<>|]/g, '-');
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+  };
+
   return (
     <div className="overlay" onClick={onClose}>
       <div className="stats-sheet report-sheet" role="dialog" aria-label="Diagnostic report" onClick={(e) => e.stopPropagation()}>
@@ -53,11 +69,17 @@ export default function ReportSheet({ code, project, profile, text, deck, onClos
         <label className="muted tiny" htmlFor="notes">Your notes (optional)</label>
         <textarea id="notes" className="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="What did you expect? What looked wrong?" />
         <textarea className="report-box" readOnly value={report} aria-label="Report text" data-testid="report" />
+        <button className="btn primary" disabled={!!(sent && sent.busy)} onClick={send} data-testid="send-report">{sent && sent.busy ? 'Sending…' : 'Send report to Claude'}</button>
+        {sent && !sent.busy && <p className={sent.ok ? 'okmsg' : 'error'} role="status" data-testid="send-status">{sent.text}</p>}
+        <button className="btn ghost" onClick={download} data-testid="download-report">Download report</button>
+        <details className="copy-parts">
+        <summary className="muted tiny">Or copy and paste it</summary>
         {parts.length > 1 && <p className="muted tiny" data-testid="parts-note">The report is long, so it comes in {parts.length} parts. Paste each part in the chat as its own message, in order.</p>}
         {parts.map((p, i) => (
           <button key={i} className={'btn ' + (done.includes(i) ? 'ghost copied' : (i === nextPart || (nextPart < 0 && i === 0 && parts.length === 1)) ? 'primary' : 'ghost')} onClick={() => copy(i)} data-testid={'copy-' + i}>{done.includes(i) ? (parts.length > 1 ? `✓ Copied part ${i + 1} of ${parts.length}` : '✓ Copied') : parts.length > 1 ? `Copy part ${i + 1} of ${parts.length}` : 'Copy report'}</button>
         ))}
         {copied && <p className="okmsg" role="status">{copied}</p>}
+        </details>
         <div className="row">
           <button className="btn ghost" onClick={() => { if (confirm('Clear the recorded activity for this project? Your photos and material stay.')) { diagClear(project.id); setEvents([]); } }}>Start fresh log</button>
           <button className="btn ghost" onClick={onClose}>Close</button>

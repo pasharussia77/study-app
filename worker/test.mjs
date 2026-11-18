@@ -14,6 +14,7 @@ globalThis.fetch = async (url, init) => {
     if (globalThis.__sttFailPrimary && m === 'gpt-transcribe') return new Response(JSON.stringify({ error: { message: 'The model `gpt-transcribe` does not exist or you do not have access to it.' } }), { status: 404 });
     return new Response(JSON.stringify({ text: 'it is a small furry pet', languages: [{ code: 'en' }] }), { status: 200 });
   }
+  if (String(url).includes('api.github.com')) return new Response('{}', { status: init.headers.Authorization === 'Bearer gh-good' ? 201 : 401 });
   if (String(url).includes('api.openai.com')) return new Response(JSON.stringify({ choices: [{ message: { content: 'hi there' } }], usage: { total_tokens: 5 } }), { status: 200 });
   throw new Error('unexpected ' + url);
 };
@@ -110,4 +111,14 @@ r = await worker.fetch(audioReq(goodNoType, new Blob([])), env); check('stt reje
 r = await worker.fetch(audioReq(goodNoType, new Blob([new Uint8Array(6_000_001)])), env); check('stt rejects huge file', r.status === 400);
 r = await worker.fetch(audioReq({ ...goodNoType, 'X-Family-Code': 'wrong-code-999' }, new Blob([new Uint8Array(10)])), env); check('stt needs family', r.status === 401);
 r = await worker.fetch(new Request('https://api.test/stt', { method: 'POST', headers: { Origin: ORIGIN, ...good }, body: 'not a form' }), env); check('stt rejects non-form', r.status === 400);
+
+calls = [];
+r = await worker.fetch(req('/report', { headers: good, body: { name: 'Chapter 5 – notes', text: 'Report ✓ é' } }), { ...env, GITHUB_TOKEN: 'gh-good' }); j = await r.json();
+const gh = calls.find((c) => c.url.includes('api.github.com')); const ghb = gh && JSON.parse(gh.init.body);
+check('report saved to the reports branch', r.status === 200 && /^reports\/\d{4}-\d\d-\d\d_\d\d-\d\d-\d\d_chapter-5-notes\.txt$/.test(j.path) && ghb.branch === 'reports' && new TextDecoder().decode(Uint8Array.from(atob(ghb.content), (c) => c.charCodeAt(0))) === 'Report ✓ é');
+check('report token not in response', !JSON.stringify(j).includes('gh-good'));
+r = await worker.fetch(req('/report', { headers: good, body: { name: 'x', text: 'y' } }), env); check('report without token says so', r.status === 500);
+r = await worker.fetch(req('/report', { headers: good, body: { name: 'x', text: 'y' } }), { ...env, GITHUB_TOKEN: 'gh-bad' }); check('report with a bad token fails clearly', r.status === 502);
+r = await worker.fetch(req('/report', { headers: good, body: { name: 'x', text: '' } }), { ...env, GITHUB_TOKEN: 'gh-good' }); check('empty report rejected', r.status === 400);
+r = await worker.fetch(req('/report', { headers: { ...good, 'X-Family-Code': 'wrong-code-999' }, body: { name: 'x', text: 'y' } }), { ...env, GITHUB_TOKEN: 'gh-good' }); check('report needs family', r.status === 401);
 console.log(`worker tests: ${pass} passed, ${fail} failed`);

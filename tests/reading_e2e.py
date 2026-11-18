@@ -204,7 +204,7 @@ try:
         # H. Review screen
         btn('Review questions').click()
         pg.get_by_text('Study items').first.wait_for()
-        ok(pg.get_by_test_id('item').count() == 5, 'review lists the questions')
+        pg.wait_for_timeout(500); ok(pg.get_by_test_id('item').count() == 5, 'review lists the questions (' + str(pg.get_by_test_id('item').count()) + ')')
         ok(pg.get_by_test_id('item-src').count() == 5, 'each question shows where on the page it came from')
         srcs = pg.get_by_test_id('item-src').all_inner_texts()
         ok(len(set(srcs)) == 5, 'no fact is asked twice')

@@ -99,7 +99,7 @@ export default function Settings({ profile, theme: initial, onChange }) {
       </div>
 
       <button className="btn ghost" disabled={atDefault} onClick={() => update({ ...latest.current, x: DEFAULT_THEME.x, y: DEFAULT_THEME.y })}><Icon name="repeat" />Put the dot back</button>
-      <p className="muted tiny center">Saved for {profile.name}. Only {profile.name} sees these colors. The family screens keep the default colors, with light or dark as last chosen on this phone.</p>
+      <p className="muted tiny center">Saved for {profile.name}. Only {profile.name} sees these colors. The family screens always keep the default colors and stay light.</p>
     </section>
   );
 }

@@ -109,9 +109,8 @@ export const skyTopHex = () => toneHex(SKY[0], current);
 export function applyTheme(input) {
   const t = cleanTheme(input);
   current = t;
-  // The family screens use the light or dark choice of the last student on this phone, so the screen does not flash when switching.
-  if (input === DEFAULT_THEME) { try { currentMode = localStorage.getItem('study:mode') || 'light'; } catch { currentMode = 'light'; } }
-  else { currentMode = t.mode; try { localStorage.setItem('study:mode', t.mode); } catch {} }
+  // The family screens that every account shares are always light; dark mode is only inside a student's own screens.
+  currentMode = input === DEFAULT_THEME ? 'light' : t.mode;
   const root = document.documentElement.style;
   const set = (k, v) => root.setProperty(k, v);
   set('--hue', String(+(hueOf(t) + warmthOf(t.y) * 8).toFixed(2)));

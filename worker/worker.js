@@ -3,6 +3,7 @@
 //   OPENAI_API_KEY (secret)  BRAIN_MODEL (optional, default gpt-5.6-luna)  REASONING_EFFORT (optional, default low)
 //   TTS_MODEL (optional, default gpt-4o-mini-tts)  TTS_VOICE (optional, default sage)  TTS_STYLE (optional)
 //   STT_MODEL (optional, default gpt-transcribe)  STT_FALLBACK_MODEL (optional, default gpt-4o-mini-transcribe)
+//   GITHUB_TOKEN (secret): saves diagnostic reports to the "reports" branch of the app's repo
 
 const ALLOWED_ORIGINS = ['https://pasharussia77.github.io'];
 const FIREBASE_PROJECT = 'family-study-94e10';
@@ -12,6 +13,9 @@ const MAX_MESSAGES = 40;
 const MAX_OUTPUT_TOKENS = 4000;
 const MAX_TTS_CHARS = 1500;
 const MAX_AUDIO_BYTES = 6_000_000;
+const MAX_REPORT_CHARS = 1_500_000;
+const REPORT_REPO = 'pasharussia77/study-app';
+const REPORT_BRANCH = 'reports';
 
 const verified = new Map(); // "code:token-tail" -> expiry time (ms)
 const VERIFY_TTL_MS = 5 * 60 * 1000;
@@ -150,6 +154,31 @@ async function handleStt(request, env, origin) {
   return json({ text: (data && data.text) || '', model, languages: (data && data.languages) || null }, 200, origin);
 }
 
+// Saves a diagnostic report as a text file on the reports branch, so Claude can read it from GitHub.
+function toBase64(text) {
+  const bytes = new TextEncoder().encode(text);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+async function handleReport(request, env, origin) {
+  if (!env.GITHUB_TOKEN) return json({ error: 'The server is missing its GitHub token.' }, 500, origin);
+  let body;
+  try { body = await request.json(); } catch { return json({ error: 'Invalid request.' }, 400, origin); }
+  const text = typeof body.text === 'string' ? body.text : '';
+  if (!text || text.length > MAX_REPORT_CHARS) return json({ error: 'Invalid report.' }, 400, origin);
+  const slug = String(body.name || 'report').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'report';
+  const stamp = new Date().toISOString().replace(/\.\d+Z$/, '').replace(/:/g, '-').replace('T', '_');
+  const path = `reports/${stamp}_${slug}.txt`;
+  const res = await fetch(`https://api.github.com/repos/${REPORT_REPO}/contents/${path}`, {
+    method: 'PUT',
+    headers: { Authorization: 'Bearer ' + env.GITHUB_TOKEN, Accept: 'application/vnd.github+json', 'User-Agent': 'study-api', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: 'report ' + stamp, content: toBase64(text), branch: REPORT_BRANCH })
+  });
+  if (!res.ok) return json({ error: `GitHub did not save the report (${res.status}). The token may have expired.` }, 502, origin);
+  return json({ ok: true, path }, 200, origin);
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -174,6 +203,7 @@ export default {
       if (url.pathname === '/chat') return handleChat(request, env, origin);
       if (url.pathname === '/tts') return handleTts(request, env, origin);
       if (url.pathname === '/stt') return handleStt(request, env, origin);
+      if (url.pathname === '/report') return handleReport(request, env, origin);
     }
     return json({ error: 'Not found.' }, 404, origin);
   }

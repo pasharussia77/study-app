@@ -341,6 +341,11 @@ try:
         pg.get_by_test_id('type-questions').click()  # the Test account now chooses the kind of project first
         pg.get_by_label('Project name').fill('Report'); btn('Create project').click()
         open_fold(); btn('Create diagnostic report').click()
+        pg.get_by_test_id('send-report').click()
+        pg.get_by_test_id('send-status').wait_for()
+        ok('report sent' in pg.inner_text('[data-testid=send-status]') and pg.evaluate('window.__sentReport.text').startswith('FAMILY STUDY'), 'report: Send report to Claude sends the whole report')
+        ok(pg.get_by_test_id('download-report').is_visible(), 'report: a download button is there')
+        pg.get_by_text('Or copy and paste it').click()
         ok(pg.locator('[data-testid=copy-1]').count() == 0 and 'Copy report' in text(), 'report: a short report is one part')
         pg.get_by_label('Your notes').fill('\n'.join('note line %d ' % k + 'x' * 50 for k in range(400)))
         pg.wait_for_timeout(300)

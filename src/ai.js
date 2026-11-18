@@ -16,6 +16,15 @@ export function explain(res, data, what = 'AI helper') {
   return (data && data.error) || `The ${what} had a problem.`;
 }
 
+// Saves a diagnostic report on GitHub (through the Worker) so Claude can read it. Returns the file path.
+export async function sendReport(code, name, text) {
+  if (isMock) { window.__sentReport = { name, text }; return 'reports/mock_' + name + '.txt'; }
+  const res = await workerFetch(code, '/report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, text }) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(explain(res, data, 'report saving'));
+  return data.path;
+}
+
 // Sends a request to the family's AI helper (the Cloudflare Worker). Returns plain text.
 export async function askAI(code, opts) { return (await askAIDetailed(code, opts)).text; }
 
