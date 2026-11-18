@@ -34,6 +34,7 @@ Return ONLY JSON: {"kind":"printed"|"handwritten"|"mixed","lines":[...],"figures
 "lines": one entry for every line or phrase, in the place where it is written.
 - text: the exact words. Do not fix spelling or grammar, do not merge, reorder, shorten or explain. Keep bullets, dashes and numbers at the start of the text. Write an arrow you see as its own entry with text "→" or "↓" (or "←", "↑") at its position. If a word cannot be read, write [?].
 - x, y: the top-left corner of the text, as a fraction of the picture width and height (0 to 1).
+- Each line is lower on the page than the line before it (y grows down the page). Two lines may have the same y only when they sit side by side and do not overlap. Lines never sit on top of each other.
 - w: its width as a fraction of the picture width. h: the height of one text line as a fraction of the picture height.
 - If a line has a big gap in the middle, or two phrases sit far apart on the same row, make two entries.
 - If there is empty space between two lines, the y values must show it. If a phrase is short and sits in the middle of the page, its x must show that. Short lines stay short.
@@ -82,7 +83,9 @@ export async function transcribePhoto(code, dataUrl, log = () => {}) {
   let t;
   try { t = parseTranscript(res.text); } catch (e) { log({ type: 'transcribe', ok: false, error: e.message, raw: res.text }); throw new Error(e.message + ' If the page is very full, photograph it in two parts.'); }
   if (!t.lines.length) { log({ type: 'transcribe', ok: false, error: 'no text', raw: res.text }); throw new Error('No text was found on this page.'); }
-  log({ type: 'transcribe', ok: true, ms: res.ms, usage: res.usage, lines: t.lines.length, raw: res.text, finish: res.finish });
+  // the AI's places are estimates: move each line onto its real row of print in the photo, then make sure no two lines overlap
+  try { const { placeOnPhoto } = await import('./align.js'); t = await placeOnPhoto(dataUrl, t); } catch { /* keep the AI's places */ }
+  log({ type: 'transcribe', ok: true, ms: res.ms, usage: res.usage, lines: t.lines.length, raw: res.text, finish: res.finish, placed: t.placed });
   return t;
 }
 
@@ -687,6 +690,7 @@ export function readingReport(files, items, perFact, detail = 'normal', events =
     if (f.transcript) {
       const t = f.transcript;
       out.push(`page text: kind=${t.kind} pieces=${t.lines.length} unselected=${(f.off || []).length} low-confidence=${t.lines.filter((l) => l.conf !== 'high').length} figures=${(t.figures || []).length}`);
+      if (t.placed) out.push(`lined up with the photo: ${t.placed.aligned ? `yes, ${t.placed.moved} of ${t.lines.length} lines moved, average shift ${t.placed.avgShift}` : 'no (kept the AI\'s places)'}; overlaps pushed down: ${t.placed.pushed}; ${t.placed.ms} ms`);
       out.push(layoutText(t, { marks: 'all' }));
       if ((f.off || []).length) out.push('unselected: ' + t.lines.filter((l) => (f.off || []).includes(l.id)).map((l) => l.text).join(' | '));
       out.push('pieces (id | x,y,w,h | marks | confidence | used | text):');

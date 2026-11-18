@@ -1,4 +1,5 @@
 // Rule tests for Reading projects (layout, chunks, blocks, question builder). Run with: npm test
+import { alignLines, untangle, inkRows } from '../src/align.js';
 import { blockAreas, remakeQuestion, dateLike, parseJson, parseTranscript, makeChunks, layoutText, parseBlocks, buildQuestions, splitTextPages, textTranscript, cleanCount, toRows, suggestCount, countQuestions, readingReport, parseBlocksDetailed, buildCheckPrompt, parseChecks, struckIds, buildFactsPrompt } from '../src/reading.js';
 import { buildDeck, spreadGroups } from '../src/deck.js';
 
@@ -247,6 +248,30 @@ ok(am.get('x2').lines.join() === 'a1,a2', 'a sentence over two lines shades both
 ok(am.get('x3').lines.join() === 'a2,a3', 'a word split with a hyphen is followed to the next line');
 ok(am.get('x4').lines.join() === 'd1,d2,d3', 'a diagram block shades its arrow too');
 ok(am.get('x5').lines.length === 0, 'a source not on the page is not shaded anywhere');
+
+// 0.20.15: lining the typed page up with the photo
+{
+  const W = 200, H = 400, ink = new Uint8Array(W * H);
+  const bar = (x0, x1, y0, y1) => { for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) ink[y * W + x] = 1; };
+  bar(20, 180, 100, 108); bar(20, 180, 116, 124); bar(40, 100, 132, 140); bar(20, 180, 148, 156); // rows: full, full, short indented, full
+  const mask = { W, H, ink };
+  ok(inkRows(mask, 20, 180, 90, 170).length === 4, 'rows of print are found');
+  const lines = [
+    { id: 'l1', text: 'a', x: 0.1, y: 0.255, w: 0.8, h: 0.02 },
+    { id: 'l2', text: 'b', x: 0.1, y: 0.30, w: 0.8, h: 0.02 },
+    { id: 'l3', text: 'c', x: 0.2, y: 0.30, w: 0.3, h: 0.02 }, // the AI gave it the same height as the line before
+    { id: 'l4', text: 'd', x: 0.1, y: 0.36, w: 0.8, h: 0.02 }];
+  const a = alignLines(lines, mask);
+  const yc = (l) => (l.y + l.h / 2) * H;
+  ok(Math.abs(yc(a.lines[0]) - 104) < 2 && Math.abs(yc(a.lines[1]) - 120) < 2, 'lines move onto their real rows');
+  ok(Math.abs(yc(a.lines[2]) - 136) < 2, 'two lines the AI put at one height go to two rows, the short indented one to the short row');
+  ok(Math.abs(yc(a.lines[3]) - 152) < 2, 'the next line follows');
+  ok(a.lines.every((l, i) => l.h === lines[i].h && l.x === lines[i].x), 'letter size and left edge stay as read');
+  const u = untangle([{ id: 'l1', x: 0.1, y: 0.3, w: 0.8, h: 0.02 }, { id: 'l2', x: 0.1, y: 0.302, w: 0.8, h: 0.02 }, { id: 'l3', x: 0.1, y: 0.31, w: 0.8, h: 0.02 }, { id: 'l4', x: 0.1, y: 0.4, w: 0.8, h: 0.02 }]);
+  ok(u.lines.every((l, i, arr) => i === 0 || Math.abs(l.y - arr[i - 1].y) >= 0.012) && u.lines[3].y === 0.4, 'lines on top of each other are moved apart; lines far below stay');
+  const side = untangle([{ id: 'l1', x: 0.05, y: 0.3, w: 0.3, h: 0.02 }, { id: 'l2', x: 0.5, y: 0.3, w: 0.4, h: 0.02 }]);
+  ok(side.pushed === 0, 'lines side by side at one height are left alone');
+}
 
 console.log(`reading: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
