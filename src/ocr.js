@@ -38,7 +38,7 @@ export function matchLine(text, ocrLines, used = new Set()) {
     const strongWords = hit.filter((w) => w.n.length >= 4).length;
     if (hit.length && (!best || score > best.score || (score === best.score && used.has(best.k) && !used.has(k)))) best = { k, score, hit, strongWords };
   });
-  if (!best || best.score < 0.5) return null;
+  if (!best || best.score < 0.7) return null; // most of the line must be there: a weak match does more harm than none
   const longWords = t.filter((w) => w.length >= 4).length;
   if (best.strongWords < Math.min(2, longWords)) return null;
   // a line of only short words ("met.", "In a") must match a short engine line word for word
@@ -87,6 +87,10 @@ export function placeByOcr(t, ocrLines, W, H) {
   const hs = placed.filter(Boolean).map((l) => l.h).sort((p, q) => p - q);
   const typicalH = hs.length ? hs[Math.floor(hs.length / 2)] : null;
   if (typicalH) placed.forEach((l, i) => { if (l && l.h < 0.7 * typicalH) placed[i] = { ...l, y: Math.max(0, l.y - (typicalH - l.h) / 2), h: typicalH }; });
+  // a line matched by part of its words gets a box only around those words: widen it to fit the whole line
+  const per = placed.map((l, i) => (l && found[i].score >= 0.95 && l.text.length > 8 ? l.w / l.text.length : null)).filter(Boolean).sort((p, q) => p - q);
+  const charW = per.length ? per[Math.floor(per.length / 2)] : null;
+  if (charW) placed.forEach((l, i) => { if (l) placed[i] = { ...l, w: Math.min(1 - l.x, Math.max(l.w, l.text.length * charW * 0.9)) }; });
   // the lines the engine did not find go between the found lines around them, in proportion (the AI's order and spacing are kept)
   const anchors = t.lines.map((l, i) => (placed[i] ? [l.y, placed[i].y] : null)).filter(Boolean).sort((p, q) => p[0] - q[0]);
   const yOf = (v) => {
