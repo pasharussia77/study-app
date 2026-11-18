@@ -389,9 +389,11 @@ function BlocksView({ files, allFiles, perFact, willMake, onToggle, onClose }) {
   };
   return (
     <section className="rd rd-blocks">
-      <ScreenHead onBack={onClose} backLabel="Pages" icon={<span className="head-ic"><Icon name="list" size={26} /></span>} title="Information blocks" />
-      <p className="muted" data-testid="blocks-summary">{all.length} found · {on} selected · {willMake} question{willMake === 1 ? '' : 's'} at {perFact} per block</p>
-      {page && page.transcript && <p className="muted tiny">Each selected block has its own color on the page. Text with no color was not used. Tap a block or a colored spot to find it.</p>}
+      <header className="rd-blocks-head">
+        <button className="back round small" onClick={onClose} aria-label="Pages"><Icon name="left" size={20} /></button>
+        <h1>Information blocks</h1>
+        <span className="muted tiny" data-testid="blocks-summary">{on} of {all.length} · {willMake} question{willMake === 1 ? '' : 's'}</span>
+      </header>
       {page && page.transcript && (
         <div className="rd-map-pin">
           {files.length > 1 && (

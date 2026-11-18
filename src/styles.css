@@ -787,3 +787,10 @@ html.is-dark img { filter: invert(1) hue-rotate(180deg); }
 .rd-blk { border-left: 6px solid transparent; cursor: pointer; scroll-margin-top: 45vh; }
 .rd-blk.on { outline: 2.5px solid var(--violet, #6d4aff); }
 .rd-swatch { width: 18px; height: 18px; border-radius: 5px; border: 2px solid; margin-left: auto; flex: none; }
+.rd-blocks-head { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; }
+.rd-blocks-head h1 { font-size: 1.2rem; margin: 0; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rd-blocks-head .back.round.small { width: 40px; height: 40px; flex: none; }
+.rd-blocks-head .muted { flex: none; }
+.rd-area { border-width: 1px; }
+.rd-area.on { border-width: 1.5px; box-shadow: 0 0 0 2px rgba(255, 255, 255, .6); }
+.rd-blocks-head { gap: 8px; } .rd-blocks-head h1 { font-size: 1.05rem; }
