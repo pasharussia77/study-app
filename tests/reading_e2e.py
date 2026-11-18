@@ -178,7 +178,7 @@ try:
         pg.get_by_test_id('review-blocks').click()
         ok(pg.get_by_test_id('block').count() == 6, 'all blocks are listed')
         pg.get_by_test_id('block').nth(0).get_by_role('checkbox').uncheck()
-        pg.get_by_text('5 selected · 5 questions').wait_for()
+        pg.get_by_text('5 of 6 · 5 questions').wait_for()
         ok(True, 'unselecting a block lowers the count of questions')
         shot('5-blocks')
         btn('Done').click()
