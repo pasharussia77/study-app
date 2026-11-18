@@ -295,5 +295,17 @@ ok(am.get('x5').lines.length === 0, 'a source not on the page is not shaded anyw
   ok(p.fixed.has('l1') && !p.fixed.has('l3'), 'found lines are kept fixed');
 }
 
+{
+  const wl = (y, x, text) => ({ words: text.split(' ').map((w, i) => ({ text: w, x0: x + i * 60, y0: y, x1: x + i * 60 + 50, y1: y + 20 })) });
+  const ocr = [wl(100, 100, 'There are many representatives in this House today'), wl(200, 100, 'Tbe first census was conducted')];
+  const t = { lines: [{ id: 'l1', text: 'There are many representatives in this House today', x: 0.1, y: 0.1, w: 0.4, h: 0.02 },
+    { id: 'l2', text: 'something else entirely here', x: 0.1, y: 0.15, w: 0.4, h: 0.02 },
+    { id: 'l3', text: 'The first census was conducted', x: 0.1, y: 0.2, w: 0.4, h: 0.02 },
+    { id: 'l4', text: 'There are many representatives in this House today', x: 0.1, y: 0.3, w: 0.4, h: 0.02 }], figures: [] };
+  const p = placeByOcr(t, [...ocr, wl(300, 100, 'There are many representatives in this House today')], 1000, 1000);
+  ok(p.lines[2].x < 0.155 && p.lines[2].w >= 0.2, 'a line whose first word was misread still reaches to its left edge and keeps its full width');
+  ok(Math.abs(p.lines[3].y - 0.3) < 0.001, 'the same words twice on a page go to two different printed lines');
+}
+
 console.log(`reading: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

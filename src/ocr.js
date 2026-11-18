@@ -26,6 +26,7 @@ export function matchLine(text, ocrLines, used = new Set()) {
   if (!t.length) return null;
   let best = null;
   ocrLines.forEach((ol, k) => {
+    if (used.has(k)) return; // each printed line holds one typed line
     const words = ol.words.map((w) => ({ ...w, n: norm(w.text) })).filter((w) => w.n);
     const hit = [];
     let from = 0;
@@ -44,7 +45,10 @@ export function matchLine(text, ocrLines, used = new Set()) {
   // a line of only short words ("met.", "In a") must match a short engine line word for word
   if (!longWords && (best.score < 1 || ocrLines[best.k].words.length > t.length + 1)) return null;
   const xs0 = best.hit.map((w) => w.x0), xs1 = best.hit.map((w) => w.x1), ys0 = best.hit.map((w) => w.y0), ys1 = best.hit.map((w) => w.y1);
-  return { k: best.k, score: best.score, box: { x0: Math.min(...xs0), y0: Math.min(...ys0), x1: Math.max(...xs1), y1: Math.max(...ys1) } };
+  // letters of the line's words before the first word found: the box must reach that far to the left
+  const firstHit = t.findIndex((tok) => close(tok, best.hit[0].n));
+  const lead = firstHit > 0 ? t.slice(0, firstHit).join(' ').length + 1 : 0;
+  return { k: best.k, score: best.score, lead, box: { x0: Math.min(...xs0), y0: Math.min(...ys0), x1: Math.max(...xs1), y1: Math.max(...ys1) } };
 }
 
 // A straight-line map v' = a*v + b that a few wrong matches cannot spoil: the middle of all pairwise slopes.
@@ -65,7 +69,14 @@ function fit(pairs) {
 // First the sure matches (most of the words found) give how the AI's places map onto the photo;
 // a weaker match then only counts when it is near where that map puts the line.
 export function placeByOcr(t, ocrLines, W, H) {
-  const found = t.lines.map((l) => matchLine(l.text, ocrLines));
+  // in the AI's reading order (ids), each printed line is given out once: the same words can appear twice on a page
+  const used = new Set();
+  const num = (l) => { const m = /^l(\d+)$/.exec(l.id || ''); return m ? +m[1] : 0; };
+  const found = new Array(t.lines.length).fill(null);
+  t.lines.map((l, i) => [l, i]).sort((a, b) => num(a[0]) - num(b[0])).forEach(([l, i]) => {
+    const m = matchLine(l.text, ocrLines, used);
+    if (m) { used.add(m.k); found[i] = m; }
+  });
   const sure = found.map((m) => m && m.score >= 0.7);
   const box = (l, m) => ({ ...l, x: m.box.x0 / W, y: m.box.y0 / H, w: Math.max((m.box.x1 - m.box.x0) / W, 0.01), h: Math.max((m.box.y1 - m.box.y0) / H, 0.006) });
   const py = [], px = [];
@@ -90,7 +101,12 @@ export function placeByOcr(t, ocrLines, W, H) {
   // a line matched by part of its words gets a box only around those words: widen it to fit the whole line
   const per = placed.map((l, i) => (l && found[i].score >= 0.95 && l.text.length > 8 ? l.w / l.text.length : null)).filter(Boolean).sort((p, q) => p - q);
   const charW = per.length ? per[Math.floor(per.length / 2)] : null;
-  if (charW) placed.forEach((l, i) => { if (l) placed[i] = { ...l, w: Math.min(1 - l.x, Math.max(l.w, l.text.length * charW * 0.9)) }; });
+  if (charW) placed.forEach((l, i) => {
+    if (!l) return;
+    const back = (found[i].lead || 0) * charW; // words missed at the start of the line
+    const x = Math.max(0, l.x - back);
+    placed[i] = { ...l, x, w: Math.min(1 - x, Math.max(l.w + (l.x - x), l.text.length * charW * 0.9)) };
+  });
   // the lines the engine did not find go between the found lines around them, in proportion (the AI's order and spacing are kept)
   const anchors = t.lines.map((l, i) => (placed[i] ? [l.y, placed[i].y] : null)).filter(Boolean).sort((p, q) => p[0] - q[0]);
   const yOf = (v) => {
