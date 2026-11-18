@@ -123,7 +123,10 @@ export function placeByOcr(t, ocrLines, W, H) {
     if (lo) return Math.min(0.99, lo[1] + (v - lo[0]) * a);
     return Math.max(0, hi[1] - (hi[0] - v) * a);
   };
-  const lines = t.lines.map((l, i) => placed[i] || { ...l, x: mv(l.x, fx), y: yOf(l.y), w: fx ? Math.max(0.01, l.w * fx.a) : l.w, h: fy ? Math.max(0.006, l.h * fy.a) : l.h });
+  const lines = t.lines.map((l, i) => {
+    const nl = placed[i] || { ...l, x: mv(l.x, fx), y: yOf(l.y), w: fx ? Math.max(0.01, l.w * fx.a) : l.w, h: fy ? Math.max(0.006, l.h * fy.a) : l.h };
+    return { ...nl, w: Math.min(nl.w, 1 - nl.x) }; // never wider than the page
+  });
   const figures = (t.figures || []).map((f) => (fx && fy ? { ...f, x: mv(f.x, fx), y: mv(f.y, fy), w: Math.max(0.02, f.w * fx.a), h: Math.max(0.02, f.h * fy.a) } : f));
   return { ...t, lines, figures, matched, fixed, good: !!good };
 }

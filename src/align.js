@@ -113,10 +113,10 @@ export function untangle(lines, fixed = new Set()) {
     let nl = { ...l };
     const h = nl.h || 0.02;
     for (let guard = 0; guard < 40; guard++) {
-      // lines whose tops are closer than 60% of a line height would print on top of each other
-      const hit = out.find((p) => p.y != null && xOverlap(p, nl) > 0.2 * Math.min(p.w || 0.3, nl.w || 0.3) && Math.abs(nl.y - p.y) < 0.6 * Math.min(p.h || 0.02, h));
+      // lines whose tops are closer than 75% of a line height print on top of each other
+      const hit = out.find((p) => p.y != null && xOverlap(p, nl) > 0.2 * Math.min(p.w || 0.3, nl.w || 0.3) && Math.abs(nl.y - p.y) < 0.75 * Math.min(p.h || 0.02, h));
       if (!hit) break;
-      nl = { ...nl, y: hit.y + (hit.h || 0.02) * 0.8 };
+      nl = { ...nl, y: hit.y + (hit.h || 0.02) * 0.9 };
       pushed++;
     }
     // never send a line far down the page: a small overlap is better than a line in the wrong place
