@@ -769,3 +769,8 @@ html.is-dark img { filter: invert(1) hue-rotate(180deg); }
 .add-row.two .btn { gap: 10px; padding: 10px 12px; min-height: 56px; font-size: .98rem; line-height: 1.2; text-align: left; }
 .add-row.two .btn .ic { width: 34px; height: 34px; padding: 7px; flex: none; }
 .rd-left-out { margin: 4px 0 0; }
+.opt.right.missed .radio-dot { background: none; }
+.ok-mark { flex: none; margin-left: auto; font-size: 1.5rem; line-height: 1; }
+.rd-keep { display: flex; gap: 8px; margin-top: 10px; }
+.rd-keep .btn { flex: 1; min-width: 0; padding: 10px 6px; gap: 6px; font-size: .9rem; white-space: nowrap; }
+.rq-actions { display: flex; gap: 8px; flex-wrap: wrap; }

@@ -43,7 +43,7 @@ export default function Quiz({ cards, code, projectId, onExit }) {
   const { sum, sumNow } = useStats(code, projectId, cards);
   const [phase, setPhase] = useState('setup');
   const [ask, setAsk] = useState('term'); // what you are shown, for words
-  const [how, setHow] = useState('type');
+  const [how, setHow] = useState('choice');
   const [mix, setMix] = useState(false);
   const [pick, setPick] = useState(null);
   const [kind, setKind] = useState('all');
@@ -186,8 +186,10 @@ export default function Quiz({ cards, code, projectId, onExit }) {
         <div className="stack" role="group" aria-label="Answer choices">
           {q.options.map((o) => {
             const isRight = normalize(o) === normalize(q.expected);
-            const cls = !result ? '' : isRight ? ' right' : o === result.given ? ' wrong' : ' dim';
-            return <button key={o} className={'opt' + cls} onClick={() => choose(o)} disabled={!!result && !isRight && o !== result.given}><span className="radio-dot" aria-hidden="true" /><span className="opt-text">{o}</span></button>;
+            const picked = !!result && o === result.given;
+            const cls = !result ? '' : isRight ? (picked ? ' right' : ' right missed') : picked ? ' wrong' : ' dim';
+            // A right answer you did not pick: green, circle left empty, a check mark on the right.
+            return <button key={o} className={'opt' + cls} onClick={() => choose(o)} disabled={!!result && !isRight && o !== result.given} data-row={!result ? undefined : isRight ? (picked ? 'right' : 'missed') : picked ? 'wrong' : 'other'}><span className="radio-dot" aria-hidden="true" /><span className="opt-text">{o}</span>{result && isRight && !picked && <span className="ok-mark" aria-label="Correct answer">✅</span>}</button>;
           })}
         </div>
       )}
@@ -249,12 +251,12 @@ export default function Quiz({ cards, code, projectId, onExit }) {
         const verdict = result.selfChecked ? (result.right ? 'Counted as correct' : 'Counted as missed') : result.overridden ? 'Counted as correct' : result.right ? 'Correct' : 'Not quite';
         const showGiven = !result.right && mode === 'type' && !result.selfChecked;
         const rows = mode === 'multi' || mode === 'order'; // the rows themselves show what was right
-        const showAnswer = !rows && (!result.right || (mode === 'type' && result.given.trim() !== q.expected));
+        const showAnswer = !rows && mode !== 'choice' && (!result.right || (mode === 'type' && result.given.trim() !== q.expected)); // with choices, the green row already shows the answer
         const details = showGiven || showAnswer || !!c.correction;
         return (
           <>
             {details && (
-              <div className={'feedback ' + (result.right ? 'good' : 'bad')} role="status" data-testid="feedback" ref={detailsRef}>
+              <div className={'feedback ' + (result.right || !showGiven ? 'good' : 'bad')} role="status" data-testid="feedback" ref={detailsRef}>
                 {showGiven && <p className="given">You wrote: {result.given}</p>}
                 {showAnswer && <AnswerBlock q={q} />}
                 {c.correction && <p className="answer-line" data-testid="quiz-correction">Correction: <b>{c.correction}</b></p>}
@@ -263,7 +265,7 @@ export default function Quiz({ cards, code, projectId, onExit }) {
             <div className="dock">
               <div className={'verdict ' + (result.right ? 'good' : 'bad')} data-testid="verdict" role="status">
                 <span>{result.right ? '✓ ' : '✗ '}{verdict}</span>
-                {details && !result.right && <button className="link inline" onClick={() => detailsRef.current && detailsRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })}>See the answer</button>}
+                {details && !result.right && <button className="link inline" onClick={() => detailsRef.current && detailsRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })}>{showAnswer || showGiven ? 'See the answer' : 'See the correction'}</button>}
               </div>
               <div className="row">
                 {showGiven && <button className="btn ghost" onClick={override}>I was right</button>}

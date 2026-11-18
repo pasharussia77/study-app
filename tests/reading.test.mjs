@@ -1,5 +1,5 @@
 // Rule tests for Reading projects (layout, chunks, blocks, question builder). Run with: npm test
-import { parseJson, parseTranscript, makeChunks, layoutText, parseBlocks, buildQuestions, splitTextPages, textTranscript, cleanCount, toRows, suggestCount, countQuestions, readingReport, parseBlocksDetailed, buildCheckPrompt, parseChecks, struckIds, buildFactsPrompt } from '../src/reading.js';
+import { remakeQuestion, dateLike, parseJson, parseTranscript, makeChunks, layoutText, parseBlocks, buildQuestions, splitTextPages, textTranscript, cleanCount, toRows, suggestCount, countQuestions, readingReport, parseBlocksDetailed, buildCheckPrompt, parseChecks, struckIds, buildFactsPrompt } from '../src/reading.js';
 import { buildDeck, spreadGroups } from '../src/deck.js';
 
 let pass = 0, fail = 0;
@@ -182,6 +182,35 @@ const cards9 = ['a', 'a', 'a', 'b', 'b', 'c', 'c', 'd'].map((g, i) => ({ key: 'k
 const sp9 = spreadGroups(cards9);
 ok(sp9.length === 8 && new Set(sp9.map((c) => c.key)).size === 8 && sp9.every((c, j) => j === 0 || c.group !== sp9[j - 1].group), 'shuffled cards are moved so one block never comes twice in a row');
 ok(spreadGroups([{ key: 'x', group: '' }, { key: 'y', group: '' }]).length === 2, 'cards without a block are left alone');
+
+// 0.20.10: run-2 page from the report
+const raw10 = JSON.stringify({ blocks: [
+  { type: 'date', source: 'In 1787, delegates met in Philadelphia to revise the Articles.', subject: '1787 meeting', question: 'When and where did delegates meet to revise the Articles?', value: 'In 1787, delegates met in Philadelphia', items: [] },
+  { type: 'date', source: 'the new government began operating in 1789.', subject: 'new government', question: 'When did the new government begin operating?', value: '1789', items: [] },
+  { type: 'fact', source: 'The constitution gave congress the power to levy federal taxes and regulate trade among the states.', subject: "Congress's powers", question: 'What powers did the constitution give Congress?', value: '', items: ['levy federal taxes', 'regulate trade among the states'] },
+  { type: 'fact', source: 'the constitution divided Federal Power', subject: 'federal power', question: 'What did the constitution do to federal power?', value: 'divided Federal Power', items: [] },
+  { type: 'fact', source: 'Legislative ↓ Makes federal laws ↓ Congress', subject: 'Legislative branch', question: 'What does the Legislative branch do?', value: 'Makes federal laws', items: [] },
+  { type: 'date', source: 'In 1776 the colonies declared independence.', subject: 'independence', question: 'When was independence declared?', value: '1776', items: [] }
+] });
+const p10 = parseBlocksDetailed(raw10);
+ok(p10.blocks.find((b) => /Philadelphia/.test(b.value)).type === 'fact', 'a "date" whose answer is not a short date becomes a fact');
+ok(p10.blocks.some((b) => b.type === 'list' && b.items.length === 2), 'a fact sent with list items is kept as a list');
+ok(dateLike('1789') && dateLike('the 1780s') && dateLike('July 4, 1776') && !dateLike('In 1787, delegates met in Philadelphia'), 'what counts as a date');
+const q10 = buildQuestions(p10.blocks, p10.blocks, 3, 'P', 'r');
+ok(q10.every((x) => !/\bin In\b|^1789 to/.test(x.question)), 'no broken true/false from a long "date"');
+ok(q10.every((x) => !/[↓→]/.test(x.question)), 'no fill in the blank or true/false from arrows');
+ok(!q10.some((x) => /^Fill in the blank: the constitution _____/i.test(x.question)), 'no blank that is most of the sentence');
+ok(q10.filter((x) => x.type === 'tf' || /^Fill in the blank: [a-z]/.test(x.question) === false).every((x) => !/^Fill in the blank: [a-z]/.test(x.question)) && q10.filter((x) => x.type === 'tf').every((x) => /^[A-Z0-9]/.test(x.question)), 'questions from a lowercase sentence start with a capital');
+const tf10 = q10.find((x) => x.type === 'tf' && x.answer === 'False');
+ok(!tf10 || /1776|1789/.test(tf10.question), 'a false date statement swaps in another date');
+// Make again
+const blk = pg6[0];
+const firstQ = buildQuestions([blk], pg6, 1, 'P', 'z')[0];
+const again1 = remakeQuestion(firstQ, blk, pg6, [], 1);
+ok(again1 && (again1.question !== firstQ.question || again1.type !== firstQ.type), 'Make again gives a different version');
+const again2 = remakeQuestion({ ...firstQ, ...again1 }, blk, pg6, [firstQ], 2);
+ok(again2 && !(again2.question === firstQ.question && again2.answer === firstQ.answer), 'Make again never repeats another question on the same block');
+ok(remakeQuestion(firstQ, null, pg6, [], 1) === null, 'Make again without a block says no');
 
 console.log(`reading: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

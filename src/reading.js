@@ -247,6 +247,8 @@ export function blockLine(b) {
 
 export function parseBlocks(raw) { return parseBlocksDetailed(raw).blocks; }
 
+// A short answer that is a date: a year, a decade, a month, a day of the month, a century or an era.
+export const dateLike = (v) => String(v || '').trim().split(/\s+/).length <= 5 && /\b(1\d{3}|20\d{2})s?\b|\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\b|\b\d{1,2}(st|nd|rd|th)\b|\bcentury\b|\b\d+\s*(bc|ad|bce|ce)\b/i.test(String(v || ''));
 export function parseBlocksDetailed(raw) {
   const data = typeof raw === 'string' ? parseJson(raw) : raw;
   const list = Array.isArray(data && data.blocks) ? data.blocks : [];
@@ -260,6 +262,8 @@ export function parseBlocksDetailed(raw) {
     let value = str(b.value);
     let items = (Array.isArray(b.items) ? b.items : []).map(str).filter(Boolean).slice(0, 8);
     if (type === 'list' && items.length === 1) { type = 'fact'; value = value || items[0]; items = []; } // one item is not a list
+    if (type !== 'list' && !value && items.length >= 2) type = 'list'; // labelled as a fact but sent as a list
+    if (type === 'date' && !dateLike(value)) type = 'fact'; // a "date" whose answer is not a short date
     if (!source || !question) { drop('no source or question', b); continue; }
     if (type === 'list' ? items.length < 2 : !value) { drop(type === 'list' ? 'list with under 2 items' : 'no answer', b); continue; }
     let plain = false;
@@ -377,13 +381,16 @@ const LETTER = (i) => String.fromCharCode(65 + i);
 const GROUPS = { date: ['date'], name: ['name'], definition: ['definition'], event: ['event', 'cause', 'fact'], cause: ['event', 'cause', 'fact'], fact: ['event', 'cause', 'fact'] };
 
 // Wrong answers come from other blocks of the same kind in the whole project.
+// Wrong answers must look like the right one: a date for a date, and about the same length, so the answer is not given away and a swapped sentence still reads well.
+const words = (v) => String(v || '').trim().split(/\s+/).filter(Boolean).length;
+export const alike = (a, b) => dateLike(a) === dateLike(b) && Math.max(words(a), words(b)) <= 2 * Math.min(words(a), words(b)) + 1;
 function distractors(block, all, n, rand) {
   const kinds = GROUPS[block.type] || [];
   const mine = norm(block.value);
   const seen = new Set([mine]);
   const pool = [];
   for (const b of all) {
-    if (b === block || !kinds.includes(b.type) || !b.value) continue;
+    if (b === block || !kinds.includes(b.type) || !b.value || !alike(block.value, b.value)) continue;
     const k = norm(b.value);
     if (!k || seen.has(k) || mine.includes(k) || k.includes(mine)) continue;
     seen.add(k); pool.push(b.value);
@@ -419,7 +426,9 @@ function sentenceOf(b) {
   const low = v.toLowerCase();
   const sent = parts.find((x) => x.toLowerCase().includes(low));
   if (!sent || sent.split(/\s+/).length < 4) return null;
-  return sent;
+  if (/[↓↑→←⇒⇐⟶➔]/.test(sent)) return null; // a diagram, not a sentence
+  if (words(v) * 2 > words(sent)) return null; // the answer is most of the sentence: a blank would leave almost nothing
+  return sent.charAt(0).toUpperCase() + sent.slice(1); // handwriting may start lowercase
 }
 function swapIn(sentence, value, replacement) {
   const i = sentence.toLowerCase().indexOf(String(value).toLowerCase());
@@ -540,6 +549,25 @@ export function buildQuestions(pageBlocks, allBlocks, perFact, label, pageKey = 
   }
   out.forEach((it, j) => { it.order = j; });
   return out;
+}
+// "Make again" on one question: builds another version from the same block by the same rules (another form, or other wrong choices).
+// Never the same as the question now or as the other questions on that block. Returns null when no other version is possible.
+export function remakeQuestion(item, block, allBlocks, siblings = [], n = 1) {
+  if (!block) return null;
+  const pool = allBlocks.filter((b) => b.on !== false);
+  const forms = block.type === 'list' ? formsFor(block) : [...new Set([...formsFor(block), 'qa', 'cloze', 'clozemc', 'mc', 'tf-false', 'tf-true'])];
+  const keyOf = (x) => norm(x.question) + '|' + norm(x.answer) + '|' + (x.choices || []).map((c) => norm(c.text)).sort().join(',');
+  const same = (x, y) => norm(x.question) === norm(y.question) && norm(x.answer) === norm(y.answer);
+  const taken = new Set([item, ...siblings].map(keyOf));
+  for (let a = 0; a < forms.length * 3; a++) {
+    const f = forms[(n + a) % forms.length];
+    const it = make(f, block, pool, item.section || '', rng(`again:${block.id}:${n}:${a}`));
+    if (!it) continue;
+    if (it.type !== 'tf' && it.type !== 'multi' && it.type !== 'order' && norm(it.question).includes(norm(it.answer))) continue;
+    if (taken.has(keyOf(it)) || siblings.some((x) => same(x, it))) continue;
+    return { ...it, order: item.order };
+  }
+  return null;
 }
 // The forms a block can take, best first.
 function formsFor(b) {

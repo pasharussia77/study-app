@@ -559,7 +559,7 @@ function PageEditor({ code, projectId, projectName, file, index, onClose }) {
     setBusy('');
   };
   const base = `${(projectName || 'page').replace(/[\\/:*?"<>|]+/g, '-').trim().slice(0, 80)} page ${index + 1}`;
-  const copyText = async () => { try { await navigator.clipboard.writeText(layoutText(t)); setNote('Copied.'); } catch { setNote('Could not copy. Use Save as text instead.'); } };
+  const copyText = async () => { try { await navigator.clipboard.writeText(layoutText(t)); setNote('Copied.'); } catch { setNote('Could not copy. Use Save text instead.'); } };
   const saveText = () => saveBlob(new Blob([layoutText(t)], { type: 'text/plain' }), base + '.txt');
   const savePicture = async () => saveBlob(await pictureOf(t, ratio), base + ' typed.png');
 
@@ -644,10 +644,10 @@ function PageEditor({ code, projectId, projectName, file, index, onClose }) {
 
       <div className="label">Keep this page</div>
       {file.data && <button className="btn rd-reread" disabled={!!busy} onClick={retype} data-testid="read-again"><Icon name="repeat" />Read the image again</button>}
-      <div className="add-row">
-        <button className="btn ghost" onClick={copyText}><Icon name="copy" />Copy text</button>
-        <button className="btn ghost" onClick={saveText}><Icon name="file" />Save as text</button>
-        {layout && <button className="btn ghost" onClick={savePicture}><Icon name="image" />Save as picture</button>}
+      <div className="rd-keep">
+        <button className="btn ghost small" onClick={copyText}><Icon name="copy" size={18} />Copy</button>
+        <button className="btn ghost small" onClick={saveText}><Icon name="file" size={18} />Save text</button>
+        {layout && <button className="btn ghost small" onClick={savePicture}><Icon name="image" size={18} />Picture</button>}
       </div>
       {busy && <p className="hint" role="status">{busy}</p>}
       {note && <p className="muted tiny" role="status">{note}</p>}

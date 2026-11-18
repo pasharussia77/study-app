@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { backend } from './firebase.js';
 import { TYPE_LABEL, crossCheck, reapplyItem, duplicateGroups, fixNumbers } from './items.js';
 import { inPageOrder } from './deck.js';
-import { BLOCK_LABEL, checkLabel, recheckItems } from './reading.js';
+import { BLOCK_LABEL, checkLabel, recheckItems, remakeQuestion, checkQuestions } from './reading.js';
 import { diagLog } from './diag.js';
 import { useOverlay, goUp } from './nav.js';
 import { Icon } from './art.jsx';
@@ -25,6 +25,8 @@ export default function Items({ code, projectId }) {
   const [asking, setAsking] = useState(false); // the "re-apply the rules" question
   const [working, setWorking] = useState('');
   const [done, setDone] = useState('');
+  const [remaking, setRemaking] = useState(''); // id of the question being made again
+  const [remakeNote, setRemakeNote] = useState({}); // id -> message under that question
   useEffect(() => backend.watchItems(code, projectId, setItems), [code, projectId]);
   useEffect(() => backend.watchFiles(code, projectId, setFiles), [code, projectId]);
   useOverlay(!!editing, () => setEditing(null));
@@ -50,6 +52,31 @@ export default function Items({ code, projectId }) {
   const unchecked = isReading ? items.filter((i) => i.srcText && i.aiChecked !== true).length : 0;
   const tickedCount = items.filter((i) => !i.off).length;
   const toggleTick = async (it) => { try { await backend.updateItem(code, projectId, it.id, { off: !it.off }); } catch (e) { setDone('Could not save the selection: ' + e.message); } };
+  // Make again: another version of one reading question from its block (app rules), then the AI checks just that one.
+  const remake = async (it) => {
+    const page = files.find((f) => f.id === it.fileId);
+    const allBlocks = files.flatMap((f) => f.blocks || []);
+    const block = (page && page.blocks || []).find((b) => (it.blockId && b.id === it.blockId) || (!it.blockId && b.source === it.srcText));
+    const siblings = items.filter((x) => x.id !== it.id && x.fileId === it.fileId && (block ? (x.blockId ? x.blockId === block.id : x.srcText === block.source) : false));
+    const n = (it.again || 0) + 1;
+    const next = remakeQuestion(it, block, allBlocks, siblings, n);
+    if (!next) { setRemakeNote((m) => ({ ...m, [it.id]: 'No other version can be made from this information block.' })); return; }
+    setRemaking(it.id); setRemakeNote((m) => ({ ...m, [it.id]: '' }));
+    const fields = { type: next.type, question: next.question, choices: next.choices || [], correctLabel: next.correctLabel ?? null, correctLabels: next.correctLabels || null, correctOrder: next.correctOrder || null,
+      answer: next.answer, correction: next.correction || '', flagged: next.flagged, note: next.note, blockId: block.id, again: n, aiChecked: false, aiNote: '', aiKind: '' };
+    try {
+      await backend.updateItem(code, projectId, it.id, fields);
+      let msg = 'Made again.';
+      try {
+        const flags = await checkQuestions(code, [{ ...it, ...fields }], (e) => diagLog(projectId, { ...e, fileId: 'check' }));
+        const f = flags.get(0);
+        await backend.updateItem(code, projectId, it.id, { aiChecked: true, aiNote: f ? f.why : '', aiKind: f ? f.kind : '' });
+        msg = f ? 'Made again. The AI check still sees a problem.' : 'Made again. The AI check found no problem.';
+      } catch { msg = 'Made again. The AI check did not work this time.'; }
+      setRemakeNote((m) => ({ ...m, [it.id]: msg }));
+    } catch (e) { setRemakeNote((m) => ({ ...m, [it.id]: 'Could not save: ' + e.message })); }
+    setRemaking('');
+  };
   const checkAgain = async () => {
     setDone(''); setWorking('Checking the questions…');
     try { const n = await recheckItems(code, projectId, items, backend, (e) => diagLog(projectId, { ...e, fileId: 'check' })); setDone(n ? `The AI check flagged ${n}.` : 'The AI check found no problems.'); }
@@ -171,7 +198,11 @@ export default function Items({ code, projectId }) {
                   {it.srcText && <p className="muted tiny item-src" data-testid="item-src">{BLOCK_LABEL[it.blockType] ? BLOCK_LABEL[it.blockType] + ' · ' : ''}From the page: {it.srcText}</p>}
                   {it.aiNote && <p className="needs" data-testid="ai-note">AI check · {checkLabel(it.aiKind)}: {it.aiNote}</p>}
                   {it.flagged && <p className="needs">Needs a look{it.note ? ': ' + it.note : ''}</p>}
-                  <button className="btn ghost small" onClick={() => setEditing(it)}>{it.flagged ? 'Check and fix' : 'Edit'}</button>
+                  <div className="rq-actions">
+                    <button className="btn ghost small" onClick={() => setEditing(it)}>{it.flagged ? 'Check and fix' : 'Edit'}</button>
+                    {isReading && it.srcText && <button className="btn ghost small" disabled={!!remaking} onClick={() => remake(it)} data-testid="make-again"><Icon name="repeat" size={18} />{remaking === it.id ? 'Making…' : 'Make again'}</button>}
+                  </div>
+                  {remakeNote[it.id] && <p className="muted tiny" role="status" data-testid="again-note">{remakeNote[it.id]}</p>}
                 </li>
               ))}
             </ul>
