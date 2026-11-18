@@ -54,9 +54,9 @@ const xOverlap = (a, b) => Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
 
 // Moves each line onto the nearest row of print near where the AI put it, one line per row.
 // Lines are handled in reading order, so two lines never take the same row.
-export function alignLines(lines, mask, figures = []) {
+export function alignLines(lines, mask, figures = [], fixed = new Set()) {
   const { W, H } = mask;
-  const placed = [];
+  const placed = lines.filter((l) => fixed.has(l.id)); // exact lines from the engine: rows they sit on are taken
   const out = [];
   let moved = 0, total = 0;
   // go through the lines in the AI's reading order (their ids), not top to bottom by its guessed places:
@@ -65,7 +65,7 @@ export function alignLines(lines, mask, figures = []) {
   const order = [...lines].sort((a, b) => num(a) - num(b));
   const done = new Map();
   for (const l of order) {
-    if (l.x == null || l.y == null || !l.w) { done.set(l, l); continue; }
+    if (l.x == null || l.y == null || !l.w || fixed.has(l.id)) { done.set(l, l); continue; }
     const h = clamp(l.h || 0.02, 0.006, 0.12);
     // look at the start of the line only: on a tilted photo the far end drifts up or down
     const x0 = l.x * W, x1 = (l.x + Math.min(l.w, 0.3)) * W;
@@ -101,10 +101,14 @@ export function alignLines(lines, mask, figures = []) {
 }
 
 // Safety net: a line that still covers an earlier one moves down just below it; the lines under it follow.
-export function untangle(lines) {
+export function untangle(lines, fixed = new Set()) {
   const out = [];
   let pushed = 0;
+  // lines placed by the engine are exact: they go first and never move; the others make room around them
+  const firm = lines.filter((l) => fixed.has(l.id));
+  out.push(...firm);
   for (const l of lines) {
+    if (fixed.has(l.id)) continue;
     if (l.x == null || l.y == null) { out.push(l); continue; }
     let nl = { ...l };
     const h = nl.h || 0.02;
@@ -115,9 +119,12 @@ export function untangle(lines) {
       nl = { ...nl, y: hit.y + (hit.h || 0.02) * 0.8 };
       pushed++;
     }
+    // never send a line far down the page: a small overlap is better than a line in the wrong place
+    if (nl.y - l.y > 3 * h) { nl = { ...l }; }
     out.push(nl);
   }
-  return { lines: out, pushed };
+  const at = new Map(out.map((l) => [l.id, l]));
+  return { lines: lines.map((l) => at.get(l.id) || l), pushed };
 }
 
 // Browser only: builds the ink mask from a photo. Dark means clearly darker than the paper around it,
@@ -152,17 +159,34 @@ export async function photoMask(dataUrl, width = 900) {
   return { W, H, ink };
 }
 
-// The whole step for one page: align to the photo when there is one, then untangle. Never throws.
+// The whole step for one page. First the text-reading engine: it finds each printed line's exact box, and lines
+// are matched to it by their words. When it cannot (handwriting, an engine error), the rows of print are used instead.
+// Then no two lines may overlap. Never throws.
 export async function placeOnPhoto(dataUrl, t) {
   const t0 = Date.now();
-  let lines = t.lines, moved = 0, avgShift = 0, aligned = false;
-  try {
-    if (dataUrl && typeof document !== 'undefined') {
+  let lines = t.lines, figures = t.figures || [], moved = 0, avgShift = 0, aligned = false, method = 'ai', matched = 0, fixed = new Set();
+  const browser = typeof document !== 'undefined';
+  const mock = browser && /[?&]mock=1/.test(location.search) && !window.__useOcr;
+  if (dataUrl && browser && !mock) {
+    try {
+      const { readWithEngine, placeByOcr } = await import('./ocr.js');
+      const r = await readWithEngine(dataUrl);
+      const p = placeByOcr(t, r.lines, r.W, r.H);
+      matched = p.matched;
+      if (p.matched >= 3) {
+        lines = p.lines; figures = p.figures; fixed = p.fixed; method = 'engine'; aligned = true;
+        // the lines the engine could not read are then snapped onto the rows of print left free
+        try { const mask = await photoMask(dataUrl); ({ lines, moved } = alignLines(lines, mask, figures, fixed)); } catch { /* keep them as placed */ }
+      }
+    } catch { /* fall back to the rows of print */ }
+  }
+  if (method !== 'engine' && dataUrl && browser) {
+    try {
       const mask = await photoMask(dataUrl);
-      ({ lines, moved, avgShift } = alignLines(lines, mask, t.figures || []));
-      aligned = true;
-    }
-  } catch { /* keep the AI's places */ }
-  const u = untangle(lines);
-  return { ...t, lines: u.lines, placed: { aligned, moved, avgShift: Math.round(avgShift * 1000) / 1000, pushed: u.pushed, ms: Date.now() - t0 } };
+      ({ lines, moved, avgShift } = alignLines(lines, mask, figures));
+      aligned = true; method = 'rows';
+    } catch { /* keep the AI's places */ }
+  }
+  const u = untangle(lines, fixed);
+  return { ...t, lines: u.lines, figures, placed: { method, matched, aligned, moved, avgShift: Math.round(avgShift * 1000) / 1000, pushed: u.pushed, ms: Date.now() - t0 } };
 }

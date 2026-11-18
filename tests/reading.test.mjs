@@ -1,5 +1,6 @@
 // Rule tests for Reading projects (layout, chunks, blocks, question builder). Run with: npm test
 import { alignLines, untangle, inkRows } from '../src/align.js';
+import { matchLine, placeByOcr } from '../src/ocr.js';
 import { blockAreas, remakeQuestion, dateLike, parseJson, parseTranscript, makeChunks, layoutText, parseBlocks, buildQuestions, splitTextPages, textTranscript, cleanCount, toRows, suggestCount, countQuestions, readingReport, parseBlocksDetailed, buildCheckPrompt, parseChecks, struckIds, buildFactsPrompt } from '../src/reading.js';
 import { buildDeck, spreadGroups } from '../src/deck.js';
 
@@ -271,6 +272,27 @@ ok(am.get('x5').lines.length === 0, 'a source not on the page is not shaded anyw
   ok(u.lines.every((l, i, arr) => i === 0 || Math.abs(l.y - arr[i - 1].y) >= 0.012) && u.lines[3].y === 0.4, 'lines on top of each other are moved apart; lines far below stay');
   const side = untangle([{ id: 'l1', x: 0.05, y: 0.3, w: 0.3, h: 0.02 }, { id: 'l2', x: 0.5, y: 0.3, w: 0.4, h: 0.02 }]);
   ok(side.pushed === 0, 'lines side by side at one height are left alone');
+}
+
+// 0.20.16: places from the text-reading engine
+{
+  const W = 1000, H = 1000;
+  const wl = (y, x, text) => ({ words: text.split(' ').map((w, i) => ({ text: w, x0: x + i * 60, y0: y, x1: x + i * 60 + 50, y1: y + 20 })) });
+  const ocr = [wl(100, 100, 'THE LEGISLATIVE BRANCH'), wl(200, 100, 'The larger house of Congress is the House'), wl(230, 100, 'in the Hause. The number of representatives'),
+    wl(300, 100, 'The House of Representatives has the sole power'), wl(330, 100, 'against a government official.')];
+  ok(matchLine('in the House. The number of representatives', ocr).k === 2, 'a line is found by its words even with a misread letter');
+  ok(matchLine('the a of', ocr) === null, 'short common words alone are not enough to find a line');
+  const t = { lines: [
+    { id: 'l1', text: 'THE LEGISLATIVE BRANCH', x: 0.2, y: 0.5, w: 0.3, h: 0.02 },
+    { id: 'l2', text: 'The larger house of Congress is the House', x: 0.2, y: 0.6, w: 0.5, h: 0.02 },
+    { id: 'l3', text: 'something the engine could not read', x: 0.2, y: 0.62, w: 0.5, h: 0.02 },
+    { id: 'l4', text: 'in the House. The number of representatives', x: 0.2, y: 0.64, w: 0.5, h: 0.02 },
+    { id: 'l5', text: 'The House of Representatives has the sole power', x: 0.2, y: 0.7, w: 0.5, h: 0.02 },
+    { id: 'l6', text: 'against a government official.', x: 0.2, y: 0.72, w: 0.5, h: 0.02 }], figures: [] };
+  const p = placeByOcr(t, ocr, W, H);
+  ok(p.matched === 5 && Math.abs(p.lines[0].y - 0.1) < 0.001 && Math.abs(p.lines[4].y - 0.3) < 0.001, 'found lines take the engine\'s place, however far the AI was off');
+  ok(p.lines[2].y > p.lines[1].y && p.lines[2].y < p.lines[3].y, 'a line the engine missed goes between its neighbours');
+  ok(p.fixed.has('l1') && !p.fixed.has('l3'), 'found lines are kept fixed');
 }
 
 console.log(`reading: ${pass} passed, ${fail} failed`);
