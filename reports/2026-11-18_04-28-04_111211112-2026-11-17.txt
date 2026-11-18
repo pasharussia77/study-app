@@ -1,0 +1,219 @@
+FAMILY STUDY DIAGNOSTIC REPORT
+Created: Nov 17, 2026, 11:28 PM ET
+App version: 0.20.9 – Nov 17, 2026, 11:10 PM ET
+Account: Test (testing account)
+Project: 111211112 – 2026-11-17
+Device: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Mobile Safari/537.36 | screen 384x854 | online true
+AI helper: model gpt-5.6-luna, key present: yes
+
+=== YOUR NOTES (written first so a cut-off paste cannot lose them) ===
+(none)
+
+=== READING PROJECT: pages, the AI's answers, blocks and questions are in the READING PROJECT part below ===
+
+=== 5. PROGRESS NOW ===
+Everything studyable (typed + photo items with an answer): total 14, covered 0, remaining 14, correct 0, incorrect 0
+
+=== 6. STUDY SESSIONS (most recent activity) ===
+[8:16:28 PM] START flashcards: shows question first, cards: all, shuffle off, 14 in this round
+[8:16:32 PM] flashcards (qa) | Q: "What did the delegates write?" | correct answer: "A New plan" | RIGHT
+[8:16:35 PM] flashcards (mc) | Q: "What did the delegates write?" | correct answer: "D. A New plan" | RIGHT
+[8:16:44 PM] flashcards (qa) | Q: "When did delegates meet in Philadelphia to revise the Articles?" | correct answer: "1787" | RIGHT
+[8:16:48 PM] flashcards (tf) | Q: "Delegates' meeting: 1789" | correct answer: "False (correct: Delegates' meeting: 1787)" | RIGHT
+[8:16:51 PM] flashcards (qa) | Q: "What did the delegates decide to write after gaining new powers?" | correct answer: "a new Constitution" | RIGHT
+[8:16:54 PM] flashcards (mc) | Q: "What did the delegates decide to write after gaining new powers?" | correct answer: "A. a new Constitution" | RIGHT
+[8:16:54 PM] flashcards (qa) | Q: "What new powers did the Constitution give Congress?" | correct answer: "levy federal taxes; regulate trade among the states" | RIGHT
+[8:16:55 PM] flashcards (qa) | Q: "When did the new government begin operating?" | correct answer: "1789" | RIGHT
+[8:16:55 PM] flashcards (tf) | Q: "New government: 1787" | correct answer: "False (correct: New government: 1789)" | RIGHT
+[8:17:09 PM] START written quiz: shows question, answers by choosing (true/false and multiple choice always choose), cards: remaining, shuffle off, 5 in this round
+[8:17:19 PM] START written quiz: shows question, answers by typing (true/false and multiple choice always choose), cards: remaining, shuffle off, 5 in this round
+[8:17:25 PM] START written quiz: shows question, answers by choosing (true/false and multiple choice always choose), cards: remaining, shuffle off, 5 in this round
+[8:17:31 PM] quiz qa (choice) | Q: "What did the Constitution assign to the three branches?" | correct answer: "different responsibilities" | given: "different responsibilities" | RIGHT
+[8:17:46 PM] quiz mc (choice) | Q: "What did the Constitution assign to the three branches?" | correct answer: "different responsibilities" | given: "different responsibilities" | RIGHT
+[8:18:10 PM] quiz qa (choice) | Q: "What is the branch identified as making federal laws?" | correct answer: "Legislative" | given: "Legislative" | RIGHT
+[8:18:26 PM] quiz qa (choice) | Q: "What does the Legislative branch do?" | correct answer: "Makes federal laws" | given: "Makes federal laws" | RIGHT
+[8:18:31 PM] quiz mc (choice) | Q: "What does the Legislative branch do?" | correct answer: "Makes federal laws" | given: "Makes federal laws" | RIGHT
+[8:18:33 PM] ROUND DONE (quiz): 5 right, 0 wrong
+[8:19:03 PM] START written quiz: shows question, answers by choosing (true/false and multiple choice always choose), cards: all, shuffle off, 14 in this round
+[8:19:08 PM] quiz qa (choice) | Q: "What did the delegates write?" | correct answer: "A New plan" | given: "A New plan" | RIGHT
+[8:19:14 PM] quiz mc (choice) | Q: "What did the delegates write?" | correct answer: "A New plan" | given: "A New plan" | RIGHT
+[8:19:33 PM] quiz qa (choice) | Q: "When did delegates meet in Philadelphia to revise the Articles?" | correct answer: "1787" | given: "1787" | RIGHT
+[8:19:37 PM] quiz tf (choice) | Q: "Delegates' meeting: 1789" | correct answer: "False" | given: "True" | WRONG
+[8:19:43 PM] quiz qa (choice) | Q: "What did the delegates decide to write after gaining new powers?" | correct answer: "a new Constitution" | given: "a new Constitution" | RIGHT
+[8:19:49 PM] quiz mc (choice) | Q: "What did the delegates decide to write after gaining new powers?" | correct answer: "a new Constitution" | given: "a new Constitution" | RIGHT
+[10:57:11 PM] START written quiz: shows question, answers by choosing (true/false and multiple choice always choose), cards: all, shuffle off, 15 in this round
+[10:57:28 PM] START flashcards: shows question first, cards: all, shuffle off, 15 in this round
+[10:57:32 PM] flashcards (qa) | Q: "What did the delegates write?" | correct answer: "A New plan" | RIGHT
+[10:57:38 PM] flashcards (mc) | Q: "Fill in the blank: Delegates wrote _____" | correct answer: "C. A New plan" | RIGHT
+[10:57:41 PM] flashcards (qa) | Q: "When did delegates meet in Philadelphia to revise the Articles?" | correct answer: "1787" | RIGHT
+[10:57:49 PM] flashcards (tf) | Q: "In 1789, delegates met in Philadelphia to revise the Articles." | correct answer: "False (correct: In 1787, delegates met in Philadelphia to revise the Articles.)" | RIGHT
+[10:57:54 PM] flashcards (qa) | Q: "What did the delegates decide to write after gaining new powers?" | correct answer: "a new constitution" | RIGHT
+[10:58:01 PM] flashcards (mc) | Q: "Fill in the blank: They gained new powers decided to write _____." | correct answer: "B. a new constitution" | RIGHT
+[10:58:07 PM] flashcards (qa) | Q: "What powers did the constitution give Congress?" | correct answer: "the power to levy federal taxes and regulate trade among the states" | RIGHT
+[11:18:06 PM] START flashcards: shows question first, cards: all, shuffle off, 16 in this round
+[11:18:10 PM] flashcards (qa) | Q: "What did the delegates write?" | correct answer: "A New plan" | RIGHT
+[11:18:16 PM] flashcards (qa) | Q: "When did delegates meet in Philadelphia to revise the Articles?" | correct answer: "1787" | RIGHT
+[11:18:20 PM] flashcards (qa) | Q: "What did the delegates decide to write?" | correct answer: "a new constitution" | RIGHT
+[11:18:25 PM] flashcards (qa) | Q: "What powers did the constitution give Congress?" | correct answer: "the power to levy federal taxes and regulate trade among the states" | RIGHT
+[11:18:29 PM] flashcards (qa) | Q: "What did the constitution do to federal power?" | correct answer: "divided Federal power" | RIGHT
+[11:18:33 PM] flashcards (qa) | Q: "When did the new government begin operating?" | correct answer: "1789" | RIGHT
+[11:18:40 PM] flashcards (qa) | Q: "What did the constitution assign to the three branches?" | correct answer: "different responsibilities" | RIGHT
+[11:18:43 PM] flashcards (qa) | Q: "What does the Legislative branch do?" | correct answer: "Makes federal laws" | RIGHT
+[11:18:52 PM] flashcards (qa) | Q: "Which body is identified with the Legislative branch?" | correct answer: "Congress" | RIGHT
+[11:18:56 PM] flashcards (mc) | Q: "Fill in the blank: Delegates wrote _____" | correct answer: "A. A New plan" | RIGHT
+[11:19:00 PM] flashcards (mc) | Q: "Fill in the blank: They decided to write _____." | correct answer: "D. a new constitution" | RIGHT
+[11:19:11 PM] flashcards (mc) | Q: "Fill in the blank: The constitution gave congress _____." | correct answer: "C. the power to levy federal taxes and regulate trade among the states" | RIGHT
+[11:19:17 PM] flashcards (mc) | Q: "Fill in the blank: the constitution _____" | correct answer: "C. divided Federal power" | RIGHT
+[11:19:25 PM] flashcards (tf) | Q: "the new government began operating in 1787." | correct answer: "False (correct: the new government began operating in 1789.)" | RIGHT
+[11:19:46 PM] flashcards (mc) | Q: "Fill in the blank: The constitution assigned _____ to three branches." | correct answer: "D. different responsibilities" | RIGHT
+[11:20:01 PM] flashcards (mc) | Q: "Fill in the blank: Legislative ↓ _____" | correct answer: "A. Makes federal laws" | RIGHT
+[11:20:01 PM] ROUND DONE (flashcards): 16 right, 0 wrong
+[11:20:28 PM] START written quiz: shows question, answers by choosing (true/false and multiple choice always choose), cards: all, shuffle off, 16 in this round
+[11:20:32 PM] quiz qa (choice) | Q: "What did the delegates write?" | correct answer: "A New plan" | given: "A New plan" | RIGHT
+[11:20:35 PM] quiz qa (choice) | Q: "When did delegates meet in Philadelphia to revise the Articles?" | correct answer: "1787" | given: "1787" | RIGHT
+[11:20:40 PM] quiz qa (choice) | Q: "What did the delegates decide to write?" | correct answer: "a new constitution" | given: "a new constitution" | RIGHT
+[11:20:49 PM] quiz qa (choice) | Q: "What powers did the constitution give Congress?" | correct answer: "the power to levy federal taxes and regulate trade among the states" | given: "Makes federal laws" | WRONG
+[11:21:26 PM] quiz qa (choice) | Q: "What did the constitution do to federal power?" | correct answer: "divided Federal power" | given: "divided Federal power" | RIGHT
+[11:21:30 PM] quiz qa (choice) | Q: "When did the new government begin operating?" | correct answer: "1789" | given: "1789" | RIGHT
+[11:21:37 PM] quiz qa (choice) | Q: "What did the constitution assign to the three branches?" | correct answer: "different responsibilities" | given: "different responsibilities" | RIGHT
+[11:21:43 PM] quiz qa (choice) | Q: "What does the Legislative branch do?" | correct answer: "Makes federal laws" | given: "Makes federal laws" | RIGHT
+[11:21:49 PM] quiz qa (choice) | Q: "Which body is identified with the Legislative branch?" | correct answer: "Congress" | given: "Congress" | RIGHT
+[11:21:55 PM] quiz mc (choice) | Q: "Fill in the blank: Delegates wrote _____" | correct answer: "A New plan" | given: "A New plan" | RIGHT
+[11:21:59 PM] quiz mc (choice) | Q: "Fill in the blank: They decided to write _____." | correct answer: "a new constitution" | given: "a new constitution" | RIGHT
+[11:22:06 PM] quiz mc (choice) | Q: "Fill in the blank: The constitution gave congress _____." | correct answer: "the power to levy federal taxes and regulate trade among the states" | given: "the power to levy federal taxes and regulate trade among the states" | RIGHT
+[11:22:14 PM] quiz mc (choice) | Q: "Fill in the blank: the constitution _____" | correct answer: "divided Federal power" | given: "divided Federal power" | RIGHT
+[11:22:17 PM] quiz tf (choice) | Q: "the new government began operating in 1787." | correct answer: "False" | given: "False" | RIGHT
+[11:22:25 PM] quiz mc (choice) | Q: "Fill in the blank: The constitution assigned _____ to three branches." | correct answer: "different responsibilities" | given: "different responsibilities" | RIGHT
+[11:22:30 PM] quiz mc (choice) | Q: "Fill in the blank: Legislative ↓ _____" | correct answer: "Makes federal laws" | given: "Makes federal laws" | RIGHT
+[11:22:31 PM] ROUND DONE (quiz): 15 right, 1 wrong
+
+=== READING PROJECT ===
+Questions per block: 2 · detail: every detail
+
+--- Page 1 (photo) status=typed approved=true
+page text: kind=handwritten pieces=17 unselected=1 low-confidence=0 figures=0
+     What changed under the constitution
+     •Delegates wrote A New plan
+     •In 1787, delegates met in Philadelphia to revise the Articles. They
+      ~~gained new powers~~  decided to write a new constitution.
+     •Congress Gained New Powers
+     •The constitution gave congress the power to levy federal taxes and
+      regulate trade among the states.
+     •the constitution divided Federal Power
+     •The new government began operating in 1789. The constitution
+      assigned different responsibilities to three branches.
+
+   The Three branches At A Glance
+      Legislative
+         ↓
+   Makes federal laws
+         ↓
+
+      Congress
+unselected: gained new powers
+pieces (id | x,y,w,h | marks | confidence | used | text):
+  l1 | 0.081,0.231,0.314,0.021 | - | high | yes | What changed under the constitution
+  l2 | 0.079,0.261,0.281,0.021 | - | high | yes | •Delegates wrote A New plan
+  l3 | 0.078,0.292,0.799,0.022 | - | high | yes | •In 1787, delegates met in Philadelphia to revise the Articles. They
+  l4 | 0.089,0.319,0.174,0.021 | strike | high | NO | gained new powers
+  l5 | 0.266,0.319,0.351,0.021 | - | high | yes | decided to write a new constitution.
+  l6 | 0.077,0.351,0.301,0.021 | - | high | yes | •Congress Gained New Powers
+  l7 | 0.077,0.382,0.833,0.021 | - | high | yes | •The constitution gave congress the power to levy federal taxes and
+  l8 | 0.088,0.412,0.384,0.021 | - | high | yes | regulate trade among the states.
+  l9 | 0.077,0.443,0.423,0.021 | - | high | yes | •the constitution divided Federal Power
+  l10 | 0.077,0.474,0.798,0.021 | - | high | yes | •The new government began operating in 1789. The constitution
+  l11 | 0.089,0.506,0.579,0.021 | - | high | yes | assigned different responsibilities to three branches.
+  l12 | 0.046,0.564,0.429,0.022 | - | high | yes | The Three branches At A Glance
+  l13 | 0.092,0.599,0.159,0.022 | - | high | yes | Legislative
+  l14 | 0.145,0.624,0.018,0.021 | - | high | yes | ↓
+  l15 | 0.046,0.663,0.231,0.022 | - | high | yes | Makes federal laws
+  l16 | 0.145,0.686,0.018,0.021 | - | high | yes | ↓
+  l17 | 0.093,0.729,0.142,0.022 | - | high | yes | Congress
+AI transcribe (latest) 11:23:32 PM: ok, 8.4 s, tokens in/out 2789/824, 17 pieces
+  the AI's answer:
+    {"kind":"handwritten","lines":[{"text":"What changed under the constitution","x":0.081,"y":0.231,"w":0.314,"h":0.021},{"text":"•Delegates wrote A New plan","x":0.079,"y":0.261,"w":0.281,"h":0.021},{"text":"•In 1787, delegates met in Philadelphia to revise the Articles. They","x":0.078,"y":0.292,"w":0.799,"h":0.022},{"text":"gained new powers","x":0.089,"y":0.319,"w":0.174,"h":0.021,"marks":["strike"]},{"text":"decided to write a new constitution.","x":0.266,"y":0.319,"w":0.351,"h":0.021},{"text":"•Congress Gained New Powers","x":0.077,"y":0.351,"w":0.301,"h":0.021},{"text":"•The constitution gave congress the power to levy federal taxes and","x":0.077,"y":0.382,"w":0.833,"h":0.021},{"text":"regulate trade among the states.","x":0.088,"y":0.412,"w":0.384,"h":0.021},{"text":"•the constitution divided Federal Power","x":0.077,"y":0.443,"w":0.423,"h":0.021},{"text":"•The new government began operating in 1789. The constitution","x":0.077,"y":0.474,"w":0.798,"h":0.021},{"text":"assigned different responsibilities to three branches.","x":0.089,"y":0.506,"w":0.579,"h":0.021},{"text":"The Three branches At A Glance","x":0.046,"y":0.564,"w":0.429,"h":0.022},{"text":"Legislative","x":0.092,"y":0.599,"w":0.159,"h":0.022},{"text":"↓","x":0.145,"y":0.624,"w":0.018,"h":0.021},{"text":"Moves federal laws","x":0.046,"y":0.663,"w":0.231,"h":0.022},{"text":"↓","x":0.145,"y":0.686,"w":0.018,"h":0.021},{"text":"Congress","x":0.093,"y":0.729,"w":0.142,"h":0.022}],"figures":[]}
+AI blocks (latest) 11:25:20 PM: ok, 7.6 s, tokens in/out 825/698, 9 blocks sent | detail all, asked for about 30
+  text sent to the AI:
+         What changed under the constitution
+         •Delegates wrote A New plan
+         •In 1787, delegates met in Philadelphia to revise the Articles. They
+                     decided to write a new constitution.
+         •Congress Gained New Powers
+         •The constitution gave congress the power to levy federal taxes and
+          regulate trade among the states.
+         •the constitution divided Federal Power
+         •The new government began operating in 1789. The constitution
+          assigned different responsibilities to three branches.
+    
+       The Three branches At A Glance
+          Legislative
+             ↓
+       Makes federal laws
+             ↓
+    
+          Congress
+  the AI's answer:
+    {"blocks":[{"type":"fact","source":"•Delegates wrote A New plan","subject":"delegates' plan","question":"What did the delegates write?","value":"A New plan","items":[],"ordered":false,"important":false},{"type":"date","source":"•In 1787, delegates met in Philadelphia to revise the Articles.","subject":"1787 meeting","question":"When and where did delegates meet to revise the Articles?","value":"In 1787, delegates met in Philadelphia","items":[],"ordered":false,"important":false},{"type":"event","source":"They decided to write a new constitution.","subject":"new constitution","question":"What did the delegates decide to write?","value":"a new constitution","items":[],"ordered":false,"important":false},{"type":"fact","source":"The constitution gave congress the power to levy federal taxes and regulate trade among the states.","subject":"Congress's powers","question":"What powers did the constitution give Congress?","value":"","items":["levy federal taxes","regulate trade among the states"],"ordered":false,"important":false},{"type":"fact","source":"the constitution divided Federal Power","subject":"federal power","question":"What did the constitution do to federal power?","value":"divided Federal Power","items":[],"ordered":false,"important":false},{"type":"date","source":"The new government began operating in 1789.","subject":"new government","question":"When did the new government begin operating?","value":"1789","items":[],"ordered":false,"important":false},{"type":"fact","source":"The constitution assigned different responsibilities to three branches.","subject":"three branches","question":"What did the constitution assign to the three branches?","value":"different responsibilities","items":[],"ordered":false,"important":false},{"type":"fact","source":"Makes federal laws","subject":"Legislative branch","question":"What does the Legislative branch do?","value":"Makes federal laws","items":[],"ordered":false,"important":false},{"type":"fact","source":"Congress","subject":"Legislative branch","question":"Which body is identified under the Legislative branch?","value":"Congress","items":[],"ordered":false,"important":false}]}
+AI check (latest) 11:25:53 PM: ok, 4.4 s, tokens in/out 976/304, 14 questions checked, 3 flagged
+  the AI's answer:
+    {"checks":[{"n":6,"kind":"vague","why":"“Different responsibilities” is too general to be useful without naming them."},{"n":10,"kind":"unclear","why":"The statement is grammatically incomplete: “1789 to revise the Articles.”"},{"n":13,"kind":"unclear","why":"The question incorrectly inserts another sentence into “began operating in.”"}]}
+blocks: 8 found, 8 selected
+  the AI sent 9 blocks, the app dropped 1:
+    dropped (no answer): Congress's powers → levy federal taxes, regulate trade among the states
+  [x] fact: delegates' plan → A New plan  <= "•Delegates wrote A New plan"
+  [x] date: 1787 meeting → In 1787, delegates met in Philadelphia  <= "•In 1787, delegates met in Philadelphia to revise the Articles."
+  [x] event: new constitution → a new constitution  <= "They decided to write a new constitution."
+  [x] fact: federal power → divided Federal Power  <= "the constitution divided Federal Power"
+  [x] date: new government → 1789  <= "The new government began operating in 1789."
+  [x] fact: three branches → different responsibilities  <= "The constitution assigned different responsibilities to three branches."
+  [x] fact: Legislative branch → Makes federal laws  <= "Makes federal laws"
+  [x] fact: Legislative branch → Congress  <= "Congress"
+questions: 14 {"qa":8,"mc":4,"tf":2}
+AI check: done, 3 flagged, 0 unselected by you
+same wording and answer asked twice: 0
+  Q1 qa: What did the delegates write?
+      answer: A New plan
+      from: "•Delegates wrote A New plan"
+  Q2 qa: When and where did delegates meet to revise the Articles?
+      answer: In 1787, delegates met in Philadelphia
+      from: "•In 1787, delegates met in Philadelphia to revise the Articles."
+  Q3 qa: What did the delegates decide to write?
+      answer: a new constitution
+      from: "They decided to write a new constitution."
+  Q4 qa: What did the constitution do to federal power?
+      answer: divided Federal Power
+      from: "the constitution divided Federal Power"
+  Q5 qa: When did the new government begin operating?
+      answer: 1789
+      from: "The new government began operating in 1789."
+  Q6 qa: What did the constitution assign to the three branches? [AI vague: “Different responsibilities” is too general to be useful without naming them.]
+      answer: different responsibilities
+      from: "The constitution assigned different responsibilities to three branches."
+  Q7 qa: What does the Legislative branch do?
+      answer: Makes federal laws
+      from: "Makes federal laws"
+  Q8 qa: Which body is identified under the Legislative branch?
+      answer: Congress
+      from: "Congress"
+  Q9 mc: Fill in the blank: Delegates wrote _____
+      choices: A. Congress | B. Makes federal laws | C. a new constitution | D. A New plan
+      answer: A New plan
+      from: "•Delegates wrote A New plan"
+  Q10 tf: 1789 to revise the Articles. [AI unclear: The statement is grammatically incomplete: “1789 to revise the Articles.”]
+      answer: False (true version: In 1787, delegates met in Philadelphia to revise the Articles.)
+      from: "•In 1787, delegates met in Philadelphia to revise the Articles."
+  Q11 mc: Fill in the blank: They decided to write _____.
+      choices: A. different responsibilities | B. Makes federal laws | C. A New plan | D. a new constitution
+      answer: a new constitution
+      from: "They decided to write a new constitution."
+  Q12 mc: Fill in the blank: the constitution _____
+      choices: A. divided Federal Power | B. different responsibilities | C. a new constitution | D. A New plan
+      answer: divided Federal Power
+      from: "the constitution divided Federal Power"
+  Q13 tf: The new government began operating in In 1787, delegates met in Philadelphia. [AI unclear: The question incorrectly inserts another sentence into “began operating in.”]
+      answer: False (true version: The new government began operating in 1789.)
+      from: "The new government began operating in 1789."
+  Q14 mc: Fill in the blank: The constitution assigned _____ to three branches.
+      choices: A. A New plan | B. Makes federal laws | C. Congress | D. different responsibilities
+      answer: different responsibilities
+      from: "The constitution assigned different responsibilities to three branches."
