@@ -1,5 +1,5 @@
 // Rule tests for Reading projects (layout, chunks, blocks, question builder). Run with: npm test
-import { parseJson, parseTranscript, makeChunks, layoutText, parseBlocks, buildQuestions, splitTextPages, textTranscript, cleanCount, toRows, suggestCount, countQuestions, readingReport, parseBlocksDetailed, buildCheckPrompt, parseChecks, struckIds } from '../src/reading.js';
+import { parseJson, parseTranscript, makeChunks, layoutText, parseBlocks, buildQuestions, splitTextPages, textTranscript, cleanCount, toRows, suggestCount, countQuestions, readingReport, parseBlocksDetailed, buildCheckPrompt, parseChecks, struckIds, buildFactsPrompt } from '../src/reading.js';
 import { buildDeck } from '../src/deck.js';
 
 let pass = 0, fail = 0;
@@ -118,7 +118,9 @@ ok(plainQs.filter((q) => q.srcText === pd.blocks[0].source && (q.type === 'term'
 // 0.20.4: crossed-out pieces
 const tr = parseTranscript({ kind: 'handwritten', lines: [{ text: 'gained new powers', x: .1, y: .2, w: .3, h: .03, marks: ['strike'] }, { text: 'decided to write', x: .5, y: .2, w: .3, h: .03 }] });
 ok(tr.lines[0].marks.includes('strike') && struckIds(tr).length === 1 && struckIds(tr)[0] === tr.lines[0].id, 'crossed-out piece keeps its strike mark and is listed to start unticked');
-ok(/~~gained new powers~~/.test(layoutText(tr, { marks: true })) && !/gained/.test(layoutText(tr, { off: struckIds(tr) })), 'report shows ~~crossed out~~ text; unticked it is left out of the source text');
+ok(/~~gained new powers~~/.test(layoutText(tr, { marks: 'all' })) && !/gained/.test(layoutText(tr, { off: struckIds(tr) })), 'report shows ~~crossed out~~ text; unticked it is left out of the source text');
+ok(/gained new powers/.test(layoutText(tr, { marks: true })) && !/~~/.test(layoutText(tr, { marks: true })), 'ticked back, crossed-out text goes to the block finder as plain text');
+ok(/MAIN POINTS/.test(buildFactsPrompt('x', 30, 'printed', 'main')) && /EVERY DETAIL/.test(buildFactsPrompt('x', 30, 'printed', 'all')) && !/Detail level/.test(buildFactsPrompt('x', 30, 'printed')), 'detail level changes the block prompt');
 ok(/handwriting/.test(buildCheckPrompt([{ type: 'qa', question: 'Q', answer: 'A', srcText: 'S' }])), 'check prompt warns about handwriting misreads');
 
 // 0.20.3: AI check of questions and unticked questions

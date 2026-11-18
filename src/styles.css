@@ -747,3 +747,13 @@ html::-webkit-scrollbar { display: none; }
 .item .rq-tick input { width: 26px; height: 26px; accent-color: var(--accent, #6d4be8); }
 
 .btn.copied { background: #E3F6EA; color: #1B6B3A; border-color: #9AD7B0; }
+
+/* Reading project: one row Less / Remake / More, per-block picker on one line */
+.rd-qline { margin: 2px 0 0; }
+.rd-make { display: grid; grid-template-columns: 1fr 1.6fr 1fr; gap: 8px; }
+.rd-make .btn { padding-left: 8px; padding-right: 8px; min-width: 0; }
+.rd-per { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; font-weight: 700; }
+.rd-per span { flex: 1; min-width: 0; font-size: .9rem; white-space: nowrap; }
+.rd-per .rd-chip { flex: 0 0 44px; width: 44px; height: 44px; min-width: 0; min-height: 0; padding: 0; }
+.tile-count { font-weight: 600; opacity: .7; white-space: nowrap; }
+.btn.rd-reread { width: 100%; font-size: 1.15rem; padding: 20px; background: #fff; border: 2px solid var(--violet); color: var(--violet-deep); }

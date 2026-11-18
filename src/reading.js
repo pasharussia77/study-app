@@ -153,7 +153,7 @@ const wrap = (l, marks) => {
   if (!marks) return l.text;
   if (l.marks.includes('box')) return `[${l.text}]`;
   if (l.marks.includes('circle')) return `(${l.text})`;
-  if (l.marks.includes('strike')) return `~~${l.text}~~`;
+  if (l.marks.includes('strike')) return marks === 'all' ? `~~${l.text}~~` : l.text;
   if (l.marks.includes('underline')) return `_${l.text}_`;
   if (l.marks.includes('star')) return `*${l.text}`;
   return l.text;
@@ -182,7 +182,14 @@ export const chunkPreview = (t, chunk) => layoutText({ ...t, lines: chunk.lines 
 
 // ---------------------------------------------------------------- information blocks
 
-export function buildFactsPrompt(sourceText, wantBlocks, kind) {
+export const DETAIL_LABEL = { main: 'main points', normal: 'normal', all: 'every detail' };
+export const DETAILS = ['main', 'normal', 'all'];
+const DETAIL_RULE = {
+  main: 'Detail level: MAIN POINTS. Report only the most important ideas a test would ask about. Skip small details and examples.',
+  normal: '',
+  all: 'Detail level: EVERY DETAIL. Each separate piece of information gets its own block, even small ones. Split a sentence that holds several pieces into several blocks.'
+};
+export function buildFactsPrompt(sourceText, wantBlocks, kind, detail = 'normal') {
   return `Find the information blocks in the study material below, for a student who will be quizzed on it.
 Report ONLY what the text says. Never add anything from your own knowledge.
 
@@ -207,7 +214,7 @@ For each block return:
 
 How to read the layout: the text is shown with its spacing as on the page.${kind === 'handwritten' || kind === 'mixed' ? ' This page was handwritten notes, so lines may be short fragments like "1776 - independence". Treat those as blocks. Indented lines under a heading belong to that heading. An arrow (→) means the left part leads to or causes the right part.' : ''} Markers: [text] boxed, (text) circled, _text_ underlined, *text starred.
 Skip headings that stand alone, page numbers, captions and anything that is not study content.
-Find every block that deserves a question, up to ${wantBlocks}. One block per separate piece of information: never report the same fact twice. If one sentence holds two separate facts (for example what happened and when, or two different results), report two blocks, each with its own source and its own question. Every bullet or line that states something to learn should give a block, unless another block already covers the same fact. Do not pad. A block's value must say something more than its subject (never "Congress" → "Congress").
+${DETAIL_RULE[detail] ? DETAIL_RULE[detail] + '\n' : ''}Find every block that deserves a question, up to ${wantBlocks}. One block per separate piece of information: never report the same fact twice. If one sentence holds two separate facts (for example what happened and when, or two different results), report two blocks, each with its own source and its own question. Every bullet or line that states something to learn should give a block, unless another block already covers the same fact. Do not pad. A block's value must say something more than its subject (never "Congress" → "Congress").
 
 Return ONLY JSON: {"blocks":[...]}
 
@@ -272,19 +279,19 @@ export function parseBlocksDetailed(raw) {
   return { blocks: out, asked: list.length, dropped: dropped.slice(0, 20) };
 }
 
-export async function findBlocks(code, t, off, log = () => {}) {
+export async function findBlocks(code, t, off, log = () => {}, detail = 'normal') {
   const sourceText = layoutText(t, { marks: true, off });
   if (!sourceText.trim()) throw new Error('Nothing on this page is ticked as source material.');
   const want = 30;
   const { askAIDetailed } = await import('./ai.js');
-  const prompt = buildFactsPrompt(sourceText, want, t.kind);
+  const prompt = buildFactsPrompt(sourceText, want, t.kind, detail);
   const t0 = Date.now();
   let res;
   try { res = await askAIDetailed(code, { messages: [{ role: 'user', content: prompt }], json: true, maxTokens: 4000 }); }
   catch (e) { log({ type: 'blocks', ok: false, error: e.message, ms: Date.now() - t0 }); throw e; }
   let blocks, info;
   try { const r = parseBlocksDetailed(res.text); blocks = r.blocks; info = { asked: r.asked, dropped: r.dropped }; } catch (e) { log({ type: 'blocks', ok: false, error: e.message, raw: res.text }); throw new Error(e.message); }
-  log({ type: 'blocks', ok: true, ms: res.ms, usage: res.usage, made: blocks.length, asked: info.asked });
+  log({ type: 'blocks', ok: true, ms: res.ms, usage: res.usage, made: blocks.length, asked: info.asked, detail });
   blocks.info = info; // read by the caller and saved with the page for the report
   return blocks;
 }
@@ -513,8 +520,8 @@ export function countQuestions(pages, perFact) {
 }
 
 // Text for the diagnostic report: each page's typed copy, the blocks found and the questions made.
-export function readingReport(files, items, perFact) {
-  const out = ['=== READING PROJECT ===', `Questions per fact: ${perFact}`];
+export function readingReport(files, items, perFact, detail = 'normal') {
+  const out = ['=== READING PROJECT ===', `Questions per block: ${perFact} · detail: ${DETAIL_LABEL[detail] || detail}`];
   files.forEach((f, i) => {
     const mine = items.filter((x) => x.fileId === f.id);
     const types = {}; mine.forEach((x) => { types[x.type] = (types[x.type] || 0) + 1; });
@@ -522,7 +529,7 @@ export function readingReport(files, items, perFact) {
     if (f.transcript) {
       const t = f.transcript;
       out.push(`typed copy: kind=${t.kind} pieces=${t.lines.length} unticked=${(f.off || []).length} low-confidence=${t.lines.filter((l) => l.conf !== 'high').length} figures=${(t.figures || []).length}`);
-      out.push(layoutText(t, { marks: true }));
+      out.push(layoutText(t, { marks: 'all' }));
       if ((f.off || []).length) out.push('unticked: ' + t.lines.filter((l) => (f.off || []).includes(l.id)).map((l) => l.text).join(' | '));
     }
     const bl = f.blocks || [];

@@ -11,14 +11,14 @@ import { TileArt } from './art.jsx';
 import ReportSheet from './Report.jsx';
 import {
   BLOCK_LABEL, transcribePhoto, findBlocks, buildQuestions, countQuestions, blockLine, readingReport,
-  splitTextPages, textTranscript, makeChunks, layoutText, chunkPreview, checkQuestions, recheckItems, struckIds
+  splitTextPages, textTranscript, makeChunks, layoutText, chunkPreview, checkQuestions, recheckItems, struckIds, DETAILS, DETAIL_LABEL
 } from './reading.js';
 
 const hash = (s) => { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0; return String(h); };
 // What the questions were made from: the ticked text of the page. If it changes, the questions are out of date.
 export const stampOf = (f) => (f.transcript ? hash(layoutText(f.transcript, { off: f.off || [] })) : '');
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
-// Which ticked blocks the questions were made from, and how many per fact.
+// Which ticked blocks the questions were made from, and how many per block.
 const blocksSig = (f) => hash(JSON.stringify((f.blocks || []).map((b) => [b.id, b.on !== false])));
 const blocksFresh = (f) => !!f.blocks && f.blocksStamp === stampOf(f);
 
@@ -146,6 +146,7 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
   const toFind = approved.filter((f) => !blocksFresh(f));
   const withBlocks = approved.filter(blocksFresh);
   const perFact = (p && p.perFact) || 1;
+  const detail = DETAILS.includes(p && p.detail) ? p.detail : 'normal';
   const findAll = async () => {
     setMsg(null);
     let failed = 0, found = 0, lastErr = '';
@@ -153,7 +154,7 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
       const f = toFind[i];
       setBusy(`Finding information blocks, page ${i + 1} of ${toFind.length}…`);
       try {
-        const blocks = await findBlocks(code, f.transcript, f.off || [], log(f.id));
+        const blocks = await findBlocks(code, f.transcript, f.off || [], log(f.id), detail);
         await backend.updateFile(code, projectId, f.id, { blocks, blocksInfo: blocks.info || null, blocksStamp: stampOf(f), error: '' });
         found += blocks.length;
       } catch (e) { failed++; lastErr = e.message; }
@@ -182,14 +183,17 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
   };
 
   // ---- step 2: make the questions from the ticked blocks (no AI for the questions, then one AI check)
-  const makeQuestions = async () => {
+  const makeQuestions = async (fresh = null) => {
+    const pages = fresh || withBlocks;
+    const every = pages.flatMap((f) => f.blocks || []);
+    const ticked = every.filter((b) => b.on !== false).length;
     setMsg(null); setBusy('Making questions, then checking them…');
     let total = 0, flagged = 0, checkFailed = false;
     try {
-      for (const f of withBlocks) {
+      for (const f of pages) {
         const label = `Page ${fileList.indexOf(f) + 1}`;
         const kept = itemList.filter((x) => x.fileId === f.id && x.source === 'set by you').map(({ id, createdAt, fileId, ...rest }) => rest);
-        const made = buildQuestions(f.blocks || [], allBlocks, perFact, label, f.id);
+        const made = buildQuestions(f.blocks || [], every, perFact, label, f.id);
         let flags = null;
         try { flags = await checkQuestions(code, made, log(f.id)); } catch { checkFailed = true; }
         const marked = made.map((q, i) => flags ? { ...q, aiChecked: true, aiNote: flags.has(i) ? flags.get(i).why : '', aiKind: flags.has(i) ? flags.get(i).kind : '' } : { ...q, aiChecked: false });
@@ -200,7 +204,31 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
       }
     } catch (e) { setBusy(''); setMsg({ kind: 'error', text: e.message }); return; }
     setBusy('');
-    setMsg({ kind: 'ok', review: true, text: `Made ${total} question${total === 1 ? '' : 's'} from ${tickedBlocks} information block${tickedBlocks === 1 ? '' : 's'}. ` + (checkFailed ? 'The AI check did not work, so none are checked yet. Tap "Check again".' : flagged ? `The AI check flagged ${flagged}. Look at them in the review.` : 'The AI check found no problems.') });
+    setMsg({ kind: 'ok', review: true, text: `Made ${total} question${total === 1 ? '' : 's'} from ${ticked} information block${ticked === 1 ? '' : 's'}. ` + (checkFailed ? 'The AI check did not work, so none are checked yet. Tap "Check again".' : flagged ? `The AI check flagged ${flagged}. Look at them in the review.` : 'The AI check found no problems.') });
+  };
+
+  // Less / More: find the blocks again at another detail level, then make the questions again.
+  const refind = async (step) => {
+    const next = DETAILS[DETAILS.indexOf(detail) + step];
+    if (!next) return;
+    setMsg(null);
+    setP((x) => ({ ...x, detail: next }));
+    try { await backend.updateProject(code, projectId, { detail: next }); } catch {}
+    const fresh = [];
+    let lastErr = '';
+    for (let i = 0; i < approved.length; i++) {
+      const f = approved[i];
+      setBusy(`Finding blocks (${DETAIL_LABEL[next]}), page ${i + 1} of ${approved.length}…`);
+      try {
+        const blocks = await findBlocks(code, f.transcript, f.off || [], log(f.id), next);
+        const upd = { blocks: blocks.map((b) => ({ ...b })), blocksInfo: blocks.info || null, blocksStamp: stampOf(f), error: '' };
+        await backend.updateFile(code, projectId, f.id, upd);
+        fresh.push({ ...f, ...upd });
+      } catch (e) { lastErr = e.message; }
+    }
+    setBusy('');
+    if (!fresh.length) { setMsg({ kind: 'error', text: 'Could not find the blocks again. ' + lastErr }); return; }
+    await makeQuestions(fresh);
   };
 
   const del = async () => {
@@ -237,7 +265,7 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
             <button className="mode-tile flash" onClick={() => onStudy('flash', deck)}><TileArt kind="flash" /><span>Flashcards</span></button>
             <button className="mode-tile quiz" onClick={() => onStudy('quiz', deck)}><TileArt kind="quiz" /><span>Written quiz</span></button>
             <button className="mode-tile voice" onClick={() => onStudy('voice', deck)}><TileArt kind="voice" /><span>Voice quiz</span></button>
-            <button className="mode-tile mat" onClick={onReview}><TileArt kind="folder" /><span>Review questions</span></button>
+            <button className="mode-tile mat" onClick={onReview} data-testid="review-tile"><TileArt kind="folder" /><span>Review questions <small className="tile-count">· {itemList.length}</small></span></button>
           </div>
         </>
       )}
@@ -292,17 +320,22 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
         <div className="rd-card" data-testid="blocks-card">
           <p className="rd-big"><b>{allBlocks.length}</b> information block{allBlocks.length === 1 ? '' : 's'} found · <b>{tickedBlocks}</b> ticked</p>
           <button className="btn ghost" onClick={() => setBlocksOpen(true)} data-testid="review-blocks"><Icon name="list" />Review blocks</button>
-          <div className="label">Questions per fact</div>
-          <div className="rd-counts" role="group" aria-label="Questions per fact">
+          <p className="muted tiny rd-qline" data-testid="q-line">{itemList.length} question{itemList.length === 1 ? '' : 's'} · Detail: {DETAIL_LABEL[detail]}</p>
+          <div className="rd-make">
+            <button className="btn ghost" disabled={!!busy || detail === DETAILS[0]} onClick={() => refind(-1)} data-testid="less">Less</button>
+            <button className="btn primary" disabled={!!busy || !willMake} onClick={() => makeQuestions()} data-testid="make-questions">
+              {itemList.length && !stale ? 'Remake' : `Make ${willMake} question${willMake === 1 ? '' : 's'}`}
+            </button>
+            <button className="btn ghost" disabled={!!busy || detail === DETAILS[DETAILS.length - 1]} onClick={() => refind(1)} data-testid="more">More</button>
+          </div>
+          <div className="rd-per" role="group" aria-label="Questions per block">
+            <span>Questions per block</span>
             {[1, 2, 3].map((n) => <button key={n} className={'rd-chip' + (perFact === n ? ' on' : '')} onClick={() => setPerFact(n)} aria-pressed={perFact === n}>{n}</button>)}
           </div>
-          <p className="muted tiny">{perFact === 1 ? 'One question for each fact, so nothing is asked twice.' : `Up to ${perFact} questions on each fact, each in a different form.`}</p>
-          <button className="btn primary" disabled={!!busy || !willMake} onClick={makeQuestions} data-testid="make-questions">
-            <Icon name="sparkle" />{itemList.length && !stale ? `Questions are up to date (${willMake})` : `Make ${willMake} question${willMake === 1 ? '' : 's'}`}
-          </button>
+          <p className="muted tiny">{perFact === 1 ? 'One question for each block, so nothing is asked twice.' : `${perFact} ask the same block again in other forms (multiple choice, true/false).`}</p>
         </div>
       )}
-      {itemList.length > 0 && <button className="btn ghost" onClick={onReview}><Icon name="list" />Review questions ({itemList.length})</button>}
+      {itemList.length > 0 && deck.length === 0 && <button className="btn ghost" onClick={onReview}><Icon name="list" />Review questions ({itemList.length})</button>}
       {unchecked > 0 && !stale && (
         <div className="hint" data-testid="check-missing">
           The AI check has not been done for {unchecked} question{unchecked === 1 ? '' : 's'}.
@@ -319,7 +352,7 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
         <button className="btn ghost" onClick={onSpeechTest}><Icon name="mic" />Run the speech test</button>
       </div>
       <button className="link danger" onClick={del}><Icon name="trash" size={18} />Delete project</button>
-      {reporting && <ReportSheet code={code} project={p} profile={profile} text="" deck={deck} extra={readingReport(fileList, itemList, perFact)} onClose={() => setReporting(false)} />}
+      {reporting && <ReportSheet code={code} project={p} profile={profile} text="" deck={deck} extra={readingReport(fileList, itemList, perFact, detail)} onClose={() => setReporting(false)} />}
 
       {pasting && (
         <div className="rd-modal" role="dialog" aria-label="Paste text">
@@ -346,7 +379,7 @@ function BlocksView({ files, allFiles, perFact, willMake, onToggle, onClose }) {
   return (
     <section className="rd rd-blocks">
       <ScreenHead onBack={onClose} backLabel="Pages" icon={<span className="head-ic"><Icon name="list" size={26} /></span>} title="Information blocks" />
-      <p className="muted" data-testid="blocks-summary">{all.length} found · {on} ticked · {willMake} question{willMake === 1 ? '' : 's'} at {perFact} per fact</p>
+      <p className="muted" data-testid="blocks-summary">{all.length} found · {on} ticked · {willMake} question{willMake === 1 ? '' : 's'} at {perFact} per block</p>
       <p className="muted tiny">Untick a block you don't need. Each ticked block gets {perFact === 1 ? 'one question' : `up to ${perFact} questions`}.</p>
       {files.map((f) => {
         const list = f.blocks || [];
@@ -514,11 +547,11 @@ function PageEditor({ code, projectId, projectName, file, index, onClose }) {
     try { await flush(); await backend.updateFile(code, projectId, file.id, { checked: true }); onClose(); } catch (e) { setNote(e.message); }
   };
   const retype = async () => {
-    if (!confirm('Type this page up again? This replaces the typed copy, including your changes.')) return;
-    setBusy('Typing up the page…'); setNote('');
+    if (!confirm('Read the image again? This replaces the typed copy, including your changes.')) return;
+    setBusy('Reading the image again…'); setNote('');
     try {
       const nt = await transcribePhoto(code, file.data, (e) => diagLog(projectId, { ...e, fileId: file.id }));
-      await backend.updateFile(code, projectId, file.id, { transcript: nt, transcriptRev: Date.now(), status: 'typed', error: '', checked: false, off: [], blocks: null, blocksInfo: null, blocksStamp: '', qStamp: '' });
+      await backend.updateFile(code, projectId, file.id, { transcript: nt, transcriptRev: Date.now(), status: 'typed', error: '', checked: false, off: struckIds(nt), blocks: null, blocksInfo: null, blocksStamp: '', qStamp: '' });
     } catch (e) { setNote(e.message); }
     setBusy('');
   };
@@ -605,11 +638,11 @@ function PageEditor({ code, projectId, projectName, file, index, onClose }) {
       </ul>
 
       <div className="label">Keep this page</div>
+      {file.data && <button className="btn rd-reread" disabled={!!busy} onClick={retype} data-testid="read-again"><Icon name="repeat" />Read the image again</button>}
       <div className="add-row">
         <button className="btn ghost" onClick={copyText}><Icon name="copy" />Copy text</button>
         <button className="btn ghost" onClick={saveText}><Icon name="file" />Save as text</button>
         {layout && <button className="btn ghost" onClick={savePicture}><Icon name="image" />Save as picture</button>}
-        {file.data && <button className="btn ghost" disabled={!!busy} onClick={retype}><Icon name="repeat" />Type it again</button>}
       </div>
       {busy && <p className="hint" role="status">{busy}</p>}
       {note && <p className="muted tiny" role="status">{note}</p>}
