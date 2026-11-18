@@ -774,3 +774,16 @@ html.is-dark img { filter: invert(1) hue-rotate(180deg); }
 .rd-keep { display: flex; gap: 8px; margin-top: 10px; }
 .rd-keep .btn { flex: 1; min-width: 0; padding: 10px 6px; gap: 6px; font-size: .9rem; white-space: nowrap; }
 .rq-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* block map on the blocks review screen */
+.rd-map-pin { position: sticky; top: 0; z-index: 20; margin: 0 -18px 8px; padding: env(safe-area-inset-top, 0px) 0 6px; background: var(--paper, #f7f5ff); box-shadow: 0 8px 14px -12px rgba(30, 20, 60, .35); }
+.rd-map-pin .rd-stage { margin: 0; }
+.rd-map-tabs { margin: 6px 12px; }
+.rd-map-tip { margin: 4px 14px 0; }
+.rd-map-page { font-weight: 800; }
+.rd-area { position: absolute; border: 2px solid; border-radius: 4px; pointer-events: none; z-index: 2; }
+.rd-area.on { border-width: 3.5px; z-index: 3; animation: rd-pulse 1.2s ease-in-out 2; box-shadow: 0 0 0 3px rgba(255, 255, 255, .7); }
+@keyframes rd-pulse { 50% { transform: scale(1.04); } }
+.rd-blk { border-left: 6px solid transparent; cursor: pointer; scroll-margin-top: 45vh; }
+.rd-blk.on { outline: 2.5px solid var(--violet, #6d4aff); }
+.rd-swatch { width: 18px; height: 18px; border-radius: 5px; border: 2px solid; margin-left: auto; flex: none; }

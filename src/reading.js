@@ -129,6 +129,76 @@ export function toRows(lines) {
 }
 
 // Groups of lines that belong together: a big empty gap starts a new chunk. Pasted text: one chunk per paragraph.
+// ---- where each block comes from on the page (for the block map)
+// A line of the page belongs to a block when a stretch of it (a sentence part) is found in the block's source sentence.
+// Short stretches (a word or two) count only next to a line that already matched with a longer stretch, so common words do not light up the page.
+const mapNorm = (x) => String(x || '').replace(/~~/g, '').replace(/[•·▪●]/g, ' ').replace(/[’‘]/g, "'").replace(/[“”]/g, '"').toLowerCase().replace(/\s+/g, ' ').replace(/\s+([.,;:!?)])/g, '$1').trim();
+function lineParts(text) {
+  const raw = String(text || '').replace(/~~/g, '');
+  const parts = []; let start = 0;
+  const re = /[.!?;:](\s+|$)|\s+[↓↑→←⇒]\s+/g; let m;
+  while ((m = re.exec(raw))) { parts.push([start, m.index + (/[.!?;:]/.test(m[0][0]) ? 1 : 0)]); start = m.index + m[0].length; }
+  if (start < raw.length) parts.push([start, raw.length]);
+  return parts.map(([a, b]) => ({ a, b, text: mapNorm(raw.slice(a, b).replace(/-$/, '')) })).filter((p) => /[a-z0-9]/.test(p.text));
+}
+export function blockAreas(t, blocks) {
+  const lines = ((t && t.lines) || []).filter((l) => l.x != null && l.y != null);
+  const order = [...lines].sort((p, q) => (p.y - q.y) || (p.x - q.x));
+  const out = new Map();
+  for (const b of blocks || []) {
+    const src = mapNorm(b.source).replace(/- /g, '');
+    const srcJoined = src.replace(/-\s*/g, '');
+    if (!src) { out.set(b.id, { rects: [], lines: [] }); continue; }
+    const hits = new Map(); // line id -> { a, b, strong }
+    order.forEach((l) => {
+      for (const p of lineParts(l.text)) {
+        if (p.text.length < 2) continue;
+        if (!(src.includes(p.text) || srcJoined.includes(p.text.replace(/-\s*/g, '')))) continue;
+        const strong = p.text.split(' ').length >= 3 || p.text === src || p.text === srcJoined;
+        const h = hits.get(l.id);
+        const pos = srcJoined.indexOf(p.text.replace(/-\s*/g, ''));
+        if (h) { h.a = Math.min(h.a, p.a); h.b = Math.max(h.b, p.b); h.strong = h.strong || strong; h.pos = Math.min(h.pos, pos); } else hits.set(l.id, { a: p.a, b: p.b, strong, pos });
+      }
+    });
+    // keep short hits only when a neighbouring line with letters is a strong hit for this block
+    const withText = order.filter((l) => /[a-z0-9]/i.test(l.text));
+    const keep = new Set();
+    withText.forEach((l, i) => {
+      const h = hits.get(l.id); if (!h) return;
+      if (h.strong) { keep.add(l.id); return; }
+      const near = [withText[i - 1], withText[i + 1]].some((n) => n && hits.get(n.id) && hits.get(n.id).strong);
+      if (near) keep.add(l.id);
+    });
+    // the lines must follow the sentence in order: a heading just above that repeats words from the middle of the sentence is not part of it
+    const kept = withText.filter((l) => keep.has(l.id));
+    if (kept.length > 1) {
+      const len = (id) => hits.get(id).b - hits.get(id).a;
+      const best = kept.map(() => 0), prev = kept.map(() => -1);
+      kept.forEach((l, i) => { best[i] = len(l.id); for (let j = 0; j < i; j++) if (hits.get(kept[j].id).pos <= hits.get(l.id).pos && best[j] + len(l.id) > best[i]) { best[i] = best[j] + len(l.id); prev[i] = j; } });
+      let i = best.indexOf(Math.max(...best)); const chain = new Set();
+      while (i >= 0) { chain.add(kept[i].id); i = prev[i]; }
+      kept.forEach((l) => { if (!chain.has(l.id)) keep.delete(l.id); });
+    }
+    // one block comes from one place: keep the biggest run of neighbouring lines (a heading elsewhere that repeats the words is not it)
+    const runs = []; let run = null;
+    withText.forEach((l) => { if (keep.has(l.id)) { if (!run) { run = []; runs.push(run); } run.push(l.id); } else run = null; });
+    if (runs.length > 1) {
+      const size = (r) => r.reduce((n, id) => n + (hits.get(id).b - hits.get(id).a), 0);
+      const best = runs.reduce((x, y) => (size(y) > size(x) ? y : x));
+      runs.forEach((r) => { if (r !== best) r.forEach((id) => keep.delete(id)); });
+    }
+    // lines with only arrows between two kept lines belong to the block too (diagrams)
+    order.forEach((l, i) => { if (!/[a-z0-9]/i.test(l.text) && /[↓↑→←⇒]/.test(l.text) && keep.has((order[i - 1] || {}).id) && keep.has((order[i + 1] || {}).id)) { keep.add(l.id); hits.set(l.id, { a: 0, b: l.text.length }); } });
+    const rects = order.filter((l) => keep.has(l.id)).map((l) => {
+      const h = hits.get(l.id); const len = Math.max(String(l.text).length, 1);
+      const w = l.w || Math.min(0.9, len * (l.h || 0.025) * 0.5);
+      return { x: l.x + w * (h.a / len), y: l.y, w: Math.max(w * ((h.b - h.a) / len), 0.01), h: l.h || 0.025, line: l.id };
+    });
+    out.set(b.id, { rects, lines: rects.map((r) => r.line) });
+  }
+  return out;
+}
+
 export function makeChunks(t) {
   const lines = (t && t.lines) || [];
   if (!lines.length) return [];
@@ -208,7 +278,7 @@ For each block return:
 - source: the exact words from the text that this block comes from (copy them, one or two sentences or lines)
 - subject: what the block is about, in a few words
 - question: a clear question a student could answer from memory. It must make sense alone (never say "according to the text"). For a list, ask for the whole group.
-- value: the short exact answer, copied from the source (a date, a name, the meaning, the outcome). Leave "" for a list.
+- value: the short exact answer, copied from the source (a date, a name, the meaning, the outcome). Use the SHORTEST words that answer the question: only the key number, date, name or term, never words the question already says (for "How many representatives are in the House?" the value is "435", not "435 representatives"; for "How many people does one representative stand for?" it is "500,000"). Leave "" for a list.
 - items: for a list, the items copied from the source (2 to 8). Otherwise [].
 - ordered: true or false (lists only)
 - important: true if the text marks it as important (boxed, underlined, circled, starred, bold, or stressed like "remember" or "important")
@@ -637,7 +707,8 @@ export function readingReport(files, items, perFact, detail = 'normal', events =
       out.push(`  the AI sent ${f.blocksInfo.asked} blocks, the app dropped ${d.length}${d.length ? ':' : ''}`);
       d.forEach((x) => out.push(`    dropped (${x.why}): ${x.line}`));
     }
-    bl.forEach((b) => out.push(`  [${b.on === false ? ' ' : 'x'}] ${b.type}${b.important ? ' !' : ''}${b.grounded ? '' : ' (not in source)'}: ${blockLine(b)}  <= "${b.source}"`));
+    const areas = f.transcript ? blockAreas(f.transcript, bl) : new Map();
+    bl.forEach((b) => out.push(`  [${b.on === false ? ' ' : 'x'}] ${b.id} ${b.type}${b.important ? ' !' : ''}${b.plain ? ' plain' : ''}${b.ordered ? ' ordered' : ''}${b.grounded ? '' : ' (not in source)'}: ${blockLine(b)}  | question: ${b.question || '-'}  | on the page: ${(areas.get(b.id) || { lines: [] }).lines.join(',') || 'NOT FOUND'}  <= "${String(b.source || '').replace(/\s+/g, ' ')}"`));
     out.push(`questions: ${mine.length} ${JSON.stringify(types)}`);
     const unchecked = mine.filter((x) => x.aiChecked !== true).length;
     out.push(unchecked ? `AI check: not done for ${unchecked} of ${mine.length} questions` : `AI check: done, ${mine.filter((x) => x.aiNote).length} flagged, ${mine.filter((x) => x.off).length} unselected by you`);

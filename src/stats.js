@@ -65,6 +65,13 @@ export function isCorrect(answer, expected) {
   const a = normalize(answer);
   if (!a) return false;
   const options = [expected, ...expected.split(/\s*[;/]\s*/)].map(normalize).filter(Boolean);
+  // When the right answer holds exactly one number, that number alone is right too ("435" for "435 representatives", "25" for "at least 25 years old").
+  const nums = (x) => String(x).match(/\d[\d,.]*\d|\d/g) || [];
+  const bare = String(answer).trim().replace(/[.,]$/, '');
+  if (/^\d[\d,.]*$/.test(bare)) {
+    const n = nums(expected);
+    if (n.length === 1 && n[0].replace(/,/g, '') === bare.replace(/,/g, '')) return true;
+  }
   return options.some((e) => {
     if (a === e) return true;
     const len = Math.max(a.length, e.length);

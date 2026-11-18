@@ -1,5 +1,5 @@
 // Rule tests for Reading projects (layout, chunks, blocks, question builder). Run with: npm test
-import { remakeQuestion, dateLike, parseJson, parseTranscript, makeChunks, layoutText, parseBlocks, buildQuestions, splitTextPages, textTranscript, cleanCount, toRows, suggestCount, countQuestions, readingReport, parseBlocksDetailed, buildCheckPrompt, parseChecks, struckIds, buildFactsPrompt } from '../src/reading.js';
+import { blockAreas, remakeQuestion, dateLike, parseJson, parseTranscript, makeChunks, layoutText, parseBlocks, buildQuestions, splitTextPages, textTranscript, cleanCount, toRows, suggestCount, countQuestions, readingReport, parseBlocksDetailed, buildCheckPrompt, parseChecks, struckIds, buildFactsPrompt } from '../src/reading.js';
 import { buildDeck, spreadGroups } from '../src/deck.js';
 
 let pass = 0, fail = 0;
@@ -225,6 +225,28 @@ ok(p11.blocks[0].value === '1787' && p11.blocks[0].type === 'date', 'a date answ
 const q11 = buildQuestions(p11.blocks, p11.blocks, 3, 'P', 'w');
 ok(q11.every((x) => !/\bin In\b|^1789, delegates/.test(x.question)), 'swapping dates keeps the sentence whole');
 ok(q11.filter((x) => x.choices && x.type !== 'tf').every((x) => x.choices.filter((c) => c.text !== x.answer).every((c) => !x.question.toLowerCase().includes(c.text.toLowerCase()))), 'a wrong choice is never already written in the question');
+
+// 0.20.12: where each block sits on the page
+const tMap = { lines: [
+  { id: 'h1', text: 'The House of Representatives', x: 0.3, y: 0.1, w: 0.4, h: 0.03 },
+  { id: 'a1', text: 'The larger house of Congress is the House of Representatives. There are 435 representatives', x: 0.1, y: 0.2, w: 0.8, h: 0.02 },
+  { id: 'a2', text: 'in the House. The first census was con-', x: 0.1, y: 0.23, w: 0.8, h: 0.02 },
+  { id: 'a3', text: 'ducted in 1790. When will', x: 0.1, y: 0.26, w: 0.5, h: 0.02 },
+  { id: 'd1', text: 'Legislative', x: 0.2, y: 0.5, w: 0.2, h: 0.02 }, { id: 'd2', text: '↓', x: 0.25, y: 0.53, w: 0.02, h: 0.02 },
+  { id: 'd3', text: 'Makes federal laws', x: 0.15, y: 0.56, w: 0.3, h: 0.02 }] };
+const bMap = [
+  { id: 'x1', source: 'The larger house of Congress is the House of Representatives.' },
+  { id: 'x2', source: 'There are 435 representatives in the House.' },
+  { id: 'x3', source: 'The first census was conducted in 1790.' },
+  { id: 'x4', source: 'Legislative ↓ Makes federal laws' },
+  { id: 'x5', source: 'Something that is not on this page at all.' }];
+const am = blockAreas(tMap, bMap);
+ok(am.get('x1').lines.join() === 'a1', 'a block is found on its own line, not on a heading with the same words');
+ok(am.get('x1').rects[0].w < 0.8 && am.get('x2').rects.find((r) => r.line === 'a1').x > 0.4, 'only the part of a line that belongs to the block is shaded');
+ok(am.get('x2').lines.join() === 'a1,a2', 'a sentence over two lines shades both');
+ok(am.get('x3').lines.join() === 'a2,a3', 'a word split with a hyphen is followed to the next line');
+ok(am.get('x4').lines.join() === 'd1,d2,d3', 'a diagram block shades its arrow too');
+ok(am.get('x5').lines.length === 0, 'a source not on the page is not shaded anywhere');
 
 console.log(`reading: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -9,7 +9,9 @@ import { Icon } from './art.jsx';
 import { ScreenHead, useStats, StatsStrip } from './Session.jsx';
 import { TileArt } from './art.jsx';
 import ReportSheet from './Report.jsx';
+import BlockMap, { blockColor } from './BlockMap.jsx';
 import {
+  blockAreas,
   BLOCK_LABEL, transcribePhoto, findBlocks, buildQuestions, countQuestions, blockLine, readingReport,
   splitTextPages, textTranscript, makeChunks, layoutText, chunkPreview, checkQuestions, recheckItems, struckIds, DETAILS, DETAIL_LABEL
 } from './reading.js';
@@ -376,14 +378,32 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
 function BlocksView({ files, allFiles, perFact, willMake, onToggle, onClose }) {
   const all = files.flatMap((f) => f.blocks || []);
   const on = all.filter((b) => b.on !== false).length;
+  const [pageId, setPageId] = useState(files[0] ? files[0].id : null);
+  const [active, setActive] = useState(null);
+  const page = files.find((f) => f.id === pageId) || files[0];
+  const areasOf = useMemo(() => new Map(files.map((f) => [f.id, f.transcript ? blockAreas(f.transcript, f.blocks || []) : new Map()])), [files]);
+  // tapping a block in the list shows it on the page; tapping the page shows its block in the list
+  const pick = (f, id, from) => {
+    setPageId(f.id); setActive(id);
+    if (from === 'map') setTimeout(() => { const el = document.querySelector(`[data-block="${id}"]`); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 30);
+  };
   return (
     <section className="rd rd-blocks">
       <ScreenHead onBack={onClose} backLabel="Pages" icon={<span className="head-ic"><Icon name="list" size={26} /></span>} title="Information blocks" />
       <p className="muted" data-testid="blocks-summary">{all.length} found · {on} selected · {willMake} question{willMake === 1 ? '' : 's'} at {perFact} per block</p>
-      <p className="muted tiny">Unselect a block you don't need. Each selected block gets {perFact === 1 ? 'one question' : `up to ${perFact} questions`}.</p>
+      {page && page.transcript && <p className="muted tiny">Each selected block has its own color on the page. Text with no color was not used. Tap a block or a colored spot to find it.</p>}
+      {page && page.transcript && (
+        <div className="rd-map-pin">
+          {files.length > 1 && (
+            <div className="seg rd-map-tabs">{files.map((f) => <button key={f.id} className={f.id === page.id ? 'on' : ''} onClick={() => { setPageId(f.id); setActive(null); }}>Page {allFiles.indexOf(f) + 1}</button>)}</div>
+          )}
+          <BlockMap file={page} blocks={page.blocks || []} areas={areasOf.get(page.id)} activeId={active} onPick={(id, from) => pick(page, id, from)} />
+        </div>
+      )}
       {files.map((f) => {
         const list = f.blocks || [];
         const allOn = list.every((b) => b.on !== false);
+        const areas = areasOf.get(f.id) || new Map();
         return (
           <div key={f.id} className="igroup">
             <div className="igroup-head">
@@ -392,17 +412,22 @@ function BlocksView({ files, allFiles, perFact, willMake, onToggle, onClose }) {
               <button className="link inline" onClick={() => onToggle(f, '*', !allOn)}>{allOn ? 'Unselect all' : 'Select all'}</button>
             </div>
             <ul className="rd-chunks">
-              {list.map((b) => (
-                <li key={b.id} className={'rd-chunk' + (b.on === false ? ' off' : '')} data-testid="block">
-                  <label className="rd-tick">
-                    <input type="checkbox" checked={b.on !== false} onChange={(e) => onToggle(f, b.id, e.target.checked)} aria-label={`Use block: ${blockLine(b)}`} />
-                    <span className="ttype">{BLOCK_LABEL[b.type] || b.type}</span>
-                    {b.important && <span className="tag">Important</span>}
-                  </label>
-                  <p className="rd-line">{blockLine(b)}</p>
-                  <p className="muted tiny rd-from">From the page: {b.source}{b.grounded ? '' : ' (check: the answer is not word for word in it)'}</p>
-                </li>
-              ))}
+              {list.map((b, n) => {
+                const c = blockColor(n); const found = (areas.get(b.id) || { rects: [] }).rects.length > 0;
+                return (
+                  <li key={b.id} className={'rd-chunk rd-blk' + (b.on === false ? ' off' : '') + (active === b.id ? ' on' : '')} data-testid="block" data-block={b.id}
+                    style={{ borderLeftColor: b.on === false ? undefined : c.line }} onClick={(e) => { if (!e.target.closest('label')) pick(f, b.id, 'list'); }}>
+                    <label className="rd-tick">
+                      <input type="checkbox" checked={b.on !== false} onChange={(e) => onToggle(f, b.id, e.target.checked)} aria-label={`Use block: ${blockLine(b)}`} />
+                      <span className="ttype">{BLOCK_LABEL[b.type] || b.type}</span>
+                      {b.important && <span className="tag">Important</span>}
+                      <span className="rd-swatch" style={{ background: b.on === false ? 'transparent' : c.fill, borderColor: c.line }} aria-hidden="true" />
+                    </label>
+                    <p className="rd-line">{blockLine(b)}</p>
+                    <p className="muted tiny rd-from">From the page: {b.source}{b.grounded ? '' : ' (check: the answer is not word for word in it)'}{f.transcript && !found ? ' · not found on the page' : ''}</p>
+                  </li>
+                );
+              })}
               {list.length === 0 && <li className="muted">No information blocks on this page.</li>}
             </ul>
           </div>

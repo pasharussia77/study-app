@@ -4,7 +4,7 @@ import { resolvePage, resolveItem, reapplyItem, readTrueFalse, duplicateGroups, 
 import { buildDeck, cardFaces, answerLetters, withNumber, inPageOrder, tidy } from '../src/deck.js';
 import { parseCards, shorterIsTerm } from '../src/parse.js';
 import { buildReport, splitReport, latestReads } from '../src/report.js';
-import { cardKey } from '../src/stats.js';
+import { cardKey, isCorrect } from '../src/stats.js';
 import { matchLetters, judgeLetters, describeQuestion, answerLine, maxAttempts, matchChoice } from '../src/tutor.js';
 import { enhancePixels } from '../src/enhance.js';
 
@@ -372,5 +372,7 @@ ok(rep17.includes('5 older readings left out'), 'report: it says how many readin
 ok(rep17.includes('--- Photo 1 at') && rep17.includes('--- Photo 2 at'), 'report: readings are named by photo');
 ok(rep17.indexOf('YOUR NOTES') < rep17.indexOf('1. WHAT WAS ADDED') && splitReport(rep17).length === 1 && splitReport('x\n'.repeat(20000)).length > 1, 'report: notes first, and the parts feature is kept');
 
+ok(isCorrect('435', '435 representatives') && isCorrect('25', 'at least 25 years old') && isCorrect('500000', 'one representative for every 500,000 people'), 'the one number in an answer is enough when typed alone');
+ok(!isCorrect('436', '435 representatives') && !isCorrect('1787', '1787 and 1789'), 'a wrong number, or one of two numbers, is not enough');
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
