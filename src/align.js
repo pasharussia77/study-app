@@ -54,7 +54,7 @@ const xOverlap = (a, b) => Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
 
 // Moves each line onto the nearest row of print near where the AI put it, one line per row.
 // Lines are handled in reading order, so two lines never take the same row.
-export function alignLines(lines, mask, figures = [], fixed = new Set()) {
+export function alignLines(lines, mask, figures = [], fixed = new Set(), maxJump = 2.5) {
   const { W, H } = mask;
   const placed = lines.filter((l) => fixed.has(l.id)); // exact lines from the engine: rows they sit on are taken
   const out = [];
@@ -75,7 +75,7 @@ export function alignLines(lines, mask, figures = [], fixed = new Set()) {
       .filter((r) => !figures.some((f) => Math.min(x1, (f.x + f.w) * W) - Math.max(x0, f.x * W) > 0.5 * (x1 - x0) && f.y * H < r.top && (f.y + f.h) * H > r.bottom)) // not inside a picture
       .filter((r) => !placed.some((p) => xOverlap(p, l) > 0.2 * Math.min(p.w, l.w) && r.top / H < p.y + p.h * 0.7 && r.bottom / H > p.y + p.h * 0.3)); // not already taken
     // keep the reading order: a line never goes above the line read just before it in the same column
-    const before = [...placed].reverse().find((p) => xOverlap(p, l) > 0.2 * Math.min(p.w, l.w));
+    const before = placed.filter((p) => num(p) < num(l) && xOverlap(p, l) > 0.2 * Math.min(p.w, l.w)).sort((p, q) => num(q) - num(p))[0]; // the nearest line read before this one
     if (before) for (let k = rows.length - 1; k >= 0; k--) if ((rows[k].top + rows[k].bottom) / 2 <= (before.y + before.h / 2) * H) rows.splice(k, 1);
     if (!rows.length) { done.set(l, l); placed.push({ ...l, h }); continue; }
     // pick the row that is near AND has the same shape: where the print starts and ends should match the line
@@ -88,7 +88,7 @@ export function alignLines(lines, mask, figures = [], fixed = new Set()) {
       return dy + 2.5 * (Math.abs(e.left - lx0) + Math.abs(e.right - lx1)) / Math.max(lx1 - lx0, 1);
     };
     const best = rows.map((r) => ({ r, c: cost(r) })).reduce((a, b) => (b.c < a.c ? b : a)).r;
-    if (Math.abs((best.top + best.bottom) / 2 - yc) > 2.5 * h * H) { done.set(l, l); placed.push({ ...l, h }); continue; }
+    if (Math.abs((best.top + best.bottom) / 2 - yc) > maxJump * h * H) { done.set(l, l); placed.push({ ...l, h }); continue; }
     // keep the AI's line height (it sets the letter size) and centre the line on its row of print
     const nh = h, ny = clamp(((best.top + best.bottom) / 2) / H - h / 2, 0, 1);
     const shift = Math.abs(ny - l.y);
@@ -176,7 +176,7 @@ export async function placeOnPhoto(dataUrl, t) {
       if (p.matched >= 3) {
         lines = p.lines; figures = p.figures; fixed = p.fixed; method = 'engine'; aligned = true;
         // the lines the engine could not read are then snapped onto the rows of print left free
-        try { const mask = await photoMask(dataUrl); ({ lines, moved } = alignLines(lines, mask, figures, fixed)); } catch { /* keep them as placed */ }
+        try { const mask = await photoMask(dataUrl); ({ lines, moved } = alignLines(lines, mask, figures, fixed, p.good ? 0.8 : 2.5)); } catch { /* keep them as placed */ } // a good map leaves only small steps
       }
     } catch { /* fall back to the rows of print */ }
   }

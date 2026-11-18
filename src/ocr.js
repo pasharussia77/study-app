@@ -69,20 +69,21 @@ function fit(pairs) {
 // First the sure matches (most of the words found) give how the AI's places map onto the photo;
 // a weaker match then only counts when it is near where that map puts the line.
 export function placeByOcr(t, ocrLines, W, H) {
-  // in the AI's reading order (ids), each printed line is given out once: the same words can appear twice on a page
-  const used = new Set();
-  const num = (l) => { const m = /^l(\d+)$/.exec(l.id || ''); return m ? +m[1] : 0; };
-  const found = new Array(t.lines.length).fill(null);
-  t.lines.map((l, i) => [l, i]).sort((a, b) => num(a[0]) - num(b[0])).forEach(([l, i]) => {
-    const m = matchLine(l.text, ocrLines, used);
-    if (m) { used.add(m.k); found[i] = m; }
-  });
+  // each printed line is given out once (the same words can appear twice on a page): best matches first
+  const pairs = [];
+  t.lines.forEach((l, i) => ocrLines.forEach((ol, k) => { const m = matchLine(l.text, [ol]); if (m) pairs.push({ i, k, m: { ...m, k } }); }));
+  pairs.sort((p, q) => q.m.score - p.m.score || q.m.box.x1 - q.m.box.x0 - (p.m.box.x1 - p.m.box.x0));
+  const found = new Array(t.lines.length).fill(null), usedK = new Set();
+  for (const p of pairs) if (!found[p.i] && !usedK.has(p.k)) { found[p.i] = p.m; usedK.add(p.k); }
   const sure = found.map((m) => m && m.score >= 0.7);
   const box = (l, m) => ({ ...l, x: m.box.x0 / W, y: m.box.y0 / H, w: Math.max((m.box.x1 - m.box.x0) / W, 0.01), h: Math.max((m.box.y1 - m.box.y0) / H, 0.006) });
   const py = [], px = [];
   t.lines.forEach((l, i) => { if (sure[i]) { const b = box(l, found[i]); py.push([l.y, b.y]); px.push([l.x, b.x]); } });
   const fy = fit(py), fx = fit(px);
   const mv = (v, f) => (f ? Math.max(0, Math.min(0.99, f.a * v + f.b)) : v);
+  // how far a match may sit from where the map puts it: tight when the AI's layout fits the photo well
+  const dev = t.lines.map((l, i) => (sure[i] && fy ? Math.abs(box(l, found[i]).y - mv(l.y, fy)) : null)).filter((v) => v != null).sort((p, q) => p - q);
+  const tol = dev.length ? Math.min(0.05, Math.max(0.015, 3 * dev[Math.floor(dev.length / 2)])) : 0.05;
   let matched = 0;
   const fixed = new Set();
   const placed = t.lines.map((l, i) => {
@@ -90,7 +91,7 @@ export function placeByOcr(t, ocrLines, W, H) {
     if (m) {
       const b = box(l, m);
       // every match, even a sure one, must sit about where the map puts the line: the same words can appear twice on a page
-      if (!fy ? sure[i] : Math.abs(b.y - mv(l.y, fy)) < 0.05) { matched++; fixed.add(l.id); return b; }
+      if (!fy ? sure[i] : Math.abs(b.y - mv(l.y, fy)) < tol) { matched++; fixed.add(l.id); return b; }
     }
     return null;
   });
@@ -109,8 +110,12 @@ export function placeByOcr(t, ocrLines, W, H) {
   });
   // the lines the engine did not find go between the found lines around them, in proportion (the AI's order and spacing are kept)
   const anchors = t.lines.map((l, i) => (placed[i] ? [l.y, placed[i].y] : null)).filter(Boolean).sort((p, q) => p[0] - q[0]);
+  // when the AI's layout matches the photo well (only shifted or stretched), the map alone places the rest best;
+  // when it does not, the rest goes in proportion between the found lines around it
+  const resid = anchors.map((a) => Math.abs(a[1] - mv(a[0], fy))).sort((p, q) => p - q);
+  const good = fy && resid.length >= 3 && resid[Math.floor(resid.length / 2)] < 0.008;
   const yOf = (v) => {
-    if (!anchors.length) return mv(v, fy);
+    if (good || !anchors.length) return mv(v, fy);
     let lo = null, hi = null;
     for (const a of anchors) { if (a[0] <= v) lo = a; else if (!hi) hi = a; }
     const a = fy ? fy.a : 1;
@@ -120,7 +125,7 @@ export function placeByOcr(t, ocrLines, W, H) {
   };
   const lines = t.lines.map((l, i) => placed[i] || { ...l, x: mv(l.x, fx), y: yOf(l.y), w: fx ? Math.max(0.01, l.w * fx.a) : l.w, h: fy ? Math.max(0.006, l.h * fy.a) : l.h });
   const figures = (t.figures || []).map((f) => (fx && fy ? { ...f, x: mv(f.x, fx), y: mv(f.y, fy), w: Math.max(0.02, f.w * fx.a), h: Math.max(0.02, f.h * fy.a) } : f));
-  return { ...t, lines, figures, matched, fixed };
+  return { ...t, lines, figures, matched, fixed, good: !!good };
 }
 
 // Browser only: reads the photo with the engine. Returns { lines, W, H } or throws.
