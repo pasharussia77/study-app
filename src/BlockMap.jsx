@@ -132,7 +132,7 @@ export default function BlockMap({ file, blocks, areas, activeId, onPick, pageLa
         <div ref={pageRef} className="rd-page" style={{ paddingBottom: `${ratio * 100}%`, transform: `translate(${view.x}px, ${view.y}px) scale(${view.s})` }}>
           {file.data && <img className="rd-photo" src={file.data} alt="Original page" draggable="false" />}
           <div className="rd-typed" style={{ opacity: file.data ? fade : 1 }}>
-            {(t.figures || []).map((f, i) => <div key={i} className="rd-fig" style={{ left: `${f.x * 100}%`, top: `${f.y * 100}%`, width: `${f.w * 100}%`, height: `${f.h * 100}%` }}><span>{f.label || 'Picture'}</span></div>)}
+            {(t.figures || []).map((f, i) => <div key={i} className="rd-fig" style={{ left: `${f.x * 100}%`, top: `${f.y * 100}%`, width: `${f.w * 100}%`, height: `${f.h * 100}%`, ...(f.h < 0.04 ? { fontSize: Math.min(f.h * ratio * 100 * 0.85, (f.w * 100) / (Math.max(String(f.label || 'Picture').length, 1) * 0.5)).toFixed(2) + 'cqw', whiteSpace: 'nowrap', lineHeight: 1, borderWidth: 1, padding: 0 } : {}) }}><span>{f.label || 'Picture'}</span></div>)}
             {lines.map((l) => (
               <div key={l.id} data-lid={l.id} className={'rd-piece' + ((file.off || []).includes(l.id) ? ' off' : '') + (l.marks || []).map((m) => ' m-' + m).join('')}
                 style={{ left: `${l.x * 100}%`, top: `${l.y * 100}%`, fontSize: fs(l) }}>{l.text}</div>

@@ -619,7 +619,7 @@ function PageEditor({ code, projectId, projectName, file, index, onClose }) {
               <div className="rd-page" style={{ paddingBottom: `${ratio * 100}%`, transform: `translate(${view.x}px, ${view.y}px) scale(${view.s})` }} data-testid="page-copy">
                 {file.data && <img className="rd-photo" src={file.data} alt={`Original page ${index + 1}`} draggable="false" />}
                 <div className="rd-typed" style={{ opacity: file.data ? fade : 1 }}>
-                  {(t0.figures || []).map((f, i) => <div key={i} className="rd-fig" style={{ left: `${f.x * 100}%`, top: `${f.y * 100}%`, width: `${f.w * 100}%`, height: `${f.h * 100}%` }}><span>{f.label || 'Picture'}</span></div>)}
+                  {(t0.figures || []).map((f, i) => <div key={i} className="rd-fig" style={{ left: `${f.x * 100}%`, top: `${f.y * 100}%`, width: `${f.w * 100}%`, height: `${f.h * 100}%`, ...(f.h < 0.04 ? { fontSize: Math.min(f.h * ratio * 100 * 0.85, (f.w * 100) / (Math.max(String(f.label || 'Picture').length, 1) * 0.5)).toFixed(2) + 'cqw', whiteSpace: 'nowrap', lineHeight: 1, borderWidth: 1, padding: 0 } : {}) }}><span>{f.label || 'Picture'}</span></div>)}
                   {lines.map((l) => (
                     <div key={l.id} data-testid="piece" data-pid={l.id}
                       className={'rd-piece' + (off.includes(l.id) ? ' off' : '') + (sel === l.id ? ' sel' : '') + (l.conf === 'low' ? ' low' : '') + l.marks.map((m) => ' m-' + m).join('')}
