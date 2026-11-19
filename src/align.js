@@ -180,13 +180,13 @@ export async function photoMask(dataUrl, width = 900) {
 // Then no two lines may overlap. Never throws.
 export async function placeOnPhoto(dataUrl, t) {
   const t0 = Date.now();
-  let lines = t.lines, figures = t.figures || [], moved = 0, avgShift = 0, aligned = false, method = 'ai', matched = 0, fixed = new Set(), offs = [], err = '';
+  let lines = t.lines, figures = t.figures || [], moved = 0, avgShift = 0, aligned = false, method = 'ai', matched = 0, fixed = new Set(), offs = [], err = '', threads = 0;
   const browser = typeof document !== 'undefined';
   const mock = browser && /[?&]mock=1/.test(location.search) && !window.__useOcr;
   if (dataUrl && browser && !mock) {
     try {
       const [{ readEngine }, { placeByEngine }] = await Promise.all([import('./ppread.js'), import('./paddle.js')]);
-      const r = await readEngine(dataUrl);
+      const r = await readEngine(dataUrl); threads = r.threads || 0;
       const p = placeByEngine(t, r.lines, r.W, r.H);
       matched = p.matched; offs = p.offs || [];
       if (p.matched >= 3) { lines = p.lines; fixed = p.fixed; method = 'engine'; aligned = true; }
@@ -200,5 +200,5 @@ export async function placeOnPhoto(dataUrl, t) {
     } catch { /* keep the AI's places */ }
   }
   const u = untangle(lines, fixed);
-  return { ...t, lines: u.lines, figures, placed: { method, matched, aligned, moved, avgShift: Math.round(avgShift * 1000) / 1000, pushed: u.pushed, found: offs.join(' '), err, ms: Date.now() - t0 } };
+  return { ...t, lines: u.lines, figures, placed: { method, matched, aligned, moved, avgShift: Math.round(avgShift * 1000) / 1000, pushed: u.pushed, found: offs.join(' '), err, threads, ms: Date.now() - t0 } };
 }

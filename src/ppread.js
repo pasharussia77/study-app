@@ -5,7 +5,7 @@ const waiting = new Map();
 function getWorker() {
   if (!worker) {
     worker = new Worker(new URL('./ppworker.js', import.meta.url), { type: 'module' });
-    worker.onmessage = (e) => { const w = waiting.get(e.data.id); if (w) { waiting.delete(e.data.id); e.data.error ? w.reject(new Error(e.data.error)) : w.resolve(e.data.lines); } };
+    worker.onmessage = (e) => { const w = waiting.get(e.data.id); if (w) { waiting.delete(e.data.id); e.data.error ? w.reject(new Error(e.data.error)) : w.resolve({ lines: e.data.lines, threads: e.data.threads }); } };
     worker.onerror = (e) => { for (const w of waiting.values()) w.reject(new Error(e.message || 'text finder failed')); waiting.clear(); worker = null; };
   }
   return worker;
@@ -19,9 +19,9 @@ export async function readEngine(dataUrl, maxSide = 2000) {
   const g = c.getContext('2d'); g.drawImage(im, 0, 0, W, H);
   const d = g.getImageData(0, 0, W, H);
   const id = ++seq;
-  const lines = await new Promise((resolve, reject) => {
+  const { lines, threads } = await new Promise((resolve, reject) => {
     waiting.set(id, { resolve, reject });
     getWorker().postMessage({ id, base: new URL(import.meta.env.BASE_URL, location.href).href, img: { data: d.data, width: W, height: H } }, [d.data.buffer]);
   });
-  return { lines, W, H };
+  return { lines, threads, W, H };
 }

@@ -293,6 +293,13 @@ ok(am.get('x5').lines.length === 0, 'a source not on the page is not shaded anyw
   ok(p.matched === 3 && p.fixed.has('l2') && !p.fixed.has('l3'), 'each line takes the engine line with the most similar text; text not in the reading is ignored');
   ok(Math.abs(y('l2') - 0.436) < 0.002 && Math.abs(p.lines[1].a - 2) < 0.01, 'a found line takes the box and tilt of its printed line');
   ok(y('l2') < y('l3') && y('l3') < y('l4'), 'a line the engine did not find goes between the found lines read before and after it (line numbers are the reading order)');
+  const rn = { lines: [
+    { id: 'l1', text: 'II', x: 0.15, y: 0.44, w: 0.02, h: 0.016 }, { id: 'l2', text: 'Right to bear arms', x: 0.22, y: 0.44, w: 0.16, h: 0.016 },
+    { id: 'l3', text: 'III', x: 0.15, y: 0.46, w: 0.03, h: 0.016 }, { id: 'l4', text: 'Quartering of soldiers', x: 0.22, y: 0.46, w: 0.19, h: 0.016 }], figures: [] };
+  const re = [e(442, 'Right to bear arms', 220, 160), e(462, 'Quartering of soldiers', 220, 190), e(462, 'III', 150, 30), e(442, '11', 150, 15)];
+  const rp = placeByEngine(rn, re, W, H);
+  const ry = (id) => rp.lines.find((l) => l.id === id).y;
+  ok(Math.abs(ry('l1') - 0.442) < 0.004 && Math.abs(ry('l3') - 0.462) < 0.004 && rp.lines.every((l) => l.id === 'l2' || l.id === 'l4' || !l.a), 'short lines like II and III take only an exact reading near their place, else stay on the row of their text, never tilted');
   const one = new Float32Array(32 * 32); for (let yy = 10; yy < 16; yy++) for (let xx = 4; xx < 28; xx++) one[yy * 32 + xx] = 0.9;
   const bx = dbBoxes(one, 32, 32, 64, 64);
   ok(bx.length === 1 && bx[0].w > bx[0].h * 2 && Math.abs(bx[0].cy - 26) < 2, 'the detector map turns into one line box, scaled to the photo');

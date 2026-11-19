@@ -164,38 +164,76 @@ export function similar(a, b) { // 2 * longest common subsequence / total length
 const rnum = (l) => Number(String(l.id).replace(/\D/g, '')) || 0;
 
 // t: the page ({ lines, figures }, places 0..1); eng: engine lines in pixels of a W x H image.
-// Each AI line takes the box of the engine line with the most similar text (each engine line used once, best pairs first).
-// A line the engine did not find goes between the found lines read before and after it.
+// 1. Lines with 6 or more letters take the engine line with the most similar text (each engine line once, best pairs first).
+// 2. Short lines (like "II" or "XI") look alike, so they only take an engine line with exactly the same letters,
+//    near where the found lines around them put them.
+// 3. A line still not found keeps the AI's place, moved by the same step as the found lines read before and after it
+//    (so a numeral stays on the row of its text).
 // A placed line keeps x, y (top-left of its left end), w (length along the text), h and a (tilt in degrees).
 export function placeByEngine(t, eng, W, H) {
-  const pairs = [];
-  t.lines.forEach((l, i) => eng.forEach((e, j) => { const s = similar(l.text, e.text); if (s > 0.6) pairs.push([s, i, j]); }));
-  pairs.sort((p, q) => q[0] - p[0]);
-  const got = new Map(), used = new Set();
-  for (const [, i, j] of pairs) if (!got.has(i) && !used.has(j)) { got.set(i, j); used.add(j); }
-  const box = (e) => { // left-end top corner of the tilted box, in 0..1
+  const short = (l) => norm(l.text).length < 6;
+  const box = (e) => {
+    if (e.w < 1.5 * e.h || Math.abs(e.a) > Math.PI / 4) { // a short box is never tilted: take its straight outline
+      const c = Math.abs(Math.cos(e.a)), s = Math.abs(Math.sin(e.a));
+      const bw = e.w * c + e.h * s, bh = e.w * s + e.h * c;
+      return { x: (e.cx - bw / 2) / W, y: (e.cy - bh / 2) / H, w: bw / W, h: bh / H, a: 0 };
+    }
     const c = Math.cos(e.a), s = Math.sin(e.a);
     const lx = e.cx - (e.w / 2) * c, ly = e.cy - (e.w / 2) * s; // middle of the left end
     return { x: (lx + (e.h / 2) * s) / W, y: (ly - (e.h / 2) * c) / H, w: e.w / W, h: e.h / H, a: (e.a * 180) / Math.PI };
   };
-  const placed = t.lines.map((l, i) => (got.has(i) ? { ...l, ...box(eng[got.get(i)]) } : null));
+  const got = new Map(), used = new Set();
+  const pairs = [];
+  t.lines.forEach((l, i) => { if (!short(l)) eng.forEach((e, j) => { const s = similar(l.text, e.text); if (s > 0.6) pairs.push([s, i, j]); }); });
+  pairs.sort((p, q) => q[0] - p[0]);
+  for (const [, i, j] of pairs) if (!got.has(i) && !used.has(j)) { got.set(i, j); used.add(j); }
   const rd = t.lines.map((l, i) => i).sort((p, q) => rnum(t.lines[p]) - rnum(t.lines[q]));
   const pos = new Map(rd.map((i, k) => [i, k]));
-  const lines = t.lines.map((l, i) => {
-    if (placed[i]) return placed[i];
+  const placed = new Map([...got].map(([i, j]) => [i, box(eng[j])]));
+  // the step (dx, dy) the found lines around line i were moved by, mixed by how close they are in reading order
+  const step = (i) => {
     const k = pos.get(i);
     let lo = null, hi = null;
-    for (let m = k - 1; m >= 0; m--) if (placed[rd[m]]) { lo = m; break; }
-    for (let m = k + 1; m < rd.length; m++) if (placed[rd[m]]) { hi = m; break; }
-    const L = lo != null ? placed[rd[lo]] : null, R = hi != null ? placed[rd[hi]] : null;
-    if (L && R) {
-      const f = (k - lo) / (hi - lo);
-      return { ...l, y: L.y + (R.y - L.y) * f, h: (L.h + R.h) / 2, a: (L.a + R.a) / 2 };
+    for (let m = k - 1; m >= 0; m--) if (placed.has(rd[m])) { lo = rd[m]; break; }
+    for (let m = k + 1; m < rd.length; m++) if (placed.has(rd[m])) { hi = rd[m]; break; }
+    const d = (n) => ({ dx: placed.get(n).x - t.lines[n].x, dy: placed.get(n).y - t.lines[n].y, h: placed.get(n).h, a: placed.get(n).a });
+    if (lo != null && hi != null) {
+      const f = (k - pos.get(lo)) / (pos.get(hi) - pos.get(lo)), A = d(lo), B = d(hi);
+      return { dx: A.dx + (B.dx - A.dx) * f, dy: A.dy + (B.dy - A.dy) * f, h: (A.h + B.h) / 2, a: Math.abs(A.a - B.a) < 3 ? (A.a + B.a) / 2 : 0 };
     }
-    const N = L || R;
-    if (!N) return l;
-    const A = t.lines[L ? rd[lo] : rd[hi]];
-    return { ...l, y: N.y + (l.y - A.y), h: N.h, a: N.a }; // keep the AI's distance from the nearest found line
+    return lo != null ? d(lo) : hi != null ? d(hi) : null;
+  };
+  // 2. short lines: exactly the same letters, within about half a line of where they are expected (closest pairs first)
+  const near = [];
+  t.lines.forEach((l, i) => {
+    if (got.has(i) || !short(l) || !norm(l.text)) return;
+    const st = step(i); if (!st) return;
+    const ey = l.y + st.dy, ex = l.x + st.dx, tol = 0.6 * (st.h || l.h || 0.02);
+    eng.forEach((e, j) => {
+      if (used.has(j) || norm(e.text) !== norm(l.text)) return;
+      const b = box(e);
+      if (Math.abs(b.y - ey) < tol) near.push([Math.abs(b.y - ey) + 0.5 * Math.abs(b.x - ex), i, j]);
+    });
+  });
+  near.sort((p, q) => p[0] - q[0]);
+  for (const [, i, j] of near) if (!got.has(i) && !used.has(j)) { got.set(i, j); used.add(j); placed.set(i, box(eng[j])); }
+  // 3. the rest keep the AI's place, moved like their neighbours
+  const lines = t.lines.map((l, i) => {
+    if (placed.has(i)) return { ...l, ...placed.get(i) };
+    const st = step(i);
+    if (!st) return l;
+    let y = l.y + st.dy;
+    // reading order wins: never above the found line read before it, never below the one read after it
+    // (in its own column it also keeps a line's height of room; a numeral beside its text may share the row)
+    const k = pos.get(i), h = st.h || l.h || 0.02;
+    let lo = null, hi = null;
+    for (let m = k - 1; m >= 0; m--) if (placed.has(rd[m])) { lo = rd[m]; break; }
+    for (let m = k + 1; m < rd.length; m++) if (placed.has(rd[m])) { hi = rd[m]; break; }
+    const sameCol = (n) => Math.min(t.lines[n].x + t.lines[n].w, l.x + l.w) - Math.max(t.lines[n].x, l.x) > 0.5 * Math.min(t.lines[n].w, l.w);
+    const low = lo != null ? placed.get(lo).y + (sameCol(lo) ? 0.6 * h : 0) : -Infinity;
+    const top = hi != null ? placed.get(hi).y - (sameCol(hi) ? 0.6 * h : 0) : Infinity;
+    if (low <= top) y = Math.min(top, Math.max(low, y)); else y = (low + top) / 2;
+    return { ...l, x: l.x + st.dx, y, h, a: short(l) ? 0 : st.a };
   });
   const fixed = new Set([...got.keys()].map((i) => t.lines[i].id));
   const offs = [...got.keys()].map((i) => `${t.lines[i].id}${lines[i].y - t.lines[i].y >= 0 ? '+' : ''}${(lines[i].y - t.lines[i].y).toFixed(3)}`);

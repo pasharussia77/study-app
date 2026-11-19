@@ -7,7 +7,8 @@ let ready = null;
 function load(base) {
   if (!ready) ready = (async () => {
     ort.env.wasm.wasmPaths = base + 'ocr/';
-    ort.env.wasm.numThreads = 1;
+    // several cores when the app is isolated (see sw.js); otherwise one
+    ort.env.wasm.numThreads = self.crossOriginIsolated ? Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 2) - 1)) : 1;
     const get = async (f) => { // a failed download is tried once more; the error names the file
       for (let k = 0; ; k++) {
         try { const r = await fetch(base + 'ocr/' + f); if (!r.ok) throw new Error('status ' + r.status); return r; }
@@ -31,7 +32,7 @@ self.onmessage = async (e) => {
   try {
     const { det, rec, keys } = await load(base);
     const lines = await readImage(ort, det, rec, keys, img);
-    self.postMessage({ id, lines });
+    self.postMessage({ id, lines, threads: ort.env.wasm.numThreads });
   } catch (err) {
     self.postMessage({ id, error: String((err && err.message) || err) });
   }
