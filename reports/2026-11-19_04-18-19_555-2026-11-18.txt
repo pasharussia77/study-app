@@ -1,0 +1,251 @@
+FAMILY STUDY DIAGNOSTIC REPORT
+Created: Nov 18, 2026, 11:18 PM ET
+App version: 0.21.3 – Nov 18, 2026, 11:12 PM ET
+Account: Test (testing account)
+Project: 555 – 2026-11-18
+Device: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Mobile Safari/537.36 | screen 384x854 | online true
+AI helper: model gpt-5.6-luna, key present: yes
+
+=== YOUR NOTES (written first so a cut-off paste cannot lose them) ===
+(none)
+
+=== READING PROJECT: pages, the AI's answers, blocks and questions are in the READING PROJECT part below ===
+
+=== 5. PROGRESS NOW ===
+Everything studyable (typed + photo items with an answer): total 8, covered 0, remaining 8, correct 0, incorrect 0
+
+=== 6. STUDY SESSIONS (most recent activity) ===
+[10:17:48 PM] START written quiz: shows word, answers by choosing (true/false and multiple choice always choose), cards: all, only mc, shuffle off, 9 in this round
+[10:17:58 PM] quiz mc (choice) | Q: "Fill in the blank: There are _____ representatives in the House." | correct answer: "435" | given: "435" | RIGHT
+
+=== READING PROJECT ===
+Questions per block: 1 · detail: normal
+
+--- Page 1 (photo) status=typed approved=true
+page text: kind=printed pieces=81 unselected=0 low-confidence=0 figures=2
+lined up with the photo: by the text-reading engine, 72 of 81 lines found by their words; overlaps pushed down: 0; 32484 ms; 1 processor core
+engine found (line, how far it sits below the AI's place): l1-0.001 l2-0.002 l3-0.001 l4-0.004 l5+0.000 l6-0.004 l7-0.001 l8-0.004 l9-0.001 l10-0.004 l11-0.002 l12-0.003 l13-0.000 l14-0.004 l15-0.001 l16-0.002 l17-0.000 l18-0.002 l20-0.002 l21-0.000 l23-0.001 l25-0.001 l27-0.000 l29-0.000 l31+0.000 l33+0.001 l35+0.002 l37+0.003 l39+0.003 l41+0.004 l43+0.007 l45+0.007 l47+0.008 l49+0.008 l51+0.011 l74-0.005 l53+0.012 l75-0.005 l55+0.013 l57+0.014 l77-0.007 l59+0.016 l78-0.007 l61+0.018 l79-0.009 l63+0.019 l80-0.009 l65+0.020 l67+0.022 l81-0.010 l69+0.023 l71+0.025 l73+0.027 l76-0.005 l50+0.010 l54+0.013 l46+0.007 l38+0.003 l56+0.014 l52+0.012 l42+0.005 l58+0.016 l62+0.018 l26-0.001 l48+0.009 l70+0.025 l68+0.024 l36+0.003 l30-0.001 l32-0.000 l72+0.028 l66+0.023
+                Organization of the Constitution and the Preamble
+
+           PREAMBLE   Introduction
+
+           ARTICLE I  Legislative Branch
+           ARTICLE II Executive Branch
+           ARTICLE III  Judicial Branch
+           ARTICLE IV Relationships Among States
+           ARTICLE V  Amending the Constitution
+           ARTICLE VI Supreme Law of the Land
+           ARTICLE VII  Ratifying the Constitution
+
+
+          AMENDMENTS:
+
+          I   Freedom of religion, press, speech,
+              assembly, petition
+          II  Right to bear arms
+          III Quartering of soldiers
+          IV  Searches and seizures
+         V    Life, liberty, and property
+          VI  Rights of the accused
+          VII Right to trial by jury
+         VIII Bail and punishment
+         IX   Rights of the people
+         X    Rights of the states
+         XI   Suits against states
+         XII  Election of the president
+         XIII Abolition of slavery
+         XIV  Civil rights in the states
+         XV  Black suffrage         Throughout the convention, Ben Franklin had noticed
+         XVI Income tax             the back of George Washington’s chair. There was
+         XVII  Direct election of senators  a sun carved into it. “I have often and often in
+         XVIII  Prohibition         the course of this session looked at that behind
+         XIX Women’s suffrage       the President without being able to tell whether it
+         XX  “Lame duck” period     was rising or setting; but now at length I have the
+        XXI  Repeal of Prohibition  happiness to know that it is a rising and not a setting
+        XXII Presidential term of office  sun,” Franklin observed.
+        XXIII  Voting in the District of Columbia
+        XXIV Abolition of poll taxes
+        XXV  Presidential disability and succession
+        XXVI Eighteen-year-old vote
+        XXVII  Congressional pay raises
+pieces (id | x,y,w,h | marks | confidence | used | text):
+  l1 | 0.244,0.14,0.661,0.021 | - | high | yes | Organization of the Constitution and the Preamble
+  l2 | 0.179,0.19,0.106,0.016 | - | high | yes | PREAMBLE
+  l3 | 0.346,0.193,0.102,0.016 | - | high | yes | Introduction
+  l4 | 0.176,0.221,0.094,0.017 | - | high | yes | ARTICLE I
+  l5 | 0.345,0.225,0.156,0.016 | - | high | yes | Legislative Branch
+  l6 | 0.174,0.238,0.099,0.016 | - | high | yes | ARTICLE II
+  l7 | 0.344,0.241,0.149,0.016 | - | high | yes | Executive Branch
+  l8 | 0.171,0.254,0.105,0.016 | - | high | yes | ARTICLE III
+  l9 | 0.342,0.257,0.132,0.016 | - | high | yes | Judicial Branch
+  l10 | 0.169,0.271,0.106,0.016 | - | high | yes | ARTICLE IV
+  l11 | 0.341,0.273,0.239,0.016 | - | high | yes | Relationships Among States
+  l12 | 0.169,0.288,0.103,0.016 | - | high | yes | ARTICLE V
+  l13 | 0.34,0.291,0.223,0.016 | - | high | yes | Amending the Constitution
+  l14 | 0.167,0.304,0.108,0.016 | - | high | yes | ARTICLE VI
+  l15 | 0.339,0.307,0.22,0.016 | - | high | yes | Supreme Law of the Land
+  l16 | 0.166,0.322,0.113,0.016 | - | high | yes | ARTICLE VII
+  l17 | 0.337,0.324,0.216,0.017 | - | high | yes | Ratifying the Constitution
+  l18 | 0.161,0.372,0.143,0.016 | - | high | yes | AMENDMENTS:
+  l19 | 0.154,0.407,0.01,0.017 | - | high | yes | I
+  l20 | 0.226,0.407,0.304,0.017 | - | high | yes | Freedom of religion, press, speech,
+  l21 | 0.225,0.426,0.155,0.016 | - | high | yes | assembly, petition
+  l22 | 0.152,0.443,0.015,0.016 | - | high | yes | II
+  l23 | 0.224,0.443,0.162,0.016 | - | high | yes | Right to bear arms
+  l24 | 0.151,0.46,0.021,0.016 | - | high | yes | III
+  l25 | 0.223,0.46,0.188,0.016 | - | high | yes | Quartering of soldiers
+  l26 | 0.151,0.477,0.023,0.015 | - | high | yes | IV
+  l27 | 0.222,0.478,0.2,0.016 | - | high | yes | Searches and seizures
+  l28 | 0.148,0.495,0.013,0.017 | - | high | yes | V
+  l29 | 0.22,0.495,0.216,0.017 | - | high | yes | Life, liberty, and property
+  l30 | 0.149,0.511,0.024,0.016 | - | high | yes | VI
+  l31 | 0.22,0.512,0.19,0.017 | - | high | yes | Rights of the accused
+  l32 | 0.149,0.529,0.028,0.016 | - | high | yes | VII
+  l33 | 0.219,0.53,0.169,0.017 | - | high | yes | Right to trial by jury
+  l34 | 0.145,0.547,0.029,0.017 | - | high | yes | VIII
+  l35 | 0.217,0.547,0.181,0.017 | - | high | yes | Bail and punishment
+  l36 | 0.146,0.565,0.023,0.016 | - | high | yes | IX
+  l37 | 0.216,0.565,0.176,0.018 | - | high | yes | Rights of the people
+  l38 | 0.144,0.582,0.021,0.017 | - | high | yes | X
+  l39 | 0.216,0.582,0.171,0.018 | - | high | yes | Rights of the states
+  l40 | 0.142,0.6,0.019,0.018 | - | high | yes | XI
+  l41 | 0.214,0.6,0.173,0.017 | - | high | yes | Suits against states
+  l42 | 0.142,0.617,0.029,0.016 | - | high | yes | XII
+  l43 | 0.213,0.619,0.214,0.017 | - | high | yes | Election of the president
+  l44 | 0.14,0.636,0.03,0.017 | - | high | yes | XIII
+  l45 | 0.212,0.636,0.167,0.017 | - | high | yes | Abolition of slavery
+  l46 | 0.139,0.653,0.037,0.017 | - | high | yes | XIV
+  l47 | 0.212,0.654,0.206,0.017 | - | high | yes | Civil rights in the states
+  l48 | 0.139,0.672,0.031,0.016 | - | high | yes | XV
+  l49 | 0.21,0.671,0.129,0.018 | - | high | yes | Black suffrage
+  l50 | 0.137,0.689,0.038,0.017 | - | high | yes | XVI
+  l51 | 0.209,0.69,0.102,0.016 | - | high | yes | Income tax
+  l74 | 0.569,0.678,0.413,0.016 | - | high | yes | Throughout the convention, Ben Franklin had noticed
+  l52 | 0.136,0.708,0.042,0.015 | - | high | yes | XVII
+  l53 | 0.208,0.708,0.233,0.017 | - | high | yes | Direct election of senators
+  l75 | 0.568,0.697,0.414,0.015 | - | high | yes | the back of George Washington’s chair. There was
+  l54 | 0.135,0.726,0.048,0.017 | - | high | yes | XVIII
+  l55 | 0.207,0.726,0.098,0.016 | - | high | yes | Prohibition
+  l76 | 0.567,0.715,0.416,0.015 | - | high | yes | a sun carved into it. “I have often and often in
+  l56 | 0.134,0.744,0.037,0.016 | - | high | yes | XIX
+  l57 | 0.207,0.744,0.161,0.017 | - | high | yes | Women’s suffrage
+  l77 | 0.568,0.732,0.414,0.015 | - | high | yes | the course of this session looked at that behind
+  l58 | 0.133,0.762,0.032,0.017 | - | high | yes | XX
+  l59 | 0.206,0.762,0.174,0.018 | - | high | yes | “Lame duck” period
+  l78 | 0.568,0.75,0.416,0.015 | - | high | yes | the President without being able to tell whether it
+  l60 | 0.132,0.78,0.028,0.018 | - | high | yes | XXI
+  l61 | 0.205,0.781,0.187,0.017 | - | high | yes | Repeal of Prohibition
+  l79 | 0.566,0.767,0.416,0.016 | - | high | yes | was rising or setting; but now at length I have the
+  l62 | 0.13,0.798,0.043,0.017 | - | high | yes | XXII
+  l63 | 0.204,0.799,0.227,0.017 | - | high | yes | Presidential term of office
+  l80 | 0.566,0.785,0.416,0.017 | - | high | yes | happiness to know that it is a rising and not a setting
+  l64 | 0.13,0.817,0.042,0.017 | - | high | yes | XXIII
+  l65 | 0.203,0.817,0.292,0.018 | - | high | yes | Voting in the District of Columbia
+  l66 | 0.128,0.836,0.05,0.016 | - | high | yes | XXIV
+  l67 | 0.2,0.835,0.193,0.017 | - | high | yes | Abolition of poll taxes
+  l81 | 0.566,0.803,0.2,0.015 | - | high | yes | sun,” Franklin observed.
+  l68 | 0.127,0.854,0.045,0.016 | - | high | yes | XXV
+  l69 | 0.2,0.853,0.335,0.018 | - | high | yes | Presidential disability and succession
+  l70 | 0.126,0.872,0.05,0.016 | - | high | yes | XXVI
+  l71 | 0.2,0.872,0.205,0.017 | - | high | yes | Eighteen-year-old vote
+  l72 | 0.126,0.892,0.055,0.015 | - | high | yes | XXVII
+  l73 | 0.198,0.891,0.23,0.017 | - | high | yes | Congressional pay raises
+  figure 1 | 0.634,0.198,0.309,0.265 | faint historical illustration
+  figure 2 | 0.571,0.518,0.411,0.157 | photograph of carved chair back
+AI transcribe (earlier) 11:01:03 PM: ok, 21.4 s, tokens in/out 2837/2736, 81 pieces
+AI transcribe (latest) 11:15:52 PM: ok, 20.1 s, tokens in/out 2837/2704, 81 pieces
+  the AI's answer:
+    {"kind":"printed","lines":[{"text":"Organization of the Constitution and the Preamble","x":0.244,"y":0.141,"w":0.664,"h":0.025},{"text":"PREAMBLE","x":0.179,"y":0.192,"w":0.123,"h":0.016},{"text":"Introduction","x":0.345,"y":0.194,"w":0.104,"h":0.016},{"text":"ARTICLE I","x":0.177,"y":0.225,"w":0.114,"h":0.016},{"text":"Legislative Branch","x":0.344,"y":0.225,"w":0.174,"h":0.016},{"text":"ARTICLE II","x":0.177,"y":0.242,"w":0.114,"h":0.016},{"text":"Executive Branch","x":0.344,"y":0.242,"w":0.159,"h":0.016},{"text":"ARTICLE III","x":0.177,"y":0.258,"w":0.122,"h":0.016},{"text":"Judicial Branch","x":0.344,"y":0.258,"w":0.147,"h":0.016},{"text":"ARTICLE IV","x":0.177,"y":0.275,"w":0.114,"h":0.016},{"text":"Relationships Among States","x":0.344,"y":0.275,"w":0.223,"h":0.016},{"text":"ARTICLE V","x":0.177,"y":0.291,"w":0.108,"h":0.016},{"text":"Amending the Constitution","x":0.344,"y":0.291,"w":0.218,"h":0.016},{"text":"ARTICLE VI","x":0.177,"y":0.308,"w":0.113,"h":0.016},{"text":"Supreme Law of the Land","x":0.344,"y":0.308,"w":0.211,"h":0.016},{"text":"ARTICLE VII","x":0.177,"y":0.324,"w":0.119,"h":0.016},{"text":"Ratifying the Constitution","x":0.344,"y":0.324,"w":0.21,"h":0.016},{"text":"AMENDMENTS:","x":0.161,"y":0.374,"w":0.147,"h":0.017},{"text":"I","x":0.154,"y":0.409,"w":0.009,"h":0.016},{"text":"Freedom of religion, press, speech,","x":0.226,"y":0.409,"w":0.288,"h":0.016},{"text":"assembly, petition","x":0.226,"y":0.426,"w":0.157,"h":0.016},{"text":"II","x":0.153,"y":0.444,"w":0.015,"h":0.016},{"text":"Right to bear arms","x":0.226,"y":0.444,"w":0.161,"h":0.016},{"text":"III","x":0.153,"y":0.461,"w":0.021,"h":0.016},{"text":"Quartering of soldiers","x":0.226,"y":0.461,"w":0.194,"h":0.016},{"text":"IV","x":0.153,"y":0.478,"w":0.021,"h":0.016},{"text":"Searches and seizures","x":0.226,"y":0.478,"w":0.194,"h":0.016},{"text":"V","x":0.153,"y":0.495,"w":0.013,"h":0.016},{"text":"Life, liberty, and property","x":0.226,"y":0.495,"w":0.228,"h":0.016},{"text":"VI","x":0.153,"y":0.512,"w":0.021,"h":0.016},{"text":"Rights of the accused","x":0.226,"y":0.512,"w":0.189,"h":0.016},{"text":"VII","x":0.153,"y":0.529,"w":0.026,"h":0.016},{"text":"Right to trial by jury","x":0.226,"y":0.529,"w":0.184,"h":0.016},{"text":"VIII","x":0.153,"y":0.545,"w":0.029,"h":0.016},{"text":"Bail and punishment","x":0.226,"y":0.545,"w":0.17,"h":0.016},{"text":"IX","x":0.153,"y":0.562,"w":0.02,"h":0.016},{"text":"Rights of the people","x":0.226,"y":0.562,"w":0.178,"h":0.016},{"text":"X","x":0.153,"y":0.579,"w":0.011,"h":0.016},{"text":"Rights of the states","x":0.226,"y":0.579,"w":0.175,"h":0.016},{"text":"XI","x":0.153,"y":0.596,"w":0.019,"h":0.016},{"text":"Suits against states","x":0.226,"y":0.596,"w":0.174,"h":0.016},{"text":"XII","x":0.153,"y":0.612,"w":0.026,"h":0.016},{"text":"Election of the president","x":0.226,"y":0.612,"w":0.214,"h":0.016},{"text":"XIII","x":0.153,"y":0.629,"w":0.03,"h":0.016},{"text":"Abolition of slavery","x":0.226,"y":0.629,"w":0.18,"h":0.016},{"text":"XIV","x":0.153,"y":0.646,"w":0.032,"h":0.016},{"text":"Civil rights in the states","x":0.226,"y":0.646,"w":0.212,"h":0.016},{"text":"XV","x":0.153,"y":0.663,"w":0.021,"h":0.016},{"text":"Black suffrage","x":0.226,"y":0.663,"w":0.125,"h":0.016},{"text":"XVI","x":0.153,"y":0.679,"w":0.027,"h":0.016},{"text":"Income tax","x":0.226,"y":0.679,"w":0.102,"h":0.016},{"text":"XVII","x":0.153,"y":0.696,"w":0.032,"h":0.016},{"text":"Direct election of senators","x":0.226,"y":0.696,"w":0.232,"h":0.016},{"text":"XVIII","x":0.153,"y":0.713,"w":0.038,"h":0.016},{"text":"Prohibition","x":0.226,"y":0.713,"w":0.104,"h":0.016},{"text":"XIX","x":0.153,"y":0.730,"w":0.031,"h":0.016},{"text":"Women’s suffrage","x":0.226,"y":0.730,"w":0.169,"h":0.016},{"text":"XX","x":0.153,"y":0.746,"w":0.025,"h":0.016},{"text":"“Lame duck” period","x":0.226,"y":0.746,"w":0.169,"h":0.016},{"text":"XXI","x":0.153,"y":0.763,"w":0.028,"h":0.016},{"text":"Repeal of Prohibition","x":0.226,"y":0.763,"w":0.194,"h":0.016},{"text":"XXII","x":0.153,"y":0.780,"w":0.035,"h":0.016},{"text":"Presidential term of office","x":0.226,"y":0.780,"w":0.226,"h":0.016},{"text":"XXIII","x":0.153,"y":0.797,"w":0.042,"h":0.016},{"text":"Voting in the District of Columbia","x":0.226,"y":0.797,"w":0.302,"h":0.016},{"text":"XXIV","x":0.153,"y":0.813,"w":0.041,"h":0.016},{"text":"Abolition of poll taxes","x":0.226,"y":0.813,"w":0.212,"h":0.016},{"text":"XXV","x":0.153,"y":0.830,"w":0.037,"h":0.016},{"text":"Presidential disability and succession","x":0.226,"y":0.830,"w":0.322,"h":0.016},{"text":"XXVI","x":0.153,"y":0.847,"w":0.042,"h":0.016},{"text":"Eighteen-year-old vote","x":0.226,"y":0.847,"w":0.208,"h":0.016},{"text":"XXVII","x":0.153,"y":0.864,"w":0.047,"h":0.016},{"text":"Congressional pay raises","x":0.226,"y":0.864,"w":0.218,"h":0.016},{"text":"Throughout the convention, Ben Franklin had noticed","x":0.569,"y":0.683,"w":0.403,"h":0.017},{"text":"the back of George Washington’s chair. There was","x":0.569,"y":0.702,"w":0.394,"h":0.017},{"text":"a sun carved into it. “I have often and often in","x":0.569,"y":0.720,"w":0.403,"h":0.017},{"text":"the course of this session looked at that behind","x":0.569,"y":0.739,"w":0.392,"h":0.017},{"text":"the President without being able to tell whether it","x":0.569,"y":0.757,"w":0.41,"h":0.017},{"text":"was rising or setting; but now at length I have the","x":0.569,"y":0.776,"w":0.415,"h":0.017},{"text":"happiness to know that it is a rising and not a setting","x":0.569,"y":0.794,"w":0.422,"h":0.017},{"text":"sun,” Franklin observed.","x":0.569,"y":0.813,"w":0.205,"h":0.017}],"figures":[{"x":0.634,"y":0.198,"w":0.309,"h":0.265,"label":"faint historical illustration"},{"x":0.571,"y":0.518,"w":0.411,"h":0.157,"label":"photograph of carved chair back"}]}
+AI blocks (earlier) 11:01:55 PM: ok, 14.1 s, tokens in/out 1070/1393, 9 blocks sent
+AI blocks (latest) 11:16:31 PM: ok, 12.9 s, tokens in/out 1069/1372, 8 blocks sent | detail normal, asked for about 30
+  text sent to the AI:
+                    Organization of the Constitution and the Preamble
+    
+               PREAMBLE   Introduction
+    
+               ARTICLE I  Legislative Branch
+               ARTICLE II Executive Branch
+               ARTICLE III  Judicial Branch
+               ARTICLE IV Relationships Among States
+               ARTICLE V  Amending the Constitution
+               ARTICLE VI Supreme Law of the Land
+               ARTICLE VII  Ratifying the Constitution
+    
+    
+              AMENDMENTS:
+    
+              I   Freedom of religion, press, speech,
+                  assembly, petition
+              II  Right to bear arms
+              III Quartering of soldiers
+              IV  Searches and seizures
+             V    Life, liberty, and property
+              VI  Rights of the accused
+              VII Right to trial by jury
+             VIII Bail and punishment
+             IX   Rights of the people
+             X    Rights of the states
+             XI   Suits against states
+             XII  Election of the president
+             XIII Abolition of slavery
+             XIV  Civil rights in the states
+             XV  Black suffrage         Throughout the convention, Ben Franklin had noticed
+             XVI Income tax             the back of George Washington’s chair. There was
+             XVII  Direct election of senators  a sun carved into it. “I have often and often in
+             XVIII  Prohibition         the course of this session looked at that behind
+             XIX Women’s suffrage       the President without being able to tell whether it
+             XX  “Lame duck” period     was rising or setting; but now at length I have the
+            XXI  Repeal of Prohibition  happiness to know that it is a rising and not a setting
+            XXII Presidential term of office  sun,” Franklin observed.
+            XXIII  Voting in the District of Columbia
+            XXIV Abolition of poll taxes
+            XXV  Presidential disability and succession
+            XXVI Eighteen-year-old vote
+            XXVII  Congressional pay raises
+  the AI's answer:
+    {"blocks":[{"type":"list","source":"PREAMBLE   Introduction\n\nARTICLE I  Legislative Branch\nARTICLE II Executive Branch\nARTICLE III  Judicial Branch\nARTICLE IV Relationships Among States\nARTICLE V  Amending the Constitution\nARTICLE VI Supreme Law of the Land\nARTICLE VII  Ratifying the Constitution","subject":"Constitution organization","question":"What are the parts of the Constitution’s organization?","value":"","items":["PREAMBLE — Introduction","ARTICLE I — Legislative Branch","ARTICLE II — Executive Branch","ARTICLE III — Judicial Branch","ARTICLE IV — Relationships Among States","ARTICLE V — Amending the Constitution","ARTICLE VI — Supreme Law of the Land","ARTICLE VII — Ratifying the Constitution"],"ordered":true,"important":false},{"type":"list","source":"I   Freedom of religion, press, speech,\n              assembly, petition\n          II  Right to bear arms\n          III Quartering of soldiers\n          IV  Searches and seizures\n         V    Life, liberty, and property\n          VI  Rights of the accused\n          VII Right to trial by jury","subject":"Amendments I–VII","question":"What do Amendments I through VII address?","value":"","items":["I — Freedom of religion, press, speech, assembly, petition","II — Right to bear arms","III — Quartering of soldiers","IV — Searches and seizures","V — Life, liberty, and property","VI — Rights of the accused","VII — Right to trial by jury"],"ordered":true,"important":false},{"type":"list","source":"         VIII Bail and punishment\n         IX   Rights of the people\n         X    Rights of the states\n         XI   Suits against states\n         XII  Election of the president\n         XIII  Abolition of slavery\n         XIV  Civil rights in the states","subject":"Amendments VIII–XIV","question":"What do Amendments VIII through XIV address?","value":"","items":["VIII — Bail and punishment","IX — Rights of the people","X — Rights of the states","XI — Suits against states","XII — Election of the president","XIII — Abolition of slavery","XIV — Civil rights in the states"],"ordered":true,"important":false},{"type":"list","source":"         XV  Black suffrage         Throughout the convention, Ben Franklin had noticed\n         XVI Income tax             the back of George Washington’s chair. There was\n         XVII  Direct election of senators  a sun carved into it. “I have often and often in\n         XVIII  Prohibition         the course of this session looked at that behind\n         XIX Women’s suffrage       the President without being able to tell whether it\n         XX  “Lame duck” period     was rising or setting; but now at length I have the\n        XXI  Repeal of Prohibition  happiness to know that it is a rising and not a setting\n        XXII Presidential term of office  sun,” Franklin observed.","subject":"Amendments XV–XXII","question":"What do Amendments XV through XXII address?","value":"","items":["XV — Black suffrage","XVI — Income tax","XVII — Direct election of senators","XVIII — Prohibition","XIX — Women’s suffrage","XX — “Lame duck” period","XXI — Repeal of Prohibition","XXII — Presidential term of office"],"ordered":true,"important":false},{"type":"list","source":"        XXIII  Voting in the District of Columbia\n        XXIV Abolition of poll taxes\n        XXV  Presidential disability and succession\n        XXVI Eighteen-year-old vote\n        XXVII  Congressional pay raises","subject":"Amendments XXIII–XXVII","question":"What do Amendments XXIII through XXVII address?","value":"","items":["XXIII — Voting in the District of Columbia","XXIV — Abolition of poll taxes","XXV — Presidential disability and succession","XXVI — Eighteen-year-old vote","XXVII — Congressional pay raises"],"ordered":true,"important":false},{"type":"name","source":"Throughout the convention, Ben Franklin had noticed\nthe back of George Washington’s chair.","subject":"George Washington’s chair","question":"What did Ben Franklin notice throughout the convention?","value":"the back of George Washington’s chair","items":[],"ordered":false,"important":false},{"type":"fact","source":"There was\na sun carved into it.","subject":"Chair carving","question":"What was carved into the back of George Washington’s chair?","value":"a sun","items":[],"ordered":false,"important":false},{"type":"event","source":"“I have often and often in\nthe course of this session looked at that behind\nthe President without being able to tell whether it\nwas rising or setting; but now at length I have the\nhappiness to know that it is a rising and not a setting\nsun,” Franklin observed.","subject":"Franklin’s observation","question":"What did Franklin conclude about the sun carved into the chair?","value":"it is a rising and not a setting sun","items":[],"ordered":false,"important":false}]}
+AI check (latest) 11:17:25 PM: ok, 4.2 s, tokens in/out 1525/281, 8 questions checked, 4 flagged
+  the AI's answer:
+    {"checks":[{"n":1,"kind":"mismatch","why":"Answer omits Articles VI and VII listed in the source."},{"n":2,"kind":"mismatch","why":"Answer omits Amendment VII listed in the source."},{"n":3,"kind":"mismatch","why":"Answer omits Amendment XIV listed in the source."},{"n":4,"kind":"mismatch","why":"Answer omits Amendments XXI and XXII listed in the source."}]}
+blocks: 8 found, 8 selected
+  the AI sent 8 blocks, the app dropped 0
+  [x] b1 list ordered: Constitution organization: PREAMBLE — Introduction, ARTICLE I — Legislative Branch, ARTICLE II — Executive Branch, ARTICLE III — Judicial Branch, ARTICLE IV — Relationships Among States, ARTICLE V — Amending the Constitution, ARTICLE VI — Supreme Law of the Land, ARTICLE VII — Ratifying the Constitution  | question: What are the parts of the Constitution’s organization?  | on the page: l10,l11,l12,l13,l14,l15,l16,l17  <= "PREAMBLE Introduction ARTICLE I Legislative Branch ARTICLE II Executive Branch ARTICLE III Judicial Branch ARTICLE IV Relationships Among States ARTICLE V Amending the Constitution ARTICLE VI Supreme Law of the Land ARTICLE VII Ratifying the Constitution"
+  [x] b2 list ordered: Amendments I–VII: I — Freedom of religion, press, speech, assembly, petition, II — Right to bear arms, III — Quartering of soldiers, IV — Searches and seizures, V — Life, liberty, and property, VI — Rights of the accused, VII — Right to trial by jury  | question: What do Amendments I through VII address?  | on the page: l20,l21,l22,l23,l24,l25,l26,l27  <= "I Freedom of religion, press, speech, assembly, petition II Right to bear arms III Quartering of soldiers IV Searches and seizures V Life, liberty, and property VI Rights of the accused VII Right to trial by jury"
+  [x] b3 list ordered: Amendments VIII–XIV: VIII — Bail and punishment, IX — Rights of the people, X — Rights of the states, XI — Suits against states, XII — Election of the president, XIII — Abolition of slavery, XIV — Civil rights in the states  | question: What do Amendments VIII through XIV address?  | on the page: l39,l40,l41,l42,l43,l44,l45,l46,l47  <= "VIII Bail and punishment IX Rights of the people X Rights of the states XI Suits against states XII Election of the president XIII Abolition of slavery XIV Civil rights in the states"
+  [x] b4 list ordered: Amendments XV–XXII: XV — Black suffrage, XVI — Income tax, XVII — Direct election of senators, XVIII — Prohibition, XIX — Women’s suffrage, XX — “Lame duck” period, XXI — Repeal of Prohibition, XXII — Presidential term of office  | question: What do Amendments XV through XXII address?  | on the page: l48,l74,l50,l51,l75,l52,l53,l76,l54,l55,l77,l57  <= "XV Black suffrage Throughout the convention, Ben Franklin had noticed XVI Income tax the back of George Washington’s chair. There was XVII Direct election of senators a sun carved into it. “I have often and often in XVIII Prohibition the course of this session looked at that behind XIX Women’s suffrage the President without being able to tell whether it XX “Lame duck” period was rising or setting; but now at length I have the XXI Repeal of Prohibition happiness to know that it is a rising and not a setting XXII Presidential term of office sun,” Franklin observed."
+  [x] b5 list ordered: Amendments XXIII–XXVII: XXIII — Voting in the District of Columbia, XXIV — Abolition of poll taxes, XXV — Presidential disability and succession, XXVI — Eighteen-year-old vote, XXVII — Congressional pay raises  | question: What do Amendments XXIII through XXVII address?  | on the page: l64,l65,l67  <= "XXIII Voting in the District of Columbia XXIV Abolition of poll taxes XXV Presidential disability and succession XXVI Eighteen-year-old vote XXVII Congressional pay raises"
+  [x] b6 name: George Washington’s chair → the back of George Washington’s chair  | question: What did Ben Franklin notice throughout the convention?  | on the page: l74  <= "Throughout the convention, Ben Franklin had noticed the back of George Washington’s chair."
+  [x] b7 fact: Chair carving → a sun  | question: What was carved into the back of George Washington’s chair?  | on the page: l76  <= "There was a sun carved into it."
+  [x] b8 event: Franklin’s observation → it is a rising and not a setting sun  | question: What did Franklin conclude about the sun carved into the chair?  | on the page: l80  <= "“I have often and often in the course of this session looked at that behind the President without being able to tell whether it was rising or setting; but now at length I have the happiness to know that it is a rising and not a setting sun,” Franklin observed."
+questions: 8 {"order":5,"qa":3}
+AI check: done, 4 flagged, 0 unselected by you
+same wording and answer asked twice: 0
+  Q1 order: What are the parts of the Constitution’s organization? [AI mismatch: Answer omits Articles VI and VII listed in the source.]
+      choices: A. ARTICLE II — Executive Branch | B. ARTICLE IV — Relationships Among States | C. PREAMBLE — Introduction | D. ARTICLE III — Judicial Branch | E. ARTICLE I — Legislative Branch | F. ARTICLE V — Amending the Constitution
+      answer: 1. PREAMBLE — Introduction; 2. ARTICLE I — Legislative Branch; 3. ARTICLE II — Executive Branch; 4. ARTICLE III — Judicial Branch; 5. ARTICLE IV — Relationships Among States; 6. ARTICLE V — Amending the Constitution
+      from: "PREAMBLE Introduction ARTICLE I Legislative Branch ARTICLE II Executive Branch ARTICLE III Judicial Branch ARTICLE IV Relationships Among States ARTICLE V Amending the Constitution ARTICLE VI Supreme Law of the Land ARTICLE VII Ratifying the Constitution"
+  Q2 order: What do Amendments I through VII address? [AI mismatch: Answer omits Amendment VII listed in the source.]
+      choices: A. V — Life, liberty, and property | B. III — Quartering of soldiers | C. IV — Searches and seizures | D. VI — Rights of the accused | E. II — Right to bear arms | F. I — Freedom of religion, press, speech, assembly, petition
+      answer: 1. I — Freedom of religion, press, speech, assembly, petition; 2. II — Right to bear arms; 3. III — Quartering of soldiers; 4. IV — Searches and seizures; 5. V — Life, liberty, and property; 6. VI — Rights of the accused
+      from: "I Freedom of religion, press, speech, assembly, petition II Right to bear arms III Quartering of soldiers IV Searches and seizures V Life, liberty, and property VI Rights of the accused VII Right to trial by jury"
+  Q3 order: What do Amendments VIII through XIV address? [AI mismatch: Answer omits Amendment XIV listed in the source.]
+      choices: A. XI — Suits against states | B. VIII — Bail and punishment | C. XIII — Abolition of slavery | D. XII — Election of the president | E. IX — Rights of the people | F. X — Rights of the states
+      answer: 1. VIII — Bail and punishment; 2. IX — Rights of the people; 3. X — Rights of the states; 4. XI — Suits against states; 5. XII — Election of the president; 6. XIII — Abolition of slavery
+      from: "VIII Bail and punishment IX Rights of the people X Rights of the states XI Suits against states XII Election of the president XIII Abolition of slavery XIV Civil rights in the states"
+  Q4 order: What do Amendments XV through XXII address? [AI mismatch: Answer omits Amendments XXI and XXII listed in the source.]
+      choices: A. XV — Black suffrage | B. XIX — Women’s suffrage | C. XVII — Direct election of senators | D. XVIII — Prohibition | E. XX — “Lame duck” period | F. XVI — Income tax
+      answer: 1. XV — Black suffrage; 2. XVI — Income tax; 3. XVII — Direct election of senators; 4. XVIII — Prohibition; 5. XIX — Women’s suffrage; 6. XX — “Lame duck” period
+      from: "XV Black suffrage Throughout the convention, Ben Franklin had noticed XVI Income tax the back of George Washington’s chair. There was XVII Direct election of senators a sun carved into it. “I have often and often in XVIII Prohibition the course of this session looked at that behind XIX Women’s suffrage the President without being able to tell whether it XX “Lame duck” period was rising or setting; but now at length I have the XXI Repeal of Prohibition happiness to know that it is a rising and not a setting XXII Presidential term of office sun,” Franklin observed."
+  Q5 order: What do Amendments XXIII through XXVII address?
+      choices: A. XXIII — Voting in the District of Columbia | B. XXVI — Eighteen-year-old vote | C. XXIV — Abolition of poll taxes | D. XXVII — Congressional pay raises | E. XXV — Presidential disability and succession
+      answer: 1. XXIII — Voting in the District of Columbia; 2. XXIV — Abolition of poll taxes; 3. XXV — Presidential disability and succession; 4. XXVI — Eighteen-year-old vote; 5. XXVII — Congressional pay raises
+      from: "XXIII Voting in the District of Columbia XXIV Abolition of poll taxes XXV Presidential disability and succession XXVI Eighteen-year-old vote XXVII Congressional pay raises"
+  Q6 qa: What did Ben Franklin notice throughout the convention?
+      answer: the back of George Washington’s chair
+      from: "Throughout the convention, Ben Franklin had noticed the back of George Washington’s chair."
+  Q7 qa: What was carved into the back of George Washington’s chair?
+      answer: a sun
+      from: "There was a sun carved into it."
+  Q8 qa: What did Franklin conclude about the sun carved into the chair?
+      answer: it is a rising and not a setting sun
+      from: "“I have often and often in the course of this session looked at that behind the President without being able to tell whether it was rising or setting; but now at length I have the happiness to know that it is a rising and not a setting sun,” Franklin observed."
