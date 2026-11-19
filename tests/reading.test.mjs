@@ -1,6 +1,6 @@
 // Rule tests for Reading projects (layout, chunks, blocks, question builder). Run with: npm test
 import { alignLines, untangle, inkRows } from '../src/align.js';
-import { matchLine, placeByOcr } from '../src/ocr.js';
+import { similar, placeByEngine, dbBoxes, ctcDecode } from '../src/paddle.js';
 import { blockAreas, remakeQuestion, dateLike, parseJson, parseTranscript, makeChunks, layoutText, parseBlocks, buildQuestions, splitTextPages, textTranscript, cleanCount, toRows, suggestCount, countQuestions, readingReport, parseBlocksDetailed, buildCheckPrompt, parseChecks, struckIds, buildFactsPrompt } from '../src/reading.js';
 import { buildDeck, spreadGroups } from '../src/deck.js';
 
@@ -277,56 +277,27 @@ ok(am.get('x5').lines.length === 0, 'a source not on the page is not shaded anyw
   ok(ord.lines[1].y > ord.lines[0].y && ord.lines[1].y < ord.lines[2].y && ord.lines[3].y > ord.lines[2].y && ord.lines[3].y < ord.lines[4].y, 'a missed line stays between the found lines read before and after it (reading order wins)');
 }
 
-// 0.20.16: places from the text-reading engine
+// 0.20.26: places from the PaddleOCR text finder
 {
   const W = 1000, H = 1000;
-  const wl = (y, x, text) => ({ words: text.split(' ').map((w, i) => ({ text: w, x0: x + i * 60, y0: y, x1: x + i * 60 + 50, y1: y + 20 })) });
-  const ocr = [wl(100, 100, 'THE LEGISLATIVE BRANCH'), wl(200, 100, 'The larger house of Congress is the House'), wl(230, 100, 'in the Hause. The number of representatives'),
-    wl(300, 100, 'The House of Representatives has the sole power'), wl(330, 100, 'against a government official.')];
-  ok(matchLine('in the House. The number of representatives', ocr).k === 2, 'a line is found by its words even with a misread letter');
-  ok(matchLine('the a of', ocr) === null, 'short common words alone are not enough to find a line');
+  const e = (y, text, x = 100, w = 400, a = 0) => ({ text, cx: x + w / 2, cy: y + 10, w, h: 20, a: (a * Math.PI) / 180 });
+  ok(similar('reelected every two years.', 'reelectedevery twoyears.') > 0.9 && similar('the a of', 'The House of Representatives') < 0.6, 'lines are matched by their letters, missing spaces do not matter');
   const t = { lines: [
-    { id: 'l1', text: 'THE LEGISLATIVE BRANCH', x: 0.2, y: 0.5, w: 0.3, h: 0.02 },
-    { id: 'l2', text: 'The larger house of Congress is the House', x: 0.2, y: 0.6, w: 0.5, h: 0.02 },
-    { id: 'l3', text: 'something the engine could not read', x: 0.2, y: 0.62, w: 0.5, h: 0.02 },
-    { id: 'l4', text: 'in the House. The number of representatives', x: 0.2, y: 0.64, w: 0.5, h: 0.02 },
-    { id: 'l5', text: 'The House of Representatives has the sole power', x: 0.2, y: 0.7, w: 0.5, h: 0.02 },
-    { id: 'l6', text: 'against a government official.', x: 0.2, y: 0.72, w: 0.5, h: 0.02 }], figures: [] };
-  const p = placeByOcr(t, ocr, W, H);
-  ok(p.matched === 5 && Math.abs(p.lines[0].y - 0.1) < 0.001 && Math.abs(p.lines[4].y - 0.3) < 0.001, 'found lines take the engine\'s place, however far the AI was off');
-  ok(p.lines[2].y > p.lines[1].y && p.lines[2].y < p.lines[3].y, 'a line the engine missed goes between its neighbours');
-  ok(p.fixed.has('l1') && !p.fixed.has('l3'), 'found lines are kept fixed');
-  const hy = { lines: [
-    { id: 'a', text: 'many people are in a state,', x: 0.1, y: 0.40, w: 0.37, h: 0.018 },
-    { id: 'b', text: 'the government conducts', x: 0.1, y: 0.42, w: 0.37, h: 0.018 },
-    { id: 'c', text: 'The first census was con-', x: 0.1, y: 0.44, w: 0.22, h: 0.018 },
-    { id: 'd', text: 'ducted in 1790. When will', x: 0.1, y: 0.46, w: 0.37, h: 0.018 },
-    { id: 'e', text: 'the next census occur?', x: 0.1, y: 0.48, w: 0.22, h: 0.018 }], figures: [] };
-  const hp = placeByOcr(hy, [], 1000, 1000);
-  ok(Math.abs(hp.lines[2].w - 0.37) < 0.005 && hp.lines[4].w === 0.22, 'a line ending with a hyphen runs the full column width; a short last line stays short');
-  const wl2 = (y, x, text) => ({ words: text.split(' ').map((w, i) => ({ text: w, x0: x + i * 60, y0: y, x1: x + i * 60 + 50, y1: y + 20 })) });
-  const col = (id, text, y) => ({ id, text, x: 0.1, y, w: 0.3, h: 0.02 });
-  const lc = { lines: [col('a', 'many people are in a state', 0.457), col('b', 'a census or count of the', 0.478), col('c', 'The first census was conducted in', 0.498), col('d', 'When will the next one', 0.519), col('e', 'requirements to become a representative', 0.54)], figures: [] };
-  const lp = placeByOcr(lc, [wl2(448, 100, 'many people are in a state'), wl2(484, 100, 'The first census was conducted in'), wl2(525, 100, 'requirements to become a representative')], 1000, 1000);
-  ok(Math.abs(lp.lines[1].y - 0.4664) < 0.004 && Math.abs(lp.lines[3].y - 0.5045) < 0.004, 'a missed line is placed between the found lines of its own column, keeping the AI spacing');
-  // the page keeps its lines sorted by height, while the line numbers are the reading order; the AI put l2 and l3 below l4
-  const col2 = (id, text, y) => ({ id, text, x: 0.1, y, w: 0.3, h: 0.02 });
-  const rs = { lines: [col2('l1', 'many people are in a state', 0.40), col2('l4', 'The first census was conducted in', 0.61), col2('l2', 'a census or count of the', 0.62), col2('l3', 'When will the next one', 0.64)], figures: [] };
-  const rp = placeByOcr(rs, [wl2(396, 100, 'many people are in a state'), wl2(606, 100, 'The first census was conducted in')], 1000, 1000);
-  const ry = (id) => rp.lines.find((l) => l.id === id).y;
-  ok(ry('l1') < ry('l2') && ry('l2') < ry('l3') && ry('l3') < ry('l4'), 'reading order is the line numbers, not the order in the list: missed lines sit between the found lines read before and after them');
-}
-
-{
-  const wl = (y, x, text) => ({ words: text.split(' ').map((w, i) => ({ text: w, x0: x + i * 60, y0: y, x1: x + i * 60 + 50, y1: y + 20 })) });
-  const ocr = [wl(100, 100, 'There are many representatives in this House today'), wl(200, 100, 'Tbe first census was conducted')];
-  const t = { lines: [{ id: 'l1', text: 'There are many representatives in this House today', x: 0.1, y: 0.1, w: 0.4, h: 0.02 },
-    { id: 'l2', text: 'something else entirely here', x: 0.1, y: 0.15, w: 0.4, h: 0.02 },
-    { id: 'l3', text: 'The first census was conducted', x: 0.1, y: 0.2, w: 0.4, h: 0.02 },
-    { id: 'l4', text: 'There are many representatives in this House today', x: 0.1, y: 0.3, w: 0.4, h: 0.02 }], figures: [] };
-  const p = placeByOcr(t, [...ocr, wl(300, 100, 'There are many representatives in this House today')], 1000, 1000);
-  ok(p.lines[2].x < 0.155 && p.lines[2].w >= 0.2, 'a line whose first word was misread still reaches to its left edge and keeps its full width');
-  ok(Math.abs(p.lines[3].y - 0.3) < 0.001, 'the same words twice on a page go to two different printed lines');
+    { id: 'l1', text: 'many people are in a state,', x: 0.1, y: 0.40, w: 0.3, h: 0.02 },
+    { id: 'l4', text: 'The first census was con-', x: 0.1, y: 0.61, w: 0.3, h: 0.02 },
+    { id: 'l2', text: 'a census, or count of the', x: 0.1, y: 0.62, w: 0.3, h: 0.02 },
+    { id: 'l3', text: 'unreadable smudge words', x: 0.1, y: 0.64, w: 0.3, h: 0.02 }], figures: [] };
+  const eng = [e(396, 'manypeople are ina state,'), e(436, 'a census, or count of the'), e(476, 'The first census was con-', 100, 400, 2), e(700, 'Understanding the U.S. Constitution')];
+  const p = placeByEngine(t, eng, W, H);
+  const y = (id) => p.lines.find((l) => l.id === id).y;
+  ok(p.matched === 3 && p.fixed.has('l2') && !p.fixed.has('l3'), 'each line takes the engine line with the most similar text; text not in the reading is ignored');
+  ok(Math.abs(y('l2') - 0.436) < 0.002 && Math.abs(p.lines[1].a - 2) < 0.01, 'a found line takes the box and tilt of its printed line');
+  ok(y('l2') < y('l3') && y('l3') < y('l4'), 'a line the engine did not find goes between the found lines read before and after it (line numbers are the reading order)');
+  const one = new Float32Array(32 * 32); for (let yy = 10; yy < 16; yy++) for (let xx = 4; xx < 28; xx++) one[yy * 32 + xx] = 0.9;
+  const bx = dbBoxes(one, 32, 32, 64, 64);
+  ok(bx.length === 1 && bx[0].w > bx[0].h * 2 && Math.abs(bx[0].cy - 26) < 2, 'the detector map turns into one line box, scaled to the photo');
+  const pr = new Float32Array(4 * 4); [1, 1, 0, 2].forEach((c, t2) => { pr[t2 * 4 + c] = 1; });
+  ok(ctcDecode(pr, 4, 4, ['a', 'b']).text === 'ab', 'recognition output is read with repeats and blanks removed');
 }
 
 console.log(`reading: ${pass} passed, ${fail} failed`);

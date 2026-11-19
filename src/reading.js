@@ -691,6 +691,7 @@ export function readingReport(files, items, perFact, detail = 'normal', events =
       const t = f.transcript;
       out.push(`page text: kind=${t.kind} pieces=${t.lines.length} unselected=${(f.off || []).length} low-confidence=${t.lines.filter((l) => l.conf !== 'high').length} figures=${(t.figures || []).length}`);
       if (t.placed) out.push(`lined up with the photo: ${t.placed.method === 'engine' ? `by the text-reading engine, ${t.placed.matched} of ${t.lines.length} lines found by their words` : t.placed.aligned ? `by rows of print (engine found ${t.placed.matched || 0} lines), ${t.placed.moved} of ${t.lines.length} lines moved, average shift ${t.placed.avgShift}` : 'no (kept the AI\'s places)'}; overlaps pushed down: ${t.placed.pushed}; ${t.placed.ms} ms`);
+      if (t.placed && t.placed.err) out.push(`text finder failed: ${t.placed.err}`);
       if (t.placed && t.placed.found) out.push(`engine found (line, how far it sits below the AI's place): ${t.placed.found}`);
       out.push(layoutText(t, { marks: 'all' }));
       if ((f.off || []).length) out.push('unselected: ' + t.lines.filter((l) => (f.off || []).includes(l.id)).map((l) => l.text).join(' | '));

@@ -180,21 +180,17 @@ export async function photoMask(dataUrl, width = 900) {
 // Then no two lines may overlap. Never throws.
 export async function placeOnPhoto(dataUrl, t) {
   const t0 = Date.now();
-  let lines = t.lines, figures = t.figures || [], moved = 0, avgShift = 0, aligned = false, method = 'ai', matched = 0, fixed = new Set(), local = new Set(), offs = [];
+  let lines = t.lines, figures = t.figures || [], moved = 0, avgShift = 0, aligned = false, method = 'ai', matched = 0, fixed = new Set(), offs = [], err = '';
   const browser = typeof document !== 'undefined';
   const mock = browser && /[?&]mock=1/.test(location.search) && !window.__useOcr;
   if (dataUrl && browser && !mock) {
     try {
-      const { readWithEngine, placeByOcr } = await import('./ocr.js');
-      const r = await readWithEngine(dataUrl);
-      const p = placeByOcr(t, r.lines, r.W, r.H);
-      matched = p.matched; offs = p.offs || []; local = p.local || new Set();
-      if (p.matched >= 3) {
-        lines = p.lines; figures = p.figures; fixed = p.fixed; method = 'engine'; aligned = true;
-        // the lines the engine could not read are then snapped onto the rows of print left free
-        try { const mask = await photoMask(dataUrl); ({ lines, moved } = alignLines(lines, mask, figures, new Set([...fixed, ...local]), p.good ? 0.8 : 2.5)); } catch { /* keep them as placed */ } // a good map leaves only small steps
-      }
-    } catch { /* fall back to the rows of print */ }
+      const [{ readEngine }, { placeByEngine }] = await Promise.all([import('./ppread.js'), import('./paddle.js')]);
+      const r = await readEngine(dataUrl);
+      const p = placeByEngine(t, r.lines, r.W, r.H);
+      matched = p.matched; offs = p.offs || [];
+      if (p.matched >= 3) { lines = p.lines; fixed = p.fixed; method = 'engine'; aligned = true; }
+    } catch (e) { err = String((e && e.message) || e).slice(0, 200); /* fall back to the rows of print */ }
   }
   if (method !== 'engine' && dataUrl && browser) {
     try {
@@ -204,5 +200,5 @@ export async function placeOnPhoto(dataUrl, t) {
     } catch { /* keep the AI's places */ }
   }
   const u = untangle(lines, fixed);
-  return { ...t, lines: u.lines, figures, placed: { method, matched, aligned, moved, avgShift: Math.round(avgShift * 1000) / 1000, pushed: u.pushed, found: offs.join(' '), ms: Date.now() - t0 } };
+  return { ...t, lines: u.lines, figures, placed: { method, matched, aligned, moved, avgShift: Math.round(avgShift * 1000) / 1000, pushed: u.pushed, found: offs.join(' '), err, ms: Date.now() - t0 } };
 }

@@ -623,7 +623,7 @@ function PageEditor({ code, projectId, projectName, file, index, onClose }) {
                   {lines.map((l) => (
                     <div key={l.id} data-testid="piece" data-pid={l.id}
                       className={'rd-piece' + (off.includes(l.id) ? ' off' : '') + (sel === l.id ? ' sel' : '') + (l.conf === 'low' ? ' low' : '') + l.marks.map((m) => ' m-' + m).join('')}
-                      style={{ left: `${l.x * 100}%`, top: `${l.y * 100}%`, fontSize: fs(l) }}>{l.marks.includes('star') ? '★ ' : ''}{l.text}</div>
+                      style={{ left: `${l.x * 100}%`, top: `${l.y * 100}%`, fontSize: fs(l), ...(l.a ? { transform: `rotate(${l.a.toFixed(2)}deg)`, transformOrigin: '0 0' } : {}) }}>{l.marks.includes('star') ? '★ ' : ''}{l.text}</div>
                   ))}
                   {hlChunk && hlChunk.box && <div className="rd-hl" style={{ left: `${hlChunk.box.x * 100 - 1}%`, top: `${hlChunk.box.y * 100 - 0.6}%`, width: `${hlChunk.box.w * 100 + 2}%`, height: `${hlChunk.box.h * 100 + 1.2}%` }} />}
                 </div>
