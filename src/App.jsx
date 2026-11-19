@@ -33,6 +33,9 @@ export default function App() {
   const [view, setView] = useState({ screen: 'loading' });
   const [code, setCode] = useState(store.get('familyCode'));
   const [family, setFamily] = useState(store.get('family'));
+  useEffect(() => { // pull-to-refresh only on the account list and family screens, never inside an account
+    document.documentElement.classList.toggle('in-account', !['loading', 'welcome', 'create', 'join', 'profiles', 'family'].includes(view.screen));
+  }, [view.screen]);
 
   useEffect(() => {
     (async () => {
