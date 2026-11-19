@@ -309,6 +309,12 @@ ok(am.get('x5').lines.length === 0, 'a source not on the page is not shaded anyw
   const lc = { lines: [col('a', 'many people are in a state', 0.457), col('b', 'a census or count of the', 0.478), col('c', 'The first census was conducted in', 0.498), col('d', 'When will the next one', 0.519), col('e', 'requirements to become a representative', 0.54)], figures: [] };
   const lp = placeByOcr(lc, [wl2(448, 100, 'many people are in a state'), wl2(484, 100, 'The first census was conducted in'), wl2(525, 100, 'requirements to become a representative')], 1000, 1000);
   ok(Math.abs(lp.lines[1].y - 0.4664) < 0.004 && Math.abs(lp.lines[3].y - 0.5045) < 0.004, 'a missed line is placed between the found lines of its own column, keeping the AI spacing');
+  // the page keeps its lines sorted by height, while the line numbers are the reading order; the AI put l2 and l3 below l4
+  const col2 = (id, text, y) => ({ id, text, x: 0.1, y, w: 0.3, h: 0.02 });
+  const rs = { lines: [col2('l1', 'many people are in a state', 0.40), col2('l4', 'The first census was conducted in', 0.61), col2('l2', 'a census or count of the', 0.62), col2('l3', 'When will the next one', 0.64)], figures: [] };
+  const rp = placeByOcr(rs, [wl2(396, 100, 'many people are in a state'), wl2(606, 100, 'The first census was conducted in')], 1000, 1000);
+  const ry = (id) => rp.lines.find((l) => l.id === id).y;
+  ok(ry('l1') < ry('l2') && ry('l2') < ry('l3') && ry('l3') < ry('l4'), 'reading order is the line numbers, not the order in the list: missed lines sit between the found lines read before and after them');
 }
 
 {

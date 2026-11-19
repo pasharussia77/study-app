@@ -101,6 +101,7 @@ export function alignLines(lines, mask, figures = [], fixed = new Set(), maxJump
 }
 
 // Safety net: a line that still covers an earlier one moves down just below it; the lines under it follow.
+const rnum = (l) => Number(String(l.id).replace(/\D/g, '')) || 0;
 export function untangle(lines, fixed = new Set()) {
   const out = [];
   let pushed = 0;
@@ -123,14 +124,15 @@ export function untangle(lines, fixed = new Set()) {
     if (nl.y - l.y > 3 * h) { nl = { ...l }; }
     // reading order wins: a line never lands below the next line the engine found in its own column.
     // It goes in the gap between the line read before it and that found line.
-    const idx = lines.indexOf(l);
+    const rd = [...lines].sort((p, q) => rnum(p) - rnum(q)); // reading order is the line's number
+    const idx = rd.indexOf(l);
     let ceil = null;
-    for (let j = idx + 1; j < lines.length; j++) {
-      const q = lines[j];
+    for (let j = idx + 1; j < rd.length; j++) {
+      const q = rd[j];
       if (fixed.has(q.id) && q.y != null && xOverlap(q, nl) > 0.2 * Math.min(q.w || 0.3, nl.w || 0.3)) { ceil = q.y; break; }
     }
     if (ceil != null && nl.y > ceil - 0.5 * h) {
-      const prev = idx > 0 ? lines[idx - 1] : null;
+      const prev = idx > 0 ? rd[idx - 1] : null;
       const pp = prev && prev.y != null ? (out.find((o) => o.id === prev.id) || prev) : null;
       const floor = pp ? pp.y : ceil - 2 * h;
       nl = { ...nl, y: ceil > floor ? floor + (ceil - floor) / 2 : ceil - 0.5 * h };
@@ -178,7 +180,7 @@ export async function photoMask(dataUrl, width = 900) {
 // Then no two lines may overlap. Never throws.
 export async function placeOnPhoto(dataUrl, t) {
   const t0 = Date.now();
-  let lines = t.lines, figures = t.figures || [], moved = 0, avgShift = 0, aligned = false, method = 'ai', matched = 0, fixed = new Set();
+  let lines = t.lines, figures = t.figures || [], moved = 0, avgShift = 0, aligned = false, method = 'ai', matched = 0, fixed = new Set(), local = new Set(), offs = [];
   const browser = typeof document !== 'undefined';
   const mock = browser && /[?&]mock=1/.test(location.search) && !window.__useOcr;
   if (dataUrl && browser && !mock) {
@@ -186,11 +188,11 @@ export async function placeOnPhoto(dataUrl, t) {
       const { readWithEngine, placeByOcr } = await import('./ocr.js');
       const r = await readWithEngine(dataUrl);
       const p = placeByOcr(t, r.lines, r.W, r.H);
-      matched = p.matched;
+      matched = p.matched; offs = p.offs || []; local = p.local || new Set();
       if (p.matched >= 3) {
         lines = p.lines; figures = p.figures; fixed = p.fixed; method = 'engine'; aligned = true;
         // the lines the engine could not read are then snapped onto the rows of print left free
-        try { const mask = await photoMask(dataUrl); ({ lines, moved } = alignLines(lines, mask, figures, fixed, p.good ? 0.8 : 2.5)); } catch { /* keep them as placed */ } // a good map leaves only small steps
+        try { const mask = await photoMask(dataUrl); ({ lines, moved } = alignLines(lines, mask, figures, new Set([...fixed, ...local]), p.good ? 0.8 : 2.5)); } catch { /* keep them as placed */ } // a good map leaves only small steps
       }
     } catch { /* fall back to the rows of print */ }
   }
@@ -202,5 +204,5 @@ export async function placeOnPhoto(dataUrl, t) {
     } catch { /* keep the AI's places */ }
   }
   const u = untangle(lines, fixed);
-  return { ...t, lines: u.lines, figures, placed: { method, matched, aligned, moved, avgShift: Math.round(avgShift * 1000) / 1000, pushed: u.pushed, ms: Date.now() - t0 } };
+  return { ...t, lines: u.lines, figures, placed: { method, matched, aligned, moved, avgShift: Math.round(avgShift * 1000) / 1000, pushed: u.pushed, found: offs.join(' '), ms: Date.now() - t0 } };
 }

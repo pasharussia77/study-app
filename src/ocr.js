@@ -115,6 +115,13 @@ export function placeByOcr(t, ocrLines, W, H) {
   const resid = anchors.map((a) => Math.abs(a[1] - mv(a[0], fy))).sort((p, q) => p - q);
   const good = fy && resid.length >= 3 && resid[Math.floor(resid.length / 2)] < 0.008;
   const yOf = (v) => {
+    // beyond the first and last found line the AI's place is moved by the same step as that found line: stretching the map
+    // out there makes the error grow with the distance
+    if (anchors.length) {
+      const f = anchors[0], z = anchors[anchors.length - 1];
+      if (v < f[0]) return Math.max(0, v + f[1] - f[0]);
+      if (v > z[0]) return Math.min(0.99, v + z[1] - z[0]);
+    }
     if (good || !anchors.length) return mv(v, fy);
     let lo = null, hi = null;
     for (const a of anchors) { if (a[0] <= v) lo = a; else if (!hi) hi = a; }
@@ -123,23 +130,30 @@ export function placeByOcr(t, ocrLines, W, H) {
     if (lo) return Math.min(0.99, lo[1] + (v - lo[0]) * a);
     return Math.max(0, hi[1] - (hi[0] - v) * a);
   };
-  // a line the engine missed is placed from the nearest found lines in its own column (above and below it):
-  // it keeps the AI's spacing from them. The map of the whole page is only the fallback, since it can be off in one column.
+  // a line the engine missed is placed from the nearest found lines in its own column, counted in reading order:
+  // between two found lines it takes its turn evenly; above a found line it stacks upward from it, below one downward,
+  // at the AI's usual line spacing. The AI's own heights can be wrong (it may even put lines of one column below
+  // a later line), but its order and spacing are good. The map of the whole page is only the fallback.
+  const sameCol = (q, l) => Math.min(q.x + q.w, l.x + l.w) - Math.max(q.x, l.x) > 0.5 * Math.min(q.w, l.w);
+  // reading order is the line's number (the page keeps its lines sorted by height, not by reading order)
+  const rnum = (l) => Number(String(l.id).replace(/\D/g, '')) || 0;
+  const rd = t.lines.map((l, k) => ({ l, k })).sort((p, q) => rnum(p.l) - rnum(q.l));
   const yLocal = (l) => {
+    const i = rd.findIndex((r) => r.l === l), n = rd.length;
     let lo = null, hi = null;
-    t.lines.forEach((q, j) => {
-      const p = placed[j];
-      if (!p || q === l || Math.abs(q.y - l.y) > 0.1) return;
-      if (Math.min(q.x + q.w, l.x + l.w) - Math.max(q.x, l.x) <= 0.5 * Math.min(q.w, l.w)) return; // not the same column
-      if (q.y <= l.y) { if (!lo || q.y > lo.q.y) lo = { q, p }; } else if (!hi || q.y < hi.q.y) hi = { q, p };
-    });
-    const a = fy ? fy.a : 1;
-    if (lo && hi && hi.q.y - lo.q.y > 1e-6) return lo.p.y + (hi.p.y - lo.p.y) * (l.y - lo.q.y) / (hi.q.y - lo.q.y);
-    if (lo) return Math.min(0.99, lo.p.y + (l.y - lo.q.y) * a);
-    if (hi) return Math.max(0, hi.p.y - (hi.q.y - l.y) * a);
-    return null;
+    // look up and down the column; a line of another column in between ends the search (the count would be wrong)
+    for (let j = i - 1; j >= Math.max(0, i - 24); j--) { if (!sameCol(rd[j].l, l)) break; if (placed[rd[j].k]) { lo = j; break; } }
+    for (let j = i + 1; j <= Math.min(n - 1, i + 24); j++) { if (!sameCol(rd[j].l, l)) break; if (placed[rd[j].k]) { hi = j; break; } }
+    if (lo == null && hi == null) return null;
+    if (lo != null && hi != null) return placed[rd[lo].k].y + (placed[rd[hi].k].y - placed[rd[lo].k].y) * (i - lo) / (hi - lo);
+    const ds = [];
+    for (let k = Math.max(0, i - 4); k < Math.min(n - 1, i + 4); k++) { const d = rd[k + 1].l.y - rd[k].l.y; if (d > 0.008 && d < 0.05) ds.push(d); }
+    ds.sort((p, q) => p - q);
+    const pitch = (ds.length ? ds[Math.floor(ds.length / 2)] : 1.1 * l.h) * (fy ? fy.a : 1);
+    return lo != null ? Math.min(0.99, placed[rd[lo].k].y + (i - lo) * pitch) : Math.max(0, placed[rd[hi].k].y - (hi - i) * pitch);
   };
-  const lines0 = t.lines.map((l, i) => placed[i] || { ...l, x: mv(l.x, fx), y: yLocal(l) ?? yOf(l.y), w: fx ? Math.max(0.01, l.w * fx.a) : l.w, h: fy ? Math.max(0.006, l.h * fy.a) : l.h });
+  const local = new Set(); // lines placed from found lines next to them: the snapping to rows of print leaves them alone
+  const lines0 = t.lines.map((l, i) => placed[i] || { ...l, x: mv(l.x, fx), y: (() => { const v = yLocal(l); if (v != null) local.add(l.id); return v ?? yOf(l.y); })(), w: fx ? Math.max(0.01, l.w * fx.a) : l.w, h: fy ? Math.max(0.006, l.h * fy.a) : l.h });
   // a line that ends with a hyphen goes on to the next line, so it runs the full width of its column:
   // it is never narrower than the lines next to it that do not end a sentence
   const lines = lines0.map((nl, i) => {
@@ -151,7 +165,8 @@ export function placeByOcr(t, ocrLines, W, H) {
     return { ...nl, w: Math.min(w, 1 - nl.x) }; // never wider than the page
   });
   const figures = (t.figures || []).map((f) => (fx && fy ? { ...f, x: mv(f.x, fx), y: mv(f.y, fy), w: Math.max(0.02, f.w * fx.a), h: Math.max(0.02, f.h * fy.a) } : f));
-  return { ...t, lines, figures, matched, fixed, good: !!good };
+  const offs = t.lines.map((l, i) => (placed[i] ? `${l.id}${placed[i].y - l.y >= 0 ? '+' : ''}${(placed[i].y - l.y).toFixed(3)}` : null)).filter(Boolean); // for the report
+  return { ...t, lines, figures, matched, fixed, good: !!good, offs, local };
 }
 
 // Browser only: reads the photo with the engine. Returns { lines, W, H } or throws.
