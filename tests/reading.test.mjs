@@ -304,6 +304,11 @@ ok(am.get('x5').lines.length === 0, 'a source not on the page is not shaded anyw
     { id: 'e', text: 'the next census occur?', x: 0.1, y: 0.48, w: 0.22, h: 0.018 }], figures: [] };
   const hp = placeByOcr(hy, [], 1000, 1000);
   ok(Math.abs(hp.lines[2].w - 0.37) < 0.005 && hp.lines[4].w === 0.22, 'a line ending with a hyphen runs the full column width; a short last line stays short');
+  const wl2 = (y, x, text) => ({ words: text.split(' ').map((w, i) => ({ text: w, x0: x + i * 60, y0: y, x1: x + i * 60 + 50, y1: y + 20 })) });
+  const col = (id, text, y) => ({ id, text, x: 0.1, y, w: 0.3, h: 0.02 });
+  const lc = { lines: [col('a', 'many people are in a state', 0.457), col('b', 'a census or count of the', 0.478), col('c', 'The first census was conducted in', 0.498), col('d', 'When will the next one', 0.519), col('e', 'requirements to become a representative', 0.54)], figures: [] };
+  const lp = placeByOcr(lc, [wl2(448, 100, 'many people are in a state'), wl2(484, 100, 'The first census was conducted in'), wl2(525, 100, 'requirements to become a representative')], 1000, 1000);
+  ok(Math.abs(lp.lines[1].y - 0.4664) < 0.004 && Math.abs(lp.lines[3].y - 0.5045) < 0.004, 'a missed line is placed between the found lines of its own column, keeping the AI spacing');
 }
 
 {

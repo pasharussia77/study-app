@@ -123,7 +123,23 @@ export function placeByOcr(t, ocrLines, W, H) {
     if (lo) return Math.min(0.99, lo[1] + (v - lo[0]) * a);
     return Math.max(0, hi[1] - (hi[0] - v) * a);
   };
-  const lines0 = t.lines.map((l, i) => placed[i] || { ...l, x: mv(l.x, fx), y: yOf(l.y), w: fx ? Math.max(0.01, l.w * fx.a) : l.w, h: fy ? Math.max(0.006, l.h * fy.a) : l.h });
+  // a line the engine missed is placed from the nearest found lines in its own column (above and below it):
+  // it keeps the AI's spacing from them. The map of the whole page is only the fallback, since it can be off in one column.
+  const yLocal = (l) => {
+    let lo = null, hi = null;
+    t.lines.forEach((q, j) => {
+      const p = placed[j];
+      if (!p || q === l || Math.abs(q.y - l.y) > 0.1) return;
+      if (Math.min(q.x + q.w, l.x + l.w) - Math.max(q.x, l.x) <= 0.5 * Math.min(q.w, l.w)) return; // not the same column
+      if (q.y <= l.y) { if (!lo || q.y > lo.q.y) lo = { q, p }; } else if (!hi || q.y < hi.q.y) hi = { q, p };
+    });
+    const a = fy ? fy.a : 1;
+    if (lo && hi && hi.q.y - lo.q.y > 1e-6) return lo.p.y + (hi.p.y - lo.p.y) * (l.y - lo.q.y) / (hi.q.y - lo.q.y);
+    if (lo) return Math.min(0.99, lo.p.y + (l.y - lo.q.y) * a);
+    if (hi) return Math.max(0, hi.p.y - (hi.q.y - l.y) * a);
+    return null;
+  };
+  const lines0 = t.lines.map((l, i) => placed[i] || { ...l, x: mv(l.x, fx), y: yLocal(l) ?? yOf(l.y), w: fx ? Math.max(0.01, l.w * fx.a) : l.w, h: fy ? Math.max(0.006, l.h * fy.a) : l.h });
   // a line that ends with a hyphen goes on to the next line, so it runs the full width of its column:
   // it is never narrower than the lines next to it that do not end a sentence
   const lines = lines0.map((nl, i) => {
