@@ -143,9 +143,12 @@ export default function BlockMap({ file, blocks, areas, activeId, onPick, pageLa
             return (areas.get(b.id) || { rects: [] }).rects.map((r0, k) => {
               const m = boxes[r0.line];
               const r = m ? { x: m.x + m.w * r0.a, w: m.w * (r0.b - r0.a), y: m.y, h: m.h } : r0;
+              // a tilted line (photo slightly crooked) is turned around its own top-left corner: turn its outline the same way
+              const ln = lines.find((q) => q.id === r0.line), tilt = ln && ln.a ? ln.a : 0;
+              const turn = tilt ? { rotate: `${tilt.toFixed(2)}deg`, transformOrigin: `${(((ln.x - r.x) / Math.max(r.w, 0.001)) * 100).toFixed(1)}% 0` } : {};
               return (
               <div key={b.id + k} className={'rd-area' + (on ? ' on' : '')} data-testid="area" data-bid={b.id}
-                style={{ left: `${r.x * 100 - 0.2}%`, top: `${r.y * 100}%`, width: `${Math.max(r.w * 100 + 0.1, 0.5)}%`, height: `${r.h * 100}%`, borderColor: on ? c.line : c.soft, background: on ? c.fill : c.pale }} />
+                style={{ left: `${r.x * 100 - 0.2}%`, top: `${r.y * 100}%`, width: `${Math.max(r.w * 100 + 0.1, 0.5)}%`, height: `${r.h * 100}%`, borderColor: on ? c.line : c.soft, background: on ? c.fill : c.pale, ...turn }} />
               );
             });
           })}
