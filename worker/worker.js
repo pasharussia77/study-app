@@ -4,6 +4,7 @@
 //   TTS_MODEL (optional, default gpt-4o-mini-tts)  TTS_VOICE (optional, default sage)  TTS_STYLE (optional)
 //   STT_MODEL (optional, default gpt-transcribe)  STT_FALLBACK_MODEL (optional, default gpt-4o-mini-transcribe)
 //   GITHUB_TOKEN (secret): saves diagnostic reports to the "reports" branch of the app's repo
+//   GOOGLE_VISION_KEY (secret): reads where each word sits on a photo (Google Cloud Vision, document text mode)
 
 const ALLOWED_ORIGINS = ['https://pasharussia77.github.io'];
 const FIREBASE_PROJECT = 'family-study-94e10';
@@ -14,6 +15,7 @@ const MAX_OUTPUT_TOKENS = 4000;
 const MAX_TTS_CHARS = 1500;
 const MAX_AUDIO_BYTES = 6_000_000;
 const MAX_REPORT_CHARS = 1_500_000;
+const MAX_VISION_CHARS = 7_000_000; // a photo as base64 text
 const REPORT_REPO = 'pasharussia77/study-app';
 const REPORT_BRANCH = 'reports';
 
@@ -179,6 +181,43 @@ async function handleReport(request, env, origin) {
   return json({ ok: true, path }, 200, origin);
 }
 
+// Google Cloud Vision: one photo in, every word with its four corners out (the phone turns them into lines).
+// Each word: { t: text, v: [x0,y0,x1,y1,x2,y2,x3,y3] in photo pixels, b: 'L' when a line ends after it }.
+function visionWords(resp) {
+  const words = [];
+  const pages = (resp && resp.fullTextAnnotation && resp.fullTextAnnotation.pages) || [];
+  for (const pg of pages) for (const bl of pg.blocks || []) for (const pa of bl.paragraphs || []) for (const w of pa.words || []) {
+    const sy = w.symbols || [];
+    const t = sy.map((x) => x.text || '').join('');
+    const vs = (w.boundingBox && w.boundingBox.vertices) || [];
+    if (!t || vs.length < 4) continue;
+    const last = sy.length ? sy[sy.length - 1] : null;
+    const br = last && last.property && last.property.detectedBreak && last.property.detectedBreak.type;
+    words.push({ t, v: vs.slice(0, 4).flatMap((q) => [q.x || 0, q.y || 0]), b: br === 'LINE_BREAK' || br === 'EOL_SURE_SPACE' ? 'L' : '' });
+  }
+  const pg0 = pages[0] || {};
+  return { words, W: pg0.width || 0, H: pg0.height || 0 };
+}
+async function handleVision(request, env, origin) {
+  if (!env.GOOGLE_VISION_KEY) return json({ error: 'The server is missing its Google Vision key.' }, 500, origin);
+  let body;
+  try { body = await request.json(); } catch { return json({ error: 'Invalid request.' }, 400, origin); }
+  const image = typeof body.image === 'string' ? body.image : '';
+  if (!image || image.length > MAX_VISION_CHARS || !/^[A-Za-z0-9+/=]+$/.test(image.slice(0, 200))) return json({ error: 'Invalid photo.' }, 400, origin);
+  const res = await fetch('https://vision.googleapis.com/v1/images:annotate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GOOGLE_VISION_KEY },
+    body: JSON.stringify({ requests: [{ image: { content: image }, features: [{ type: 'DOCUMENT_TEXT_DETECTION' }], imageContext: { languageHints: ['en'] } }] })
+  });
+  const data = await res.json().catch(() => ({}));
+  const one = data && data.responses && data.responses[0];
+  if (!res.ok || !one || one.error) {
+    const msg = (data && data.error && data.error.message) || (one && one.error && one.error.message) || 'Google Vision returned an error.';
+    return json({ error: String(msg).slice(0, 200) }, 502, origin);
+  }
+  return json(visionWords(one), 200, origin);
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -204,6 +243,7 @@ export default {
       if (url.pathname === '/tts') return handleTts(request, env, origin);
       if (url.pathname === '/stt') return handleStt(request, env, origin);
       if (url.pathname === '/report') return handleReport(request, env, origin);
+      if (url.pathname === '/vision') return handleVision(request, env, origin);
     }
     return json({ error: 'Not found.' }, 404, origin);
   }

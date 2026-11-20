@@ -1,5 +1,6 @@
 // Rule tests for Reading projects (layout, chunks, blocks, question builder). Run with: npm test
 import { alignLines, untangle, inkRows } from '../src/align.js';
+import { wordsToLines } from '../src/gvision.js';
 import { similar, placeByEngine, dbBoxes, ctcDecode } from '../src/paddle.js';
 import { blockAreas, remakeQuestion, dateLike, parseJson, parseTranscript, makeChunks, layoutText, parseBlocks, buildQuestions, splitTextPages, textTranscript, cleanCount, toRows, suggestCount, countQuestions, readingReport, parseBlocksDetailed, buildCheckPrompt, parseChecks, struckIds, buildFactsPrompt } from '../src/reading.js';
 import { buildDeck, spreadGroups } from '../src/deck.js';
@@ -305,6 +306,38 @@ ok(am.get('x5').lines.length === 0, 'a source not on the page is not shaded anyw
   ok(bx.length === 1 && bx[0].w > bx[0].h * 2 && Math.abs(bx[0].cy - 26) < 2, 'the detector map turns into one line box, scaled to the photo');
   const pr = new Float32Array(4 * 4); [1, 1, 0, 2].forEach((c, t2) => { pr[t2 * 4 + c] = 1; });
   ok(ctcDecode(pr, 4, 4, ['a', 'b']).text === 'ab', 'recognition output is read with repeats and blanks removed');
+}
+
+// 0.22.0: lines from Google Vision's words
+{
+  const W = 1000, H = 1000, tilt = 0.02; // radians
+  // a word as Google gives it: text, four corners (top-left, top-right, bottom-right, bottom-left), and "L" when the line ends after it
+  const word = (t, x, y, w, h, b = '') => {
+    const c = Math.cos(tilt), s = Math.sin(tilt), pt = (dx, dy) => [(x + dx) * c - (y + dy) * s, (x + dx) * s + (y + dy) * c]; // the whole page is tilted around its corner
+    return { t, v: [...pt(0, 0), ...pt(w, 0), ...pt(w, h), ...pt(0, h)], b };
+  };
+  const words = [
+    word('II', 150, 440, 18, 16), word('Right', 220, 440, 50, 16), word('to', 276, 440, 20, 16), word('bear', 302, 440, 40, 16), word('arms', 348, 440, 44, 16, 'L'),
+    word('XIV', 140, 600, 36, 16), word('Civil', 215, 600, 44, 16), word('rights', 265, 600, 52, 16, 'L'),
+    word('Freedom', 225, 480, 70, 16), word('of', 300, 480, 18, 16), word('religion,', 322, 480, 70, 16, 'L'),
+    word('assembly,', 225, 500, 80, 16), word('petition', 312, 500, 66, 16, 'L')
+  ];
+  const ls = wordsToLines(words);
+  ok(ls.length === 6, 'a numeral far from its text is its own line; each line break ends a line (' + ls.length + ')');
+  ok(ls[0].text === 'II' && ls[1].text === 'Right to bear arms', 'words are joined in reading order');
+  ok(Math.abs(ls[1].a - tilt) < 0.002 && ls[1].h > 15 && ls[1].h < 17 && Math.abs(ls[1].w - 172) < 3, 'a line takes the tilt, height and length of its words');
+  const t = { lines: [
+    { id: 'l1', text: 'II', x: 0.15, y: 0.44, w: 0.02, h: 0.016 }, { id: 'l2', text: 'Right to bear arms', x: 0.22, y: 0.44, w: 0.16, h: 0.016 },
+    { id: 'l3', text: 'XIV', x: 0.14, y: 0.6, w: 0.04, h: 0.016 }, { id: 'l4', text: 'Civil rights in the states', x: 0.21, y: 0.6, w: 0.2, h: 0.016 },
+    { id: 'l5', text: 'Freedom of religion,', x: 0.22, y: 0.48, w: 0.17, h: 0.016 }], figures: [] };
+  const p = placeByEngine(t, ls, W, H);
+  ok(p.matched === 5 && p.fixed.has('l1') && p.fixed.has('l3') && p.fixed.has('l2') && p.fixed.has('l5'), 'Google lines feed the same matching: numerals and long lines are found (' + p.matched + ')');
+  ok(Math.abs(p.lines[1].a - 1.146) < 0.1, 'the tilt reaches the page piece (' + p.lines[1].a + ')');
+  ok(wordsToLines([]).length === 0 && wordsToLines(null).length === 0 && wordsToLines([{ t: 'x', v: [1, 2] }]).length === 0, 'empty or broken words give no lines');
+  const wide = wordsToLines([word('A', 100, 100, 10, 16), word('B', 400, 100, 10, 16)]);
+  ok(wide.length === 2, 'a wide gap on one row splits the line');
+  const two = wordsToLines([word('top', 100, 100, 30, 16), word('lower', 100, 140, 40, 16)]);
+  ok(two.length === 2, 'a word on another row starts a new line even without a line break');
 }
 
 console.log(`reading: ${pass} passed, ${fail} failed`);

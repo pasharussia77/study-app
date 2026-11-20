@@ -14,6 +14,14 @@ globalThis.fetch = async (url, init) => {
     if (globalThis.__sttFailPrimary && m === 'gpt-transcribe') return new Response(JSON.stringify({ error: { message: 'The model `gpt-transcribe` does not exist or you do not have access to it.' } }), { status: 404 });
     return new Response(JSON.stringify({ text: 'it is a small furry pet', languages: [{ code: 'en' }] }), { status: 200 });
   }
+  if (String(url).includes('vision.googleapis.com')) {
+    if (init.headers['x-goog-api-key'] !== 'gv-good') return new Response(JSON.stringify({ error: { message: 'API key not valid.' } }), { status: 400 });
+    const sym = (text, br) => ({ text, ...(br ? { property: { detectedBreak: { type: br } } } : {}) });
+    const v = (x, y, w, h) => [{ x, y }, { x: x + w, y }, { x: x + w, y: y + h }, { x, y: y + h }];
+    return new Response(JSON.stringify({ responses: [{ fullTextAnnotation: { pages: [{ width: 800, height: 600, blocks: [{ paragraphs: [{ words: [
+      { boundingBox: { vertices: v(10, 20, 30, 12) }, symbols: [sym('I'), sym('I', 'SPACE')] },
+      { boundingBox: { vertices: v(60, 20, 40, 12) }, symbols: [sym('Hi'), sym('!', 'LINE_BREAK')] }] }] }] }] } }] }), { status: 200 });
+  }
   if (String(url).includes('api.github.com')) return new Response('{}', { status: init.headers.Authorization === 'Bearer gh-good' ? 201 : 401 });
   if (String(url).includes('api.openai.com')) return new Response(JSON.stringify({ choices: [{ message: { content: 'hi there' } }], usage: { total_tokens: 5 } }), { status: 200 });
   throw new Error('unexpected ' + url);
@@ -121,4 +129,11 @@ r = await worker.fetch(req('/report', { headers: good, body: { name: 'x', text: 
 r = await worker.fetch(req('/report', { headers: good, body: { name: 'x', text: 'y' } }), { ...env, GITHUB_TOKEN: 'gh-bad' }); check('report with a bad token fails clearly', r.status === 502);
 r = await worker.fetch(req('/report', { headers: good, body: { name: 'x', text: '' } }), { ...env, GITHUB_TOKEN: 'gh-good' }); check('empty report rejected', r.status === 400);
 r = await worker.fetch(req('/report', { headers: { ...good, 'X-Family-Code': 'wrong-code-999' }, body: { name: 'x', text: 'y' } }), { ...env, GITHUB_TOKEN: 'gh-good' }); check('report needs family', r.status === 401);
+r = await worker.fetch(req('/vision', { headers: good, body: { image: 'AAAA' } }), env); check('vision without key says so', r.status === 500);
+r = await worker.fetch(req('/vision', { headers: good, body: { image: 'AAAA' } }), { ...env, GOOGLE_VISION_KEY: 'gv-bad' }); j = await r.json(); check('vision with a bad key fails clearly, key not shown', r.status === 502 && !JSON.stringify(j).includes('gv-bad'));
+r = await worker.fetch(req('/vision', { headers: good, body: { image: 'AAAA' } }), { ...env, GOOGLE_VISION_KEY: 'gv-good' }); j = await r.json();
+check('vision returns words with corners and line ends', r.status === 200 && j.W === 800 && j.H === 600 && j.words.length === 2 && j.words[0].t === 'II' && j.words[0].b === '' && j.words[1].t === 'Hi!' && j.words[1].b === 'L' && j.words[1].v.length === 8 && j.words[1].v[0] === 60);
+check('vision key goes in a header, not the address', !calls[calls.length - 1].url.includes('gv-good') && calls[calls.length - 1].init.headers['x-goog-api-key'] === 'gv-good');
+r = await worker.fetch(req('/vision', { headers: good, body: { image: '' } }), { ...env, GOOGLE_VISION_KEY: 'gv-good' }); check('vision rejects an empty photo', r.status === 400);
+r = await worker.fetch(req('/vision', { headers: { ...good, 'X-Family-Code': 'wrong-code-999' }, body: { image: 'AAAA' } }), { ...env, GOOGLE_VISION_KEY: 'gv-good' }); check('vision needs family', r.status === 401);
 console.log(`worker tests: ${pass} passed, ${fail} failed`);

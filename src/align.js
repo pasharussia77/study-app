@@ -178,21 +178,32 @@ export async function photoMask(dataUrl, width = 900) {
 // The whole step for one page. First the text-reading engine: it finds each printed line's exact box, and lines
 // are matched to it by their words. When it cannot (handwriting, an engine error), the rows of print are used instead.
 // Then no two lines may overlap. Never throws.
-export async function placeOnPhoto(dataUrl, t) {
+// google: optional promise of Google Vision's lines ({ lines, W, H } or { err }), started earlier so it runs while the AI reads.
+export async function placeOnPhoto(dataUrl, t, google = null) {
   const t0 = Date.now();
   let lines = t.lines, figures = t.figures || [], moved = 0, avgShift = 0, aligned = false, method = 'ai', matched = 0, fixed = new Set(), offs = [], err = '', threads = 0;
   const browser = typeof document !== 'undefined';
   const mock = browser && /[?&]mock=1/.test(location.search) && !window.__useOcr;
-  if (dataUrl && browser && !mock) {
+  if (google && dataUrl && browser && !mock) {
+    try {
+      const [r, { placeByEngine }] = await Promise.all([google, import('./paddle.js')]);
+      if (r && r.err) throw new Error(r.err);
+      const p = placeByEngine(t, r.lines, r.W, r.H);
+      matched = p.matched; offs = p.offs || [];
+      if (p.matched >= 3) { lines = p.lines; fixed = p.fixed; method = 'google'; aligned = true; }
+      else err = `Google Vision matched only ${p.matched} lines`;
+    } catch (e) { err = 'Google Vision: ' + String((e && e.message) || e).slice(0, 160); /* fall back to the on-phone text finder */ }
+  }
+  if (method === 'ai' && dataUrl && browser && !mock) {
     try {
       const [{ readEngine }, { placeByEngine }] = await Promise.all([import('./ppread.js'), import('./paddle.js')]);
       const r = await readEngine(dataUrl); threads = r.threads || 0;
       const p = placeByEngine(t, r.lines, r.W, r.H);
       matched = p.matched; offs = p.offs || [];
       if (p.matched >= 3) { lines = p.lines; fixed = p.fixed; method = 'engine'; aligned = true; }
-    } catch (e) { err = String((e && e.message) || e).slice(0, 200); /* fall back to the rows of print */ }
+    } catch (e) { err = (err ? err + '; ' : '') + String((e && e.message) || e).slice(0, 200); /* fall back to the rows of print */ }
   }
-  if (method !== 'engine' && dataUrl && browser) {
+  if (method !== 'engine' && method !== 'google' && dataUrl && browser) {
     try {
       const mask = await photoMask(dataUrl);
       ({ lines, moved, avgShift } = alignLines(lines, mask, figures));

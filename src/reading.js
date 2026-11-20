@@ -72,10 +72,18 @@ export function parseTranscript(raw) {
   return { kind, layout: true, lines, figures };
 }
 
+// Never throws: gives { lines, W, H } or { err }.
+function startGoogle(code, dataUrl) {
+  if (typeof document === 'undefined' || !dataUrl) return null;
+  return import('./gvision.js').then((m) => m.readGoogle(code, dataUrl)).catch((e) => ({ err: String((e && e.message) || e) }));
+}
+
 export async function transcribePhoto(code, dataUrl, log = () => {}) {
   const { askAIDetailed } = await import('./ai.js'); // loaded when needed, so the rules above can be tested without the app
   const prompt = buildTranscribePrompt();
   const t0 = Date.now();
+  // Google Vision reads where the words sit while the AI reads what they say: both run at once
+  const google = startGoogle(code, dataUrl);
   let res;
   try {
     res = await askAIDetailed(code, { messages: [{ role: 'user', content: [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: dataUrl } }] }], json: true, maxTokens: 4000 });
@@ -84,7 +92,7 @@ export async function transcribePhoto(code, dataUrl, log = () => {}) {
   try { t = parseTranscript(res.text); } catch (e) { log({ type: 'transcribe', ok: false, error: e.message, raw: res.text }); throw new Error(e.message + ' If the page is very full, photograph it in two parts.'); }
   if (!t.lines.length) { log({ type: 'transcribe', ok: false, error: 'no text', raw: res.text }); throw new Error('No text was found on this page.'); }
   // the AI's places are estimates: move each line onto its real row of print in the photo, then make sure no two lines overlap
-  try { const { placeOnPhoto } = await import('./align.js'); t = await placeOnPhoto(dataUrl, t); } catch { /* keep the AI's places */ }
+  try { const { placeOnPhoto } = await import('./align.js'); t = await placeOnPhoto(dataUrl, t, google); } catch { /* keep the AI's places */ }
   log({ type: 'transcribe', ok: true, ms: res.ms, usage: res.usage, lines: t.lines.length, raw: res.text, finish: res.finish, placed: t.placed });
   return t;
 }
@@ -696,7 +704,7 @@ export function readingReport(files, items, perFact, detail = 'normal', events =
     if (f.transcript) {
       const t = f.transcript;
       out.push(`page text: kind=${t.kind} pieces=${t.lines.length} unselected=${(f.off || []).length} low-confidence=${t.lines.filter((l) => l.conf !== 'high').length} figures=${(t.figures || []).length}`);
-      if (t.placed) out.push(`lined up with the photo: ${t.placed.method === 'engine' ? `by the text-reading engine, ${t.placed.matched} of ${t.lines.length} lines found by their words` : t.placed.aligned ? `by rows of print (engine found ${t.placed.matched || 0} lines), ${t.placed.moved} of ${t.lines.length} lines moved, average shift ${t.placed.avgShift}` : 'no (kept the AI\'s places)'}; overlaps pushed down: ${t.placed.pushed}; ${t.placed.ms} ms${t.placed.threads ? `; ${t.placed.threads} processor core${t.placed.threads > 1 ? 's' : ''}` : ''}`);
+      if (t.placed) out.push(`lined up with the photo: ${t.placed.method === 'google' ? `by Google Vision, ${t.placed.matched} of ${t.lines.length} lines found by their words` : t.placed.method === 'engine' ? `by the text-reading engine, ${t.placed.matched} of ${t.lines.length} lines found by their words` : t.placed.aligned ? `by rows of print (engine found ${t.placed.matched || 0} lines), ${t.placed.moved} of ${t.lines.length} lines moved, average shift ${t.placed.avgShift}` : 'no (kept the AI\'s places)'}; overlaps pushed down: ${t.placed.pushed}; ${t.placed.ms} ms${t.placed.threads ? `; ${t.placed.threads} processor core${t.placed.threads > 1 ? 's' : ''}` : ''}`);
       if (t.placed && t.placed.err) out.push(`text finder failed: ${t.placed.err}`);
       if (t.placed && t.placed.found) out.push(`engine found (line, how far it sits below the AI's place): ${t.placed.found}`);
       out.push(layoutText(t, { marks: 'all' }));
