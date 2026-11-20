@@ -181,7 +181,7 @@ export async function photoMask(dataUrl, width = 900) {
 // google: optional promise of Google Vision's lines ({ lines, W, H } or { err }), started earlier so it runs while the AI reads.
 export async function placeOnPhoto(dataUrl, t, google = null) {
   const t0 = Date.now();
-  let lines = t.lines, figures = t.figures || [], moved = 0, avgShift = 0, aligned = false, method = 'ai', matched = 0, fixed = new Set(), offs = [], err = '', threads = 0;
+  let lines = t.lines, figures = t.figures || [], moved = 0, avgShift = 0, aligned = false, method = 'ai', matched = 0, fixed = new Set(), offs = [], miss = [], err = '', threads = 0;
   const browser = typeof document !== 'undefined';
   const mock = browser && /[?&]mock=1/.test(location.search) && !window.__useOcr;
   if (google && dataUrl && browser && !mock) {
@@ -189,7 +189,7 @@ export async function placeOnPhoto(dataUrl, t, google = null) {
       const [r, { placeByEngine }] = await Promise.all([google, import('./paddle.js')]);
       if (r && r.err) throw new Error(r.err);
       const p = placeByEngine(t, r.lines, r.W, r.H);
-      matched = p.matched; offs = p.offs || [];
+      matched = p.matched; offs = p.offs || []; miss = p.miss || [];
       if (p.matched >= 3) { lines = p.lines; fixed = p.fixed; method = 'google'; aligned = true; }
       else err = `Google Vision matched only ${p.matched} lines`;
     } catch (e) { err = 'Google Vision: ' + String((e && e.message) || e).slice(0, 160); /* fall back to the on-phone text finder */ }
@@ -199,7 +199,7 @@ export async function placeOnPhoto(dataUrl, t, google = null) {
       const [{ readEngine }, { placeByEngine }] = await Promise.all([import('./ppread.js'), import('./paddle.js')]);
       const r = await readEngine(dataUrl); threads = r.threads || 0;
       const p = placeByEngine(t, r.lines, r.W, r.H);
-      matched = p.matched; offs = p.offs || [];
+      matched = p.matched; offs = p.offs || []; miss = p.miss || [];
       if (p.matched >= 3) { lines = p.lines; fixed = p.fixed; method = 'engine'; aligned = true; }
     } catch (e) { err = (err ? err + '; ' : '') + String((e && e.message) || e).slice(0, 200); /* fall back to the rows of print */ }
   }
@@ -211,5 +211,5 @@ export async function placeOnPhoto(dataUrl, t, google = null) {
     } catch { /* keep the AI's places */ }
   }
   const u = untangle(lines, fixed);
-  return { ...t, lines: u.lines, figures, placed: { method, matched, aligned, moved, avgShift: Math.round(avgShift * 1000) / 1000, pushed: u.pushed, found: offs.join(' '), err, threads, ms: Date.now() - t0 } };
+  return { ...t, lines: u.lines, figures, placed: { method, matched, aligned, moved, avgShift: Math.round(avgShift * 1000) / 1000, pushed: u.pushed, found: offs.join(' '), miss: miss.join(' | '), err, threads, ms: Date.now() - t0 } };
 }

@@ -161,6 +161,8 @@ export function similar(a, b) { // 2 * longest common subsequence / total length
   }
   return (2 * prev[b.length]) / (a.length + b.length);
 }
+// I, l, 1 and | look alike in a short numeral (II can be read as Il or 11): compare short lines on that basis
+const looks = (s) => String(s || '').toLowerCase().replace(/[l1|!]/g, 'i').replace(/[^a-z0-9]/g, '');
 const rnum = (l) => Number(String(l.id).replace(/\D/g, '')) || 0;
 
 // t: the page ({ lines, figures }, places 0..1); eng: engine lines in pixels of a W x H image.
@@ -203,14 +205,14 @@ export function placeByEngine(t, eng, W, H) {
     }
     return lo != null ? d(lo) : hi != null ? d(hi) : null;
   };
-  // 2. short lines: exactly the same letters, within about half a line of where they are expected (closest pairs first)
+  // 2. short lines: the same letters (I, l, 1 and | count as one), within about half a line of where they are expected (closest pairs first)
   const near = [];
   t.lines.forEach((l, i) => {
     if (got.has(i) || !short(l) || !norm(l.text)) return;
     const st = step(i); if (!st) return;
     const ey = l.y + st.dy, ex = l.x + st.dx, tol = 0.6 * (st.h || l.h || 0.02);
     eng.forEach((e, j) => {
-      if (used.has(j) || norm(e.text) !== norm(l.text)) return;
+      if (used.has(j) || looks(e.text) !== looks(l.text)) return;
       const b = box(e);
       if (Math.abs(b.y - ey) < tol) near.push([Math.abs(b.y - ey) + 0.5 * Math.abs(b.x - ex), i, j]);
     });
@@ -237,5 +239,13 @@ export function placeByEngine(t, eng, W, H) {
   });
   const fixed = new Set([...got.keys()].map((i) => t.lines[i].id));
   const offs = [...got.keys()].map((i) => `${t.lines[i].id}${lines[i].y - t.lines[i].y >= 0 ? '+' : ''}${(lines[i].y - t.lines[i].y).toFixed(3)}`);
-  return { lines, matched: got.size, fixed, offs, engineLines: eng.length };
+  // what the engine read nearest to each line it did not find (for the report: shows why a line was missed)
+  const miss = [];
+  t.lines.forEach((l, i) => {
+    if (got.has(i) || miss.length >= 12) return;
+    const q = lines[i]; let best = null, bd = Infinity;
+    eng.forEach((e) => { const b = box(e), d = Math.hypot(0.5 * (b.x + b.w / 2 - q.x - (q.w || 0) / 2), b.y + b.h / 2 - q.y - (q.h || 0) / 2); if (d < bd) { bd = d; best = e; } });
+    miss.push(`${l.id} "${l.text}" -> ${best && bd < 0.05 ? `"${best.text}"` : 'nothing near'}`);
+  });
+  return { lines, matched: got.size, fixed, offs, miss, engineLines: eng.length };
 }

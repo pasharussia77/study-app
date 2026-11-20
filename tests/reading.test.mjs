@@ -340,5 +340,27 @@ ok(am.get('x5').lines.length === 0, 'a source not on the page is not shaded anyw
   ok(two.length === 2, 'a word on another row starts a new line even without a line break');
 }
 
+// 0.22.1: look-alike numerals, the not-found list, whole ordered lists
+{
+  const W = 1000, H = 1000;
+  const e = (y, text, x = 100, w = 400) => ({ text, cx: x + w / 2, cy: y + 10, w, h: 20, a: 0 });
+  const t = { lines: [
+    { id: 'l1', text: 'I', x: 0.15, y: 0.40, w: 0.01, h: 0.016 }, { id: 'l2', text: 'Freedom of religion', x: 0.22, y: 0.40, w: 0.2, h: 0.016 },
+    { id: 'l3', text: 'II', x: 0.15, y: 0.44, w: 0.015, h: 0.016 }, { id: 'l4', text: 'Right to bear arms', x: 0.22, y: 0.44, w: 0.16, h: 0.016 },
+    { id: 'l5', text: 'III', x: 0.15, y: 0.46, w: 0.025, h: 0.016 }, { id: 'l6', text: 'Quartering of soldiers', x: 0.22, y: 0.46, w: 0.19, h: 0.016 },
+    { id: 'l7', text: 'IV', x: 0.15, y: 0.48, w: 0.02, h: 0.016 }, { id: 'l8', text: 'Searches and seizures', x: 0.22, y: 0.48, w: 0.2, h: 0.016 }], figures: [] };
+  const eng = [e(402, 'Freedom of religion', 220, 200), e(442, 'Right to bear arms', 220, 160), e(462, 'Quartering of soldiers', 220, 190), e(482, 'Searches and seizures', 220, 200),
+    e(402, '|', 150, 10), e(442, 'Il', 150, 15), e(462, 'Ill', 150, 25), e(482, 'IV', 150, 20)];
+  const p = placeByEngine(t, eng, W, H);
+  ok(p.matched === 8 && p.miss.length === 0, 'I, Il, 11, Ill and | are taken for the numerals I, II and III on their own rows (matched ' + p.matched + ')');
+  const t2 = { lines: [...t.lines, { id: 'l9', text: 'XXVII', x: 0.08, y: 0.5, w: 0.05, h: 0.016 }], figures: [] };
+  const p2 = placeByEngine(t2, [...eng, e(522, 'XXV11', 130, 50)], W, H);
+  ok(p2.matched === 8 && p2.miss.length === 1 && p2.miss[0] === 'l9 "XXVII" -> "XXV11"', 'a line not found is listed with what the reader saw nearest: ' + p2.miss[0]);
+  const items = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+  const blk = [{ type: 'list', source: items.join(', '), subject: 'Steps', question: 'What are the steps in order?', items: items.slice(0, 8), ordered: true }];
+  const q8 = buildQuestions(blk, blk, 1, 'Page 1', 'a').find((q) => q.type === 'order');
+  ok(q8 && q8.choices.length === 8 && q8.correctOrder.length === 8 && q8.answer.includes('8. eight'), 'an ordered list of 8 is asked whole');
+}
+
 console.log(`reading: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
