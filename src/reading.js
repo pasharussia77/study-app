@@ -206,6 +206,26 @@ export function blockAreas(t, blocks) {
     }
     // lines with only arrows between two kept lines belong to the block too (diagrams)
     order.forEach((l, i) => { if (!/[a-z0-9]/i.test(l.text) && /[↓↑→←⇒]/.test(l.text) && keep.has((order[i - 1] || {}).id) && keep.has((order[i + 1] || {}).id)) { keep.add(l.id); hits.set(l.id, { a: 0, b: l.text.length }); } });
+    // a list or table: every line whose whole text is in the list counts, with the markers (I, V, X, 1, a) standing in front of them;
+    // one block is one run of lines in the page's reading order (a second column beside the list is not in that run)
+    if (b.type === 'list') {
+      const lt = (l) => mapNorm(String(l.text).replace(/-$/, ''));
+      const cand = new Set(withText.filter((l) => hits.has(l.id) && lt(l).length >= 2 && (src.includes(lt(l)) || srcJoined.includes(lt(l).replace(/-\s*/g, '')))).map((l) => l.id));
+      withText.forEach((l) => {
+        if (cand.has(l.id) || !/^[a-z0-9]{1,4}$/i.test(String(l.text).trim())) return;
+        const mid = l.y + (l.h || 0) / 2;
+        const row = withText.filter((o) => o !== l && o.x > l.x && Math.abs(o.y + (o.h || 0) / 2 - mid) < 0.7 * Math.max(o.h || 0.02, l.h || 0.02)).sort((p, q) => p.x - q.x)[0];
+        if (row && cand.has(row.id)) { cand.add(l.id); if (!hits.has(l.id)) hits.set(l.id, { a: 0, b: String(l.text).length, strong: false, pos: 0 }); }
+      });
+      const num = (l) => Number(String(l.id).replace(/\D/g, '')) || 0;
+      const runs = []; let run = null;
+      [...withText].sort((p, q) => num(p) - num(q)).forEach((l) => { if (cand.has(l.id)) { if (!run) { run = []; runs.push(run); } run.push(l); } else run = null; });
+      if (runs.length) {
+        const size = (r) => r.reduce((n, l) => n + lt(l).length, 0);
+        const best = runs.reduce((x, y) => (size(y) > size(x) ? y : x));
+        if (best.length >= keep.size) { keep.clear(); best.forEach((l) => keep.add(l.id)); }
+      }
+    }
     const rects = order.filter((l) => keep.has(l.id)).map((l) => {
       const h = hits.get(l.id); const len = Math.max(String(l.text).length, 1);
       // never reach into the line below: the box stops just above the next line that sits under this one

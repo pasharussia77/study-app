@@ -362,5 +362,24 @@ ok(am.get('x5').lines.length === 0, 'a source not on the page is not shaded anyw
   ok(q8 && q8.choices.length === 8 && q8.correctOrder.length === 8 && q8.answer.includes('8. eight'), 'an ordered list of 8 is asked whole');
 }
 
+// 0.22.2: a list with one-letter markers and a second column beside it gets all its lines outlined
+{
+  const names = ['Freedom of religion', 'Right to bear arms', 'Quartering of soldiers', 'Searches and seizures', 'Life, liberty, and property', 'Rights of the accused', 'Right to trial by jury'];
+  const marks = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
+  const L = []; let n = 1;
+  marks.forEach((m, i) => { const y = 0.4 + i * 0.02; L.push({ id: 'l' + n++, text: m, x: 0.15, y, w: 0.02 + 0.005 * i, h: 0.016 }); L.push({ id: 'l' + n++, text: names[i], x: 0.22, y: y + 0.001, w: 0.2, h: 0.016 }); });
+  const side = ['Throughout the convention, Ben Franklin had noticed', 'the back of the chair. There was', 'a sun carved into it.', 'sun, Franklin observed.'];
+  side.forEach((tx, i) => L.push({ id: 'l' + n++, text: tx, x: 0.57, y: 0.405 + i * 0.03, w: 0.4, h: 0.015 }));
+  const blocksL = [
+    { id: 'b1', type: 'list', source: marks.map((m, i) => m + '   ' + names[i]).join('\n'), items: names },
+    { id: 'b2', type: 'fact', source: 'a sun carved into it.', items: [] }];
+  const a = blockAreas({ lines: L }, blocksL);
+  const got = new Set(a.get('b1').lines.map((l) => (typeof l === 'string' ? l : l.id)));
+  ok(got.size === 14 && L.slice(0, 14).every((l) => got.has(l.id)), 'every row of a list is outlined, numerals I, V and the rest included (' + got.size + ' of 14)');
+  ok(!L.slice(14).some((l) => got.has(l.id)), 'the paragraph in the second column is not part of the list');
+  const f = new Set(a.get('b2').lines.map((l) => (typeof l === 'string' ? l : l.id)));
+  ok(f.size === 1 && f.has('l17'), 'a fact block still gets only its own line');
+}
+
 console.log(`reading: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
