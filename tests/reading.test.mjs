@@ -2,7 +2,7 @@
 import { alignLines, untangle, inkRows } from '../src/align.js';
 import { wordsToLines } from '../src/gvision.js';
 import { similar, placeByEngine, dbBoxes, ctcDecode } from '../src/paddle.js';
-import { numberedParts, blockAreas, remakeQuestion, dateLike, parseJson, parseTranscript, makeChunks, layoutText, parseBlocks, buildQuestions, splitTextPages, textTranscript, cleanCount, toRows, suggestCount, countQuestions, readingReport, parseBlocksDetailed, buildCheckPrompt, parseChecks, struckIds, buildFactsPrompt } from '../src/reading.js';
+import { numberedParts, checkBatches, blockAreas, remakeQuestion, dateLike, parseJson, parseTranscript, makeChunks, layoutText, parseBlocks, buildQuestions, splitTextPages, textTranscript, cleanCount, toRows, suggestCount, countQuestions, readingReport, parseBlocksDetailed, buildCheckPrompt, parseChecks, struckIds, buildFactsPrompt } from '../src/reading.js';
 import { buildDeck, spreadGroups } from '../src/deck.js';
 
 let pass = 0, fail = 0;
@@ -407,6 +407,24 @@ ok(am.get('x5').lines.length === 0, 'a source not on the page is not shaded anyw
   const mixed = [...parsed, { id: 'b2', type: 'fact', source: 'It was in 1787.', subject: 'Constitution', question: 'When was it written?', value: '1787', items: [], on: true, grounded: true }];
   const both = buildQuestions(mixed, mixed, 1, 'Page 1', 'a');
   ok(both.length === 59 && both[58].blockType !== 'list' && both[0].blockType === 'list', 'blocks keep their place: the list first, then the fact');
+}
+
+// 0.23.1: the AI check stays small
+{
+  const R = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX', 'XXI', 'XXII', 'XXIII', 'XXIV', 'XXV', 'XXVI', 'XXVII'];
+  const am = R.map((r, i) => `${r} \u2014 ${'Long topic words '.repeat(6)}${i + 1}`);
+  const blk = parseBlocks(JSON.stringify({ blocks: [{ type: 'list', source: am.join('\n'), subject: 'Constitutional amendments', question: 'What?', items: am, ordered: true }] }));
+  const qs = buildQuestions(blk, blk, 1, 'Page 1', 'a');
+  const qa = qs.find((q) => q.type === 'qa');
+  ok(qa.srcText.length < 200 && qa.srcText.startsWith('I \u2014 '), 'a number question has its own line as the source sentence (' + qa.srcText.length + ' characters)');
+  const ord = qs.find((q) => q.type === 'order');
+  ok(ord.srcText.split('\n').length <= 8, 'an order round has only its own items as the source');
+  ok(buildCheckPrompt(qs).length < 60000, 'one check message for 58 numbered questions is under the Worker limit (' + buildCheckPrompt(qs).length + ')');
+  const many = Array.from({ length: 100 }, (_, i) => ({ type: 'qa', question: 'q' + i, answer: 'a', srcText: 'x'.repeat(1400) }));
+  const bs = checkBatches(many);
+  ok(bs.length >= 4 && bs.every((b) => b.length <= 30 && buildCheckPrompt(b.map((i) => many[i])).length < 50000) && bs.flat().length === 100 && bs.flat().every((v, i) => v === i), 'a long list is checked in batches under the size limit, nothing lost or repeated (' + bs.length + ' batches)');
+  ok(checkBatches([]).length === 0 && checkBatches([many[0]]).length === 1, 'empty and single lists work');
+  ok(buildCheckPrompt([{ type: 'qa', question: 'q', answer: 'a', srcText: 'y'.repeat(5000) }]).length < 9000, 'a very long source sentence is cut in the check');
 }
 
 console.log(`reading: ${pass} passed, ${fail} failed`);

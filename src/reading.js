@@ -424,7 +424,7 @@ function choiceLine(q) {
   return ` Choices: ${q.choices.map((c) => c.label + '. ' + c.text).join(' | ')}`;
 }
 export function buildCheckPrompt(list) {
-  const lines = list.map((q, i) => `${i + 1}. [${q.type}] ${q.question}${choiceLine(q)}\n   Answer: ${q.answer || '(none)'}${q.correction ? ' (correction: ' + q.correction + ')' : ''}\n   Source sentence: ${q.srcText || '(none)'}`).join('\n');
+  const lines = list.map((q, i) => `${i + 1}. [${q.type}] ${q.question}${choiceLine(q)}\n   Answer: ${q.answer || '(none)'}${q.correction ? ' (correction: ' + q.correction + ')' : ''}\n   Source sentence: ${String(q.srcText || '(none)').slice(0, 1500)}`).join('\n');
   return `CHECK THESE QUESTIONS. They were made automatically from a student's study material. Look at each one and report only the ones with a problem.
 Problem kinds:
 - unclear: the question does not make sense on its own, is cut off, or has no clear answer
@@ -457,16 +457,33 @@ export function parseChecks(raw, count) {
   return out;
 }
 // One AI call for a list of question items. Returns Map(index -> {kind, why}) for the ones with a problem. Throws if the call or answer fails.
+// The questions in groups that stay well under the Worker's size limit (about 40,000 characters, 30 questions each).
+export function checkBatches(list, maxChars = 40000, maxCount = 30) {
+  const size = (q) => 250 + String(q.question || '').length + String(q.answer || '').length + Math.min(1500, String(q.srcText || '').length) + choiceLine(q).length;
+  const out = []; let cur = [], chars = 0;
+  list.forEach((q, i) => {
+    const n = size(q);
+    if (cur.length && (cur.length >= maxCount || chars + n > maxChars)) { out.push(cur); cur = []; chars = 0; }
+    cur.push(i); chars += n;
+  });
+  if (cur.length) out.push(cur);
+  return out; // lists of positions in the original list
+}
 export async function checkQuestions(code, list, log = () => {}) {
   if (!list.length) return new Map();
   const { askAIDetailed } = await import('./ai.js');
-  const t0 = Date.now();
-  let res;
-  try { res = await askAIDetailed(code, { messages: [{ role: 'user', content: buildCheckPrompt(list) }], json: true, maxTokens: 4000 }); }
-  catch (e) { log({ type: 'check', ok: false, error: e.message, ms: Date.now() - t0 }); throw e; }
-  let flags;
-  try { flags = parseChecks(res.text, list.length); } catch (e) { log({ type: 'check', ok: false, error: e.message, raw: res.text }); throw e; }
-  log({ type: 'check', ok: true, ms: res.ms, usage: res.usage, asked: list.length, flagged: flags.size, raw: res.text, finish: res.finish });
+  const flags = new Map();
+  for (const idx of checkBatches(list)) {
+    const part = idx.map((i) => list[i]);
+    const t0 = Date.now();
+    let res;
+    try { res = await askAIDetailed(code, { messages: [{ role: 'user', content: buildCheckPrompt(part) }], json: true, maxTokens: 4000 }); }
+    catch (e) { log({ type: 'check', ok: false, error: e.message, ms: Date.now() - t0 }); throw e; }
+    let got;
+    try { got = parseChecks(res.text, part.length); } catch (e) { log({ type: 'check', ok: false, error: e.message, raw: res.text }); throw e; }
+    got.forEach((v, k) => flags.set(idx[k], v));
+    log({ type: 'check', ok: true, ms: res.ms, usage: res.usage, asked: part.length, flagged: got.size, raw: res.text, finish: res.finish });
+  }
   return flags;
 }
 
@@ -719,8 +736,9 @@ function numberedQuestions(b, parts, label, r, pool) {
   const out = [];
   const nums = parts.filter(Boolean);
   for (const p of nums) {
-    out.push(baseItem(b, { type: 'qa', question: p.word ? `${subj}: what is ${p.label}?` : `${subj}: what is number ${p.label}?`, answer: p.topic }, label, 0));
-    out.push(baseItem(b, { type: 'qa', question: p.word ? `${subj}: which one is \u201c${p.topic}\u201d?` : `${subj}: which number is \u201c${p.topic}\u201d?`, answer: p.label }, label, 0));
+    const line = `${p.label} \u2014 ${p.topic}`; // the source sentence of a number question is its own line, not the whole list
+    out.push(baseItem(b, { type: 'qa', question: p.word ? `${subj}: what is ${p.label}?` : `${subj}: what is number ${p.label}?`, answer: p.topic, srcText: line }, label, 0));
+    out.push(baseItem(b, { type: 'qa', question: p.word ? `${subj}: which one is \u201c${p.topic}\u201d?` : `${subj}: which number is \u201c${p.topic}\u201d?`, answer: p.label, srcText: line }, label, 0));
   }
   // the list also in rounds of up to 8, to put in order (the topics only: the numbers are what the student has to know)
   const topics = parts.map((p, i) => (p ? p.topic : String(b.items[i]).trim()));
@@ -731,7 +749,7 @@ function numberedQuestions(b, parts, label, r, pool) {
     if (slice.length < 3) continue;
     const first = parts[from] || nums[0], last = parts[to - 1] || nums[nums.length - 1];
     const range = first && last ? `${first.label}\u2013${first.word && last.word ? last.label.replace(/^\S+\s+/, '') : last.label}` : `part ${k + 1} of ${rounds}`;
-    const tmp = { ...b, items: slice, ordered: true, question: `${subj} ${range}: put these in order, from first to last.` };
+    const tmp = { ...b, source: b.items.slice(from, to).join('\n'), items: slice, ordered: true, question: `${subj} ${range}: put these in order, from first to last.` };
     const it = listOf(tmp, pool, label, 0, r, 'order');
     if (it && it.type === 'order') out.push(it);
   }
