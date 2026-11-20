@@ -2,7 +2,7 @@
 import { alignLines, untangle, inkRows } from '../src/align.js';
 import { wordsToLines } from '../src/gvision.js';
 import { similar, placeByEngine, dbBoxes, ctcDecode } from '../src/paddle.js';
-import { blockAreas, remakeQuestion, dateLike, parseJson, parseTranscript, makeChunks, layoutText, parseBlocks, buildQuestions, splitTextPages, textTranscript, cleanCount, toRows, suggestCount, countQuestions, readingReport, parseBlocksDetailed, buildCheckPrompt, parseChecks, struckIds, buildFactsPrompt } from '../src/reading.js';
+import { numberedParts, blockAreas, remakeQuestion, dateLike, parseJson, parseTranscript, makeChunks, layoutText, parseBlocks, buildQuestions, splitTextPages, textTranscript, cleanCount, toRows, suggestCount, countQuestions, readingReport, parseBlocksDetailed, buildCheckPrompt, parseChecks, struckIds, buildFactsPrompt } from '../src/reading.js';
 import { buildDeck, spreadGroups } from '../src/deck.js';
 
 let pass = 0, fail = 0;
@@ -379,6 +379,34 @@ ok(am.get('x5').lines.length === 0, 'a source not on the page is not shaded anyw
   ok(!L.slice(14).some((l) => got.has(l.id)), 'the paragraph in the second column is not part of the list');
   const f = new Set(a.get('b2').lines.map((l) => (typeof l === 'string' ? l : l.id)));
   ok(f.size === 1 && f.has('l17'), 'a fact block still gets only its own line');
+}
+
+// 0.23.0: numbered lists (articles, amendments) get one question per number, both ways
+{
+  const R = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX', 'XXI', 'XXII', 'XXIII', 'XXIV', 'XXV', 'XXVI', 'XXVII'];
+  const am = R.map((r, i) => `${r} \u2014 Topic ${i + 1}`);
+  const np = numberedParts(am);
+  ok(np && np.length === 27 && np[3].label === 'IV' && np[3].value === 4 && np[26].value === 27 && np[3].topic === 'Topic 4', 'Roman numerals are read with their values');
+  const arts = ['PREAMBLE \u2014 Introduction', ...['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'].map((r) => `ARTICLE ${r} \u2014 Part ${r}`)];
+  const ap = numberedParts(arts);
+  ok(ap && ap[0] === null && ap[4].label === 'ARTICLE IV' && ap[4].word === true, 'a list with one heading before the numbers is still numbered, the word stays in the label');
+  ok(numberedParts(['Civil rights', 'Citizens vote', 'Congress meets']) === null && numberedParts(['13 colonies', '50 states', '27 amendments']) === null && numberedParts(['plan', 'build', 'test']) === null, 'words, counts and plain steps are not numbered lists');
+  ok(numberedParts(['1. Plan', '2. Build', '3. Test']).length === 3 && numberedParts(['1. Plan', '2. Build', '9. Test']) === null, 'numbers must count up, a gap of one or two allowed');
+  const parsed = parseBlocks(JSON.stringify({ blocks: [{ type: 'list', source: am.join('\n'), subject: 'Constitutional amendments', question: 'What are the amendments?', items: am, ordered: true }] }));
+  ok(parsed.length === 1 && parsed[0].items.length === 27, 'a numbered list keeps all 27 items');
+  const plain = parseBlocks(JSON.stringify({ blocks: [{ type: 'list', source: 'a b c d e f g h i j', subject: 'Letters', question: 'Which?', items: ['a','b','c','d','e','f','g','h','i','j'], ordered: false }] }));
+  ok(plain[0].items.length === 8, 'other lists still keep 8');
+  const qs = buildQuestions(parsed, parsed, 1, 'Page 1', 'a');
+  const qa = qs.filter((q) => q.type === 'qa'), ord = qs.filter((q) => q.type === 'order');
+  ok(qa.length === 54 && ord.length === 4 && qs.length === 58, 'one question per number, both ways, plus 4 rounds to put in order (got ' + qs.length + ')');
+  ok(qa[6].question === 'Constitutional amendments: what is number IV?'.replace('IV', 'IV') || qa[6].question.includes('IV'), 'a number asks for its topic');
+  const back = qa.find((q) => q.answer === 'IV');
+  ok(back && back.question.includes('Topic 4') && !back.question.includes('number IV'), 'a topic asks for its number (' + (back && back.question) + ')');
+  ok(ord.every((q) => q.choices.length >= 6 && q.choices.length <= 8 && q.choices.every((c) => !/^[IVXL]+ /.test(c.text))), 'order rounds hold 6 to 8 topics without their numbers');
+  ok(qs.every((q, i) => q.order === i && q.blockType === 'list'), 'questions keep their order and block');
+  const mixed = [...parsed, { id: 'b2', type: 'fact', source: 'It was in 1787.', subject: 'Constitution', question: 'When was it written?', value: '1787', items: [], on: true, grounded: true }];
+  const both = buildQuestions(mixed, mixed, 1, 'Page 1', 'a');
+  ok(both.length === 59 && both[58].blockType !== 'list' && both[0].blockType === 'list', 'blocks keep their place: the list first, then the fact');
 }
 
 console.log(`reading: ${pass} passed, ${fail} failed`);

@@ -61,9 +61,32 @@ function distance(a, b) {
   }
   return prev[n];
 }
+// A numbered label ("IV", "ARTICLE IV", "12") is also right as the number ("4", "four") with or without its word ("article 4").
+const ROMAN = { I: 1, V: 5, X: 10, L: 50, C: 100 };
+const ONES = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+const TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+const numberWord = (n) => (n < 20 ? ONES[n] : n < 100 ? TENS[Math.floor(n / 10)] + (n % 10 ? ' ' + ONES[n % 10] : '') : n === 100 ? 'one hundred' : '');
+const LABEL_WORD = '(?:article|amendment|chapter|section|step|part|rule|lesson|unit)';
+function numeralValue(expected) {
+  const m = new RegExp('^\\s*(?:' + LABEL_WORD + '\\s+)?([IVXLC]{1,8}|\\d{1,3})\\s*$', 'i').exec(String(expected || ''));
+  if (!m) return 0;
+  if (/^\d+$/.test(m[1])) return parseInt(m[1], 10);
+  const r = m[1];
+  if (r !== r.toUpperCase()) return 0; // a lower-case "mix" or "civil" is a word, not a numeral
+  let t = 0; for (let i = 0; i < r.length; i++) { const v = ROMAN[r[i]], n = ROMAN[r[i + 1]] || 0; t += v < n ? -v : v; }
+  return t;
+}
+function sameNumeral(a, expected) {
+  const v = numeralValue(expected);
+  if (!v || v > 100) return false;
+  const bare = a.replace(new RegExp('^(?:' + LABEL_WORD + '|number|no)\\s+'), '');
+  const romanForm = (() => { let n = v, out = ''; for (const [sym, val] of [['C', 100], ['XC', 90], ['L', 50], ['XL', 40], ['X', 10], ['IX', 9], ['V', 5], ['IV', 4], ['I', 1]]) while (n >= val) { out += sym; n -= val; } return out.toLowerCase(); })();
+  return bare === String(v) || bare === normalize(numberWord(v)) || bare === romanForm;
+}
 export function isCorrect(answer, expected) {
   const a = normalize(answer);
   if (!a) return false;
+  if (sameNumeral(a, expected)) return true;
   const options = [expected, ...expected.split(/\s*[;/]\s*/)].map(normalize).filter(Boolean);
   // When the right answer holds exactly one number, that number alone is right too ("435" for "435 representatives", "25" for "at least 25 years old").
   const nums = (x) => String(x).match(/\d[\d,.]*\d|\d/g) || [];

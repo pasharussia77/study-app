@@ -320,7 +320,7 @@ For each block return:
 - subject: what the block is about, in a few words
 - question: a clear question a student could answer from memory. It must make sense alone (never say "according to the text"). For a list, ask for the whole group.
 - value: the short exact answer, copied from the source (a date, a name, the meaning, the outcome). Use the SHORTEST words that answer the question: only the key number, date, name or term, never words the question already says (for "How many representatives are in the House?" the value is "435", not "435 representatives"; for "How many people does one representative stand for?" it is "500,000"). Leave "" for a list.
-- items: for a list, the items copied from the source (2 to 8). Otherwise [].
+- items: for a list, the items copied from the source (2 to 8). Otherwise []. A numbered list (articles, amendments, numbered steps or rules) is ONE list block with ALL its items, each written "number — text", for example "IV — Searches and seizures".
 - ordered: true or false (lists only)
 - important: true if the text marks it as important (boxed, underlined, circled, starred, bold, or stressed like "remember" or "important")
 
@@ -371,7 +371,8 @@ export function parseBlocksDetailed(raw) {
     let type = BLOCK_TYPES.includes(b.type) ? b.type : 'fact';
     const source = str(b.source), question = str(b.question);
     let value = str(b.value);
-    let items = (Array.isArray(b.items) ? b.items : []).map(str).filter(Boolean).slice(0, 8);
+    let items = (Array.isArray(b.items) ? b.items : []).map(str).filter(Boolean);
+    items = numberedParts(items) ? items.slice(0, 40) : items.slice(0, 8); // a numbered list keeps every item; other lists keep 8
     if (type === 'list' && items.length === 1) { type = 'fact'; value = value || items[0]; items = []; } // one item is not a list
     if (type !== 'list' && !value && items.length >= 2) type = 'list'; // labelled as a fact but sent as a list
     if (type === 'date') value = value.replace(/^(in|on|by|around|about|during|since|from|at|until|before|after)\s+/i, ''); // "In 1787" -> "1787"
@@ -520,6 +521,31 @@ function listDistractors(block, all, n, rand) {
   return shuffled(pool, rand).slice(0, n);
 }
 
+// ---- numbered lists (articles, amendments, steps): one question per number, both ways
+const ROMAN_V = { I: 1, V: 5, X: 10, L: 50, C: 100 };
+const romanValue = (r) => { let t = 0; for (let i = 0; i < r.length; i++) { const v = ROMAN_V[r[i]], n = ROMAN_V[r[i + 1]] || 0; t += v < n ? -v : v; } return t; };
+// "IV — Searches", "ARTICLE IV Relationships", "12. Income tax"  ->  label, number, topic (Roman numerals are capitals)
+const MARK_WORD = /^\s*(article|amendment|chapter|section|step|part|rule|lesson|unit)\s+/i;
+const MARK = /^([IVXLC]{1,8}|\d{1,3})\b\s*(?:[\u2014\u2013:.)-]+\s*|\s+)(\S.*)$/;
+export function numberedParts(items) {
+  if (!Array.isArray(items) || items.length < 3) return null;
+  const parts = items.map((t) => {
+    const text = String(t), w = MARK_WORD.exec(text);
+    const m = MARK.exec(w ? text.slice(w[0].length) : text.trim());
+    if (!m) return null;
+    const roman = /^[IVXLC]+$/.test(m[1]);
+    const value = roman ? romanValue(m[1]) : parseInt(m[1], 10);
+    if (!value) return null;
+    return { label: (w ? w[1] + ' ' : '') + m[1], word: !!w, value, topic: m[2].trim() };
+  });
+  const got = parts.filter(Boolean);
+  if (got.length < 3 || got.length < 0.8 * items.length) return null;
+  for (let i = 1; i < got.length; i++) { const d = got[i].value - got[i - 1].value; if (d < 1 || d > 3) return null; } // counting up, a gap or two allowed
+  return parts;
+}
+// the numbered items of a list block, or null when it is not a numbered list
+const numberedOf = (b) => (b && b.type === 'list' ? numberedParts(b.items) : null);
+
 function baseItem(block, extra, label, seq) {
   const flagged = !block.grounded;
   return {
@@ -636,8 +662,11 @@ export function buildQuestions(pageBlocks, allBlocks, perFact, label, pageKey = 
     const k = norm(it.question) + '|' + norm(it.answer); // the same wording and answer is never asked twice, in any form
     if (used.has(k)) return false; used.add(k); return true;
   };
+  const numbered = new Map(); // block id -> all its questions (a numbered list asks every number, both ways)
   const perBlock = blocks.map((b, i) => {
     const r = rng(`${pageKey}:${b.id || i}`);
+    const parts = numberedOf(b);
+    if (parts) { numbered.set(b, numberedQuestions(b, parts, label, r, pool)); return []; }
     const mine = []; const types = new Set();
     for (const f of formsFor(b)) {
       if (mine.length >= per) break;
@@ -651,14 +680,16 @@ export function buildQuestions(pageBlocks, allBlocks, perFact, label, pageKey = 
   // Round by round: every block's first question, then every block's second, so two questions on one block never sit side by side.
   const out = [];
   for (let round = 0; round < per; round++) {
-    for (const mine of perBlock) {
-      const it = mine[round]; if (!it) continue;
+    blocks.forEach((b, bi) => {
+      const mine = perBlock[bi];
+      if (round === 0 && numbered.has(b)) { out.push(...numbered.get(b)); return; }
+      const it = mine[round]; if (!it) return;
       if (out.length && out[out.length - 1].blockId === it.blockId) { // only this block has questions left: put it where it does not touch its own
         const at = out.findIndex((x, j) => x.blockId !== it.blockId && (j === 0 || out[j - 1].blockId !== it.blockId));
-        if (at >= 0) { out.splice(at, 0, it); continue; }
+        if (at >= 0) { out.splice(at, 0, it); return; }
       }
       out.push(it);
-    }
+    });
   }
   out.forEach((it, j) => { it.order = j; });
   return out;
@@ -683,6 +714,29 @@ export function remakeQuestion(item, block, allBlocks, siblings = [], n = 1) {
   return null;
 }
 // The forms a block can take, best first.
+function numberedQuestions(b, parts, label, r, pool) {
+  const subj = b.subject || 'This list';
+  const out = [];
+  const nums = parts.filter(Boolean);
+  for (const p of nums) {
+    out.push(baseItem(b, { type: 'qa', question: p.word ? `${subj}: what is ${p.label}?` : `${subj}: what is number ${p.label}?`, answer: p.topic }, label, 0));
+    out.push(baseItem(b, { type: 'qa', question: p.word ? `${subj}: which one is \u201c${p.topic}\u201d?` : `${subj}: which number is \u201c${p.topic}\u201d?`, answer: p.label }, label, 0));
+  }
+  // the list also in rounds of up to 8, to put in order (the topics only: the numbers are what the student has to know)
+  const topics = parts.map((p, i) => (p ? p.topic : String(b.items[i]).trim()));
+  const rounds = Math.ceil(topics.length / 8);
+  for (let k = 0; k < rounds; k++) {
+    const from = Math.round((k * topics.length) / rounds), to = Math.round(((k + 1) * topics.length) / rounds);
+    const slice = topics.slice(from, to);
+    if (slice.length < 3) continue;
+    const first = parts[from] || nums[0], last = parts[to - 1] || nums[nums.length - 1];
+    const range = first && last ? `${first.label}\u2013${first.word && last.word ? last.label.replace(/^\S+\s+/, '') : last.label}` : `part ${k + 1} of ${rounds}`;
+    const tmp = { ...b, items: slice, ordered: true, question: `${subj} ${range}: put these in order, from first to last.` };
+    const it = listOf(tmp, pool, label, 0, r, 'order');
+    if (it && it.type === 'order') out.push(it);
+  }
+  return out;
+}
 function formsFor(b) {
   if (b.plain) return ['qa', 'clozemc', 'cloze']; // subject label is weak: no word card or true/false made from it
   if (b.type === 'list') return b.ordered && b.items.length >= 3 ? ['order', 'multi', 'listmc', 'listtf'] : ['multi', 'listmc', 'listtf'];

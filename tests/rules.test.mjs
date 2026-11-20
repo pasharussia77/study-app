@@ -373,6 +373,8 @@ ok(rep17.includes('--- Photo 1 at') && rep17.includes('--- Photo 2 at'), 'report
 ok(rep17.indexOf('YOUR NOTES') < rep17.indexOf('1. WHAT WAS ADDED') && splitReport(rep17).length === 1 && splitReport('x\n'.repeat(20000)).length > 1, 'report: notes first, and the parts feature is kept');
 
 ok(isCorrect('435', '435 representatives') && isCorrect('25', 'at least 25 years old') && isCorrect('500000', 'one representative for every 500,000 people'), 'the one number in an answer is enough when typed alone');
+ok(isCorrect('4', 'IV') && isCorrect('four', 'IV') && isCorrect('iv', 'IV') && !isCorrect('five', 'IV') && isCorrect('twenty seven', 'XXVII') && isCorrect('27', 'XXVII') && !isCorrect('26', 'XXVII'), 'a Roman numeral is also right as the number or the number word');
+ok(isCorrect('article 4', 'ARTICLE IV') && isCorrect('Article four', 'ARTICLE IV') && isCorrect('7', 'ARTICLE VII') && !isCorrect('4', 'Searches and seizures'), 'a labelled number is right with or without its word, and a topic is not a number');
 ok(!isCorrect('436', '435 representatives') && !isCorrect('1787', '1787 and 1789'), 'a wrong number, or one of two numbers, is not enough');
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
