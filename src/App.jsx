@@ -3,6 +3,7 @@ import { backend, isMock } from './firebase.js';
 import { parseCards, shuffle, datedName, niceDate, shortName, makeFamilyCode, cleanCode } from './parse.js';
 import { APP_VERSION } from './version.js';
 import Flashcards from './Flashcards.jsx';
+import Missed from './Missed.jsx';
 import Quiz from './Quiz.jsx';
 import Voice from './Voice.jsx';
 import SpeechTest from './SpeechTest.jsx';
@@ -118,7 +119,7 @@ export default function App() {
   if (screen === 'speechtest') return <Shell><SpeechTest code={code} onExit={goUp} /></Shell>;
   if (screen === 'items') return <Shell><Items code={code} projectId={project.id} /></Shell>;
   if (screen === 'study') {
-    const Mode = view.mode === 'quiz' ? Quiz : view.mode === 'voice' ? Voice : Flashcards;
+    const Mode = view.mode === 'quiz' ? Quiz : view.mode === 'voice' ? Voice : view.mode === 'missed' ? Missed : Flashcards;
     return <Shell><Mode cards={view.deck} code={code} projectId={project.id} onExit={goUp} /></Shell>;
   }
   return null;

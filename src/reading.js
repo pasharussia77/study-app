@@ -734,24 +734,10 @@ export function remakeQuestion(item, block, allBlocks, siblings = [], n = 1) {
 function numberedQuestions(b, parts, label, r, pool) {
   const subj = b.subject || 'This list';
   const out = [];
-  const nums = parts.filter(Boolean);
-  for (const p of nums) {
+  // One question per number ("what is IV?"): the list keeps every item, and no number is asked twice. More per block comes from the questions-per-block setting.
+  for (const p of parts.filter(Boolean)) {
     const line = `${p.label} \u2014 ${p.topic}`; // the source sentence of a number question is its own line, not the whole list
     out.push(baseItem(b, { type: 'qa', question: p.word ? `${subj}: what is ${p.label}?` : `${subj}: what is number ${p.label}?`, answer: p.topic, srcText: line }, label, 0));
-    out.push(baseItem(b, { type: 'qa', question: p.word ? `${subj}: which one is \u201c${p.topic}\u201d?` : `${subj}: which number is \u201c${p.topic}\u201d?`, answer: p.label, srcText: line }, label, 0));
-  }
-  // the list also in rounds of up to 8, to put in order (the topics only: the numbers are what the student has to know)
-  const topics = parts.map((p, i) => (p ? p.topic : String(b.items[i]).trim()));
-  const rounds = Math.ceil(topics.length / 8);
-  for (let k = 0; k < rounds; k++) {
-    const from = Math.round((k * topics.length) / rounds), to = Math.round(((k + 1) * topics.length) / rounds);
-    const slice = topics.slice(from, to);
-    if (slice.length < 3) continue;
-    const first = parts[from] || nums[0], last = parts[to - 1] || nums[nums.length - 1];
-    const range = first && last ? `${first.label}\u2013${first.word && last.word ? last.label.replace(/^\S+\s+/, '') : last.label}` : `part ${k + 1} of ${rounds}`;
-    const tmp = { ...b, source: b.items.slice(from, to).join('\n'), items: slice, ordered: true, question: `${subj} ${range}: put these in order, from first to last.` };
-    const it = listOf(tmp, pool, label, 0, r, 'order');
-    if (it && it.type === 'order') out.push(it);
   }
   return out;
 }

@@ -234,7 +234,7 @@ export default function Voice({ cards, code, projectId, onExit }) {
   const start = (which) => {
     const q = filtered(which, sumNow());
     if (!q.length) return;
-    const d = spreadGroups(mix ? shuffle(q) : q);
+    const d = (mix ? spreadGroups(shuffle(q)) : q);
     const read = readAloud;
     cfg.current = { ask, readAloud: read };
     lastKind.current = null;

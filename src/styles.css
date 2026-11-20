@@ -800,3 +800,18 @@ html.is-dark img { filter: invert(1) hue-rotate(180deg); }
 .rd-blocks-head { gap: 8px; } .rd-blocks-head h1 { font-size: 1.05rem; }
 .rd-area { border-width: 1px; box-sizing: border-box; border-radius: 3px; }
 .rd-area.on { border-width: 1.5px; box-shadow: none; animation: none; }
+
+/* 0.24.0: What's Missed? */
+.mode-tile.missed { background: linear-gradient(160deg, #FFF6DD, #FFE0A3); background: linear-gradient(160deg, hsl(from #FFF6DD h calc(s * var(--sat)) calc(l + var(--lift) - var(--vivid) * 11 * clamp(0, (l - 70) / 25, 1))), hsl(from #FFE0A3 h calc(s * var(--sat)) calc(l + var(--lift) - var(--vivid) * 11 * clamp(0, (l - 70) / 25, 1)))); }
+.mode-tile:disabled { opacity: .5; }
+.rd-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.rd-pair .btn { padding: 10px 8px; min-height: 54px; font-size: .95rem; line-height: 1.2; text-align: center; }
+.lvl-hint { display: block; font-weight: 600; font-size: .8rem; opacity: .75; }
+.chip-gap { min-width: 40px; }
+.missed-card { cursor: default; }
+.missed-card .face { transition: none; }
+.miss-line { display: block; font-size: var(--ft); line-height: 1.9; font-weight: 700; text-align: left; overflow-wrap: break-word; }
+.miss-pill { display: inline-flex; align-items: center; justify-content: center; vertical-align: baseline; min-height: 1.5em; padding: 0 .5em; margin: 0 .08em; border-radius: 999px; border: 2.5px dashed var(--violet); background: var(--lav); color: var(--violet-deep); font: inherit; font-weight: 800; line-height: 1.3; }
+.miss-pill .dots { display: inline-block; height: 1em; }
+.miss-pill.open { border-style: solid; background: var(--grad); color: #fff; border-color: transparent; }
+.miss-pill:active { transform: scale(.96); }

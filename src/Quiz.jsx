@@ -74,7 +74,7 @@ export default function Quiz({ cards, code, projectId, onExit }) {
     const q = filtered(which, sumNow());
     if (!q.length) return;
     diagLog(projectId, { type: 'session_start', mode: 'written quiz', shows: hasTerm ? (ask === 'term' ? 'word' : 'definition') : 'question', how: hasTyped ? (how === 'type' ? 'typing' : 'choosing') + (hasChoiceOnly ? ' (true/false and multiple choice always choose)' : '') : 'choosing', pick: which + (kind !== 'all' ? ', only ' + kind : ''), shuffle: mix, deckSize: q.length });
-    setDeck(spreadGroups(mix ? shuffle(q) : q)); setI(0); setAnswer(''); setPicks([]); setPlace({}); setResult(null);
+    setDeck((mix ? spreadGroups(shuffle(q)) : q)); setI(0); setAnswer(''); setPicks([]); setPlace({}); setResult(null);
     setRound({ right: 0, wrong: 0 }); setPhase('play');
   };
   const reset = async () => { await backend.resetStats(code, projectId); setKind('all'); begin('all'); };

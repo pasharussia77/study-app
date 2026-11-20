@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { backend } from './firebase.js';
 import { compressImage, readTextFile, readPdf } from './material.js';
 import { buildDeck } from './deck.js';
+import { missedLines } from './missed.js';
 import { shortName, niceDate } from './parse.js';
 import { diagLog, diagGet } from './diag.js';
 import { useOverlay } from './nav.js';
@@ -172,6 +173,7 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
   };
   const allBlocks = withBlocks.flatMap((f) => f.blocks || []);
   const tickedBlocks = allBlocks.filter((b) => b.on !== false).length;
+  const missedDeck = useMemo(() => missedLines(withBlocks), [files]); // eslint-disable-line
   const willMake = useMemo(() => countQuestions(withBlocks, perFact), [files, perFact]); // eslint-disable-line
   const madeFrom = (f) => blocksSig(f) + ':' + perFact;
   const stale = withBlocks.some((f) => f.qStamp !== madeFrom(f) || f.qText !== stampOf(f));
@@ -265,9 +267,9 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
           <StatsStrip sum={sum} />
           <div className="modes">
             <button className="mode-tile flash" onClick={() => onStudy('flash', deck)}><TileArt kind="flash" /><span>Flashcards</span></button>
+            <button className="mode-tile missed" onClick={() => onStudy('missed', missedDeck)} disabled={!missedDeck.length} data-testid="missed-tile"><TileArt kind="missed" /><span>What's Missed?</span></button>
             <button className="mode-tile quiz" onClick={() => onStudy('quiz', deck)}><TileArt kind="quiz" /><span>Written quiz</span></button>
             <button className="mode-tile voice" onClick={() => onStudy('voice', deck)}><TileArt kind="voice" /><span>Voice quiz</span></button>
-            <button className="mode-tile mat" onClick={onReview} data-testid="review-tile"><TileArt kind="folder" /><span>Review questions <small className="tile-count">· {itemList.length}</small></span></button>
           </div>
         </>
       )}
@@ -321,7 +323,10 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
       {withBlocks.length > 0 && (
         <div className="rd-card" data-testid="blocks-card">
           <p className="rd-big"><b>{allBlocks.length}</b> information block{allBlocks.length === 1 ? '' : 's'} found · <b>{tickedBlocks}</b> selected</p>
-          <button className="btn ghost" onClick={() => setBlocksOpen(true)} data-testid="review-blocks"><Icon name="list" />Review blocks</button>
+          <div className="rd-pair">
+            <button className="btn ghost" onClick={() => setBlocksOpen(true)} data-testid="review-blocks"><Icon name="list" /><span>Review blocks</span></button>
+            {itemList.length > 0 && <button className="btn ghost" onClick={onReview} data-testid="review-tile"><Icon name="list" /><span>Review questions <small className="tile-count">· {itemList.length}</small></span></button>}
+          </div>
           <p className="muted tiny rd-qline" data-testid="q-line">{itemList.length} question{itemList.length === 1 ? '' : 's'} · Detail: {DETAIL_LABEL[detail]}</p>
           <div className="rd-make">
             <button className="btn ghost" disabled={!!busy || detail === DETAILS[0]} onClick={() => refind(-1)} data-testid="less">Less</button>
@@ -337,7 +342,6 @@ export default function ReadingProject({ code, projectId, profile, onBack, onStu
           <p className="muted tiny">{perFact === 1 ? 'One question for each block, so nothing is asked twice.' : `${perFact} ask the same block again in other forms (multiple choice, true/false).`}</p>
         </div>
       )}
-      {itemList.length > 0 && deck.length === 0 && <button className="btn ghost" onClick={onReview}><Icon name="list" />Review questions ({itemList.length})</button>}
       {unchecked > 0 && !stale && (
         <div className="hint" data-testid="check-missing">
           The AI check has not been done for {unchecked} question{unchecked === 1 ? '' : 's'}.

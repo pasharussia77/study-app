@@ -29,6 +29,7 @@ const PATHS = {
   repeat: 'M4 12a8 8 0 0 1 13.700-5.700L20 8.500M20 4v4.500h-4.500M20 12a8 8 0 0 1-13.700 5.700L4 15.500M4 20v-4.500h4.500',
   skip: 'M5 5.500v13l10-6.500zM19 5v14',
   swap: 'M4 8h13l-3-3M20 16H7l3 3',
+  eye: 'M2 12s3.600-6.500 10-6.500S22 12 22 12s-3.600 6.500-10 6.500S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
   tap: 'M9 11V5.500a1.500 1.500 0 0 1 3 0V11l4.600.900a2 2 0 0 1 1.600 2.300l-.700 4.300A2 2 0 0 1 15.500 20h-4a2 2 0 0 1-1.600-.800L6.500 14.500a1.300 1.300 0 0 1 2-1.600L9 13.500',
   home: 'M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4.500v-5.500h-5V20H5a1 1 0 0 1-1-1z',
   chart: 'M5 20v-6M12 20V5M19 20v-9',
@@ -269,6 +270,15 @@ export function TileArt({ kind }) {
       <path d="M78 22l8 6-22 28-11 5 3-12z" fill={u('b')} />
       <path d="M56 49l8 6-11 5z" style={{ fill: T('#1E3F9A') }} />
       <path d="M78 22l8 6 3-4a5 5 0 0 0-8-6z" style={{ fill: T('#9BD3FF') }} />
+    </svg>
+  );
+  if (kind === 'missed') return (
+    <svg className="tile-art" viewBox="0 0 96 64" aria-hidden="true">
+      <defs>{g('a', '#FFFFFF', '#FFF1CC')}{g('b', '#FFC23D', '#F28A1E')}</defs>
+      <rect x="10" y="8" width="76" height="48" rx="11" fill={u('a')} strokeWidth="3" style={{ stroke: T('#F2A22E') }} />
+      <path d="M20 22h20M62 22h14M20 34h10M52 34h24M20 46h26" strokeWidth="4" strokeLinecap="round" style={{ stroke: T('#F6C46A') }} />
+      <rect x="43" y="28" width="26" height="12" rx="6" fill={u('b')} />
+      <path d="M48 34h4M56 34h4M63 34h2" strokeWidth="2.400" strokeLinecap="round" style={{ stroke: T('#FFFFFF') }} />
     </svg>
   );
   if (kind === 'voice') return (

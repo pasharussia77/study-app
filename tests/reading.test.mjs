@@ -398,15 +398,14 @@ ok(am.get('x5').lines.length === 0, 'a source not on the page is not shaded anyw
   ok(plain[0].items.length === 8, 'other lists still keep 8');
   const qs = buildQuestions(parsed, parsed, 1, 'Page 1', 'a');
   const qa = qs.filter((q) => q.type === 'qa'), ord = qs.filter((q) => q.type === 'order');
-  ok(qa.length === 54 && ord.length === 4 && qs.length === 58, 'one question per number, both ways, plus 4 rounds to put in order (got ' + qs.length + ')');
-  ok(qa[6].question === 'Constitutional amendments: what is number IV?'.replace('IV', 'IV') || qa[6].question.includes('IV'), 'a number asks for its topic');
-  const back = qa.find((q) => q.answer === 'IV');
-  ok(back && back.question.includes('Topic 4') && !back.question.includes('number IV'), 'a topic asks for its number (' + (back && back.question) + ')');
-  ok(ord.every((q) => q.choices.length >= 6 && q.choices.length <= 8 && q.choices.every((c) => !/^[IVXL]+ /.test(c.text))), 'order rounds hold 6 to 8 topics without their numbers');
+  ok(qa.length === 27 && ord.length === 0 && qs.length === 27, 'one question per number, no reverse question, no order rounds (got ' + qs.length + ')');
+  ok(qa[3].question === 'Constitutional amendments: what is number IV?' && qa[3].answer === 'Topic 4', 'a number asks for its topic (' + qa[3].question + ')');
+  const two = buildQuestions(parsed, parsed, 3, 'Page 1', 'a');
+  ok(two.length === 27, 'a numbered list stays at one question per number even when the setting is 3');
   ok(qs.every((q, i) => q.order === i && q.blockType === 'list'), 'questions keep their order and block');
   const mixed = [...parsed, { id: 'b2', type: 'fact', source: 'It was in 1787.', subject: 'Constitution', question: 'When was it written?', value: '1787', items: [], on: true, grounded: true }];
   const both = buildQuestions(mixed, mixed, 1, 'Page 1', 'a');
-  ok(both.length === 59 && both[58].blockType !== 'list' && both[0].blockType === 'list', 'blocks keep their place: the list first, then the fact');
+  ok(both.length === 28 && both[27].blockType !== 'list' && both[0].blockType === 'list', 'blocks keep their place: the list first, then the fact');
 }
 
 // 0.23.1: the AI check stays small
@@ -417,8 +416,6 @@ ok(am.get('x5').lines.length === 0, 'a source not on the page is not shaded anyw
   const qs = buildQuestions(blk, blk, 1, 'Page 1', 'a');
   const qa = qs.find((q) => q.type === 'qa');
   ok(qa.srcText.length < 200 && qa.srcText.startsWith('I \u2014 '), 'a number question has its own line as the source sentence (' + qa.srcText.length + ' characters)');
-  const ord = qs.find((q) => q.type === 'order');
-  ok(ord.srcText.split('\n').length <= 8, 'an order round has only its own items as the source');
   ok(buildCheckPrompt(qs).length < 60000, 'one check message for 58 numbered questions is under the Worker limit (' + buildCheckPrompt(qs).length + ')');
   const many = Array.from({ length: 100 }, (_, i) => ({ type: 'qa', question: 'q' + i, answer: 'a', srcText: 'x'.repeat(1400) }));
   const bs = checkBatches(many);

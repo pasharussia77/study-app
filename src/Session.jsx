@@ -103,7 +103,7 @@ export function PlayTop({ onExit, index, total, onStats, title }) {
       <header className="play-top">
         <button className="back round" onClick={onExit}><Icon name="left" /><span className="sr">Exit</span></button>
         <span className="play-title">{title}</span>
-        <button className="chip" onClick={onStats}><Icon name="chart" size={18} />Stats</button>
+        {onStats ? <button className="chip" onClick={onStats}><Icon name="chart" size={18} />Stats</button> : <span className="chip-gap" aria-hidden="true" />}
       </header>
       <div className="track">
         <span className="count" data-testid="counter">{index + 1} / {total}</span>
