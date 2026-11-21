@@ -568,7 +568,7 @@ function baseItem(block, extra, label, seq) {
   return {
     type: 'qa', section: label, number: null, question: '', choices: [], correctLabel: null, answer: '', source: 'reading', studentAnswer: null,
     markedWrong: null, confidence: 'high', note: flagged ? 'The answer was not found word for word in the page text. Check it.' : '', order: seq,
-    circled: null, printed: null, correction: '', aiReview: false, flagged, blockType: block.type, blockId: block.id || '', srcText: block.source, ...extra
+    circled: null, printed: null, correction: '', aiReview: false, flagged, blockType: block.type, blockId: block.id || '', srcText: block.source, context: block.subject || '', ...extra
   };
 }
 
@@ -732,12 +732,11 @@ export function remakeQuestion(item, block, allBlocks, siblings = [], n = 1) {
 }
 // The forms a block can take, best first.
 function numberedQuestions(b, parts, label, r, pool) {
-  const subj = b.subject || 'This list';
   const out = [];
   // One question per number ("what is IV?"): the list keeps every item, and no number is asked twice. More per block comes from the questions-per-block setting.
   for (const p of parts.filter(Boolean)) {
     const line = `${p.label} \u2014 ${p.topic}`; // the source sentence of a number question is its own line, not the whole list
-    out.push(baseItem(b, { type: 'qa', question: p.word ? `${subj}: what is ${p.label}?` : `${subj}: what is number ${p.label}?`, answer: p.topic, srcText: line }, label, 0));
+    out.push(baseItem(b, { type: 'qa', question: p.word ? `What is ${p.label}?` : `What is number ${p.label}?`, answer: p.topic, srcText: line }, label, 0));
   }
   return out;
 }

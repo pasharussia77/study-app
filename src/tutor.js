@@ -1,6 +1,6 @@
 // The voice tutor's rules: how a question is spoken, how a spoken choice is understood, and what the AI is asked.
 import { normalize, isCorrect } from './stats.js';
-import { answerLetters, withNumber } from './deck.js';
+import { answerLetters, withNumber, contextFor } from './deck.js';
 
 const L = (i) => String.fromCharCode(65 + i);
 
@@ -17,7 +17,8 @@ export const INTRO = {
 
 // `spoken` is just the question; `intro` explains the kind of question and is said once per run of the same kind.
 export function describeQuestion(c, ask = 'term') {
-  const base = (kind, label, shown, spoken, expected, choices) => ({ kind, label, shown: withNumber(c, shown), spoken, expected, choices, intro: INTRO[kind] });
+  const ctx = contextFor(c);
+  const base = (kind, label, shown, spoken, expected, choices) => ({ kind, label, shown: withNumber(c, shown), spoken: ctx ? sentence(ctx) + ' ' + spoken : spoken, expected, choices, intro: INTRO[kind] });
   if (c.type === 'tf') return base('true/false', 'True or false?', c.prompt, sentence(c.prompt), c.answer, c.choices);
   if (c.type === 'mc') return base('multiple choice', 'Choose the correct answer', c.prompt, `${c.prompt} ${c.choices.map((t, i) => `${L(i)}, ${t}.`).join(' ')}`, c.answer, c.choices);
   const lettered = () => `${c.prompt} ${c.choices.map((t, i) => `${L(i)}, ${t}.`).join(' ')}`;

@@ -7,7 +7,7 @@ import { describeQuestion, utterance, maxAttempts, countsRight, matchChoice, det
 import { speak, warm, stopSpeaking, startListening, transcribe, beep, primeMic, VOICES, getVoice, setVoice } from './voice.js';
 import { useStats, StatsSheet, CardPicker, TypePicker, RoundDone, ScreenHead, PlayTop, StartFab } from './Session.jsx';
 import { FitBody } from './Scroller.jsx';
-import { numberParts, spreadGroups } from './deck.js';
+import { numberParts, spreadGroups, contextFor } from './deck.js';
 import { Icon, Scenery, TileArt } from './art.jsx';
 import { diagLog } from './diag.js';
 import { useOverlay, back } from './nav.js';
@@ -330,6 +330,7 @@ export default function Voice({ cards, code, projectId, onExit }) {
       <PlayTop onExit={back} index={i} total={deck.length} onStats={() => setShowStats(true)} title="Voice quiz" />
       <div className="question fitcard">
         <small>{qd.label}</small>
+        {contextFor(c) && <span className="card-ctx" data-testid="card-ctx">{contextFor(c)}</span>}
         <FitBody key={'q' + c.key + i} hasList={!!qd.choices} dep={i}>
           {numberParts(c, qd.shown)[0] && <span className="card-num" data-testid="card-num">{numberParts(c, qd.shown)[0]}</span>}
           <b data-testid="question">{numberParts(c, qd.shown)[1]}</b>

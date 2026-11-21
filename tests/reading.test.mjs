@@ -399,7 +399,8 @@ ok(am.get('x5').lines.length === 0, 'a source not on the page is not shaded anyw
   const qs = buildQuestions(parsed, parsed, 1, 'Page 1', 'a');
   const qa = qs.filter((q) => q.type === 'qa'), ord = qs.filter((q) => q.type === 'order');
   ok(qa.length === 27 && ord.length === 0 && qs.length === 27, 'one question per number, no reverse question, no order rounds (got ' + qs.length + ')');
-  ok(qa[3].question === 'Constitutional amendments: what is number IV?' && qa[3].answer === 'Topic 4', 'a number asks for its topic (' + qa[3].question + ')');
+  ok(qa[3].question === 'What is number IV?' && qa[3].answer === 'Topic 4', 'a number asks for its topic (' + qa[3].question + ')');
+  ok(qa[3].context === 'Constitutional amendments', 'the block subject is kept as the card context (' + qa[3].context + ')');
   const two = buildQuestions(parsed, parsed, 3, 'Page 1', 'a');
   ok(two.length === 27, 'a numbered list stays at one question per number even when the setting is 3');
   ok(qs.every((q, i) => q.order === i && q.blockType === 'list'), 'questions keep their order and block');

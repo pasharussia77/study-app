@@ -7,6 +7,17 @@ export const tidy = (text) => String(text ?? '').replace(/_{3,}/g, '_____');
 export const withNumber = (c, text) => (c && c.number != null && c.number !== '' && text ? `${c.number}.\u00A0${tidy(text)}` : tidy(text));
 
 // For a card: the number goes on a line of its own, with the text under it. Returns [number or null, text].
+// The small label above a card: what the block is about ("Constitutional amendments"). Left out when the question already says it or when it would give the answer away.
+const plainText = (s) => String(s || '').toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
+export function contextFor(c) {
+  const ctx = String((c && c.context) || '').trim();
+  if (!ctx) return '';
+  const x = plainText(ctx), a = plainText(c.answer), p = plainText(c.prompt);
+  if (!x || (p && p.includes(x))) return '';
+  if (a && (x.includes(a) || a.includes(x))) return '';
+  return ctx;
+}
+
 export function numberParts(c, shown) {
   const prefix = c && c.number != null && c.number !== '' ? `${c.number}.\u00A0` : null;
   return prefix && String(shown).startsWith(prefix) ? [`${c.number}.`, String(shown).slice(prefix.length)] : [null, shown];
@@ -34,7 +45,7 @@ export function buildDeck(textCards, items, files = []) {
     if (it.off) continue; // unticked in the review: kept in the list, left out of study
     if (!it.answer || !it.question) { notReady++; continue; }
     const key = 'i' + cardKey({ term: it.id, definition: it.answer });
-    const base = { key, type: it.type, prompt: it.question, answer: it.answer, itemId: it.id, group: it.blockId ? it.fileId + ':' + it.blockId : '', number: it.number, section: it.section, correction: it.type === 'tf' && it.correction ? it.correction : '' };
+    const base = { key, type: it.type, prompt: it.question, answer: it.answer, itemId: it.id, group: it.blockId ? it.fileId + ':' + it.blockId : '', number: it.number, section: it.section, context: it.context || '', correction: it.type === 'tf' && it.correction ? it.correction : '' };
     if (it.type === 'term') deck.push({ ...base, term: it.question, definition: it.answer });
     else if (it.type === 'qa') deck.push(base);
     else if (it.type === 'multi' || it.type === 'order') {

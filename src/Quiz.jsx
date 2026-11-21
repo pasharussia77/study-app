@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { backend } from './firebase.js';
 import { shuffle } from './parse.js';
 import { defaultPick, queueFor, isCorrect, normalize } from './stats.js';
-import { isChoiceOnly, withNumber, spreadGroups } from './deck.js';
+import { isChoiceOnly, withNumber, spreadGroups, contextFor } from './deck.js';
 import { useStats, StatsSheet, CardPicker, TypePicker, RoundDone, ScreenHead, PlayTop, StartFab } from './Session.jsx';
 import { Icon, Scenery, TileArt } from './art.jsx';
 import { diagLog } from './diag.js';
@@ -174,6 +174,7 @@ export default function Quiz({ cards, code, projectId, onExit }) {
       <PlayTop onExit={back} index={i} total={deck.length} onStats={() => setShowStats(true)} title="Written quiz" />
       <div className="question">
         <small>{q.label}</small>
+        {contextFor(c) && <span className="card-ctx" data-testid="card-ctx">{contextFor(c)}</span>}
         <b data-testid="question">{q.shown}</b>
       </div>
 

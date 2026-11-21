@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { backend } from './firebase.js';
 import { shuffle } from './parse.js';
 import { defaultPick, queueFor } from './stats.js';
-import { cardFaces, numberParts, spreadGroups } from './deck.js';
+import { cardFaces, numberParts, spreadGroups, contextFor } from './deck.js';
 import { useStats, StatsSheet, CardPicker, TypePicker, RoundDone, ScreenHead, PlayTop, StartFab } from './Session.jsx';
 import { Icon, Scenery, TileArt } from './art.jsx';
 import { diagLog } from './diag.js';
@@ -81,6 +81,7 @@ export default function Flashcards({ cards, code, projectId, onExit }) {
       </div>
       <button key={'card' + i} className={'flip' + (flipped ? ' flipped' : '')} onClick={() => setFlipped(!flipped)} aria-label={flipped ? 'Show front' : 'Show back'} data-testid="card">
         <span className="face face-front" aria-hidden={flipped}>
+          {contextFor(deck[i]) && <span className="card-ctx" data-testid="card-ctx">{contextFor(deck[i])}</span>}
           <FitBody key={'f' + deck[i].key + i} hasList={!!f.extra} dep={i}>
             {num && <span className="card-num" data-testid="card-num">{num}</span>}
             <b>{frontText}</b>
