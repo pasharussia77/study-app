@@ -1,0 +1,54 @@
+name: Build Android app
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'android/**'
+      - '.github/workflows/android.yml'
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Bundle the offline copy of the app (no on-phone OCR engine)
+        run: |
+          W=android/app/src/main/assets/www
+          mkdir -p $W
+          cp docs/index.html docs/manifest.webmanifest docs/icon-192.png docs/icon-512.png docs/apple-touch-icon.png $W/
+          cp -r docs/assets $W/assets
+      - name: Signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/studybuddy.jks"
+      - name: Build
+        working-directory: android
+        env:
+          KEYSTORE_FILE: ${{ runner.temp }}/studybuddy.jks
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          VERSION_CODE: ${{ github.run_number }}
+        run: gradle assembleRelease --no-daemon 2>&1 | tee ../build.log
+      - name: Save the build log to a side branch (so problems can be read)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir /tmp/bl && cp build.log /tmp/bl/build.log || echo "no log" > /tmp/bl/build.log
+          cd /tmp/bl && git init -q && git checkout -q -b build-log && git add . && git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "build log"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}" build-log
+      - name: Publish the APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk StudyBuddy.apk
+          gh release delete apk-latest --yes --cleanup-tag || true
+          gh release create apk-latest StudyBuddy.apk --title "StudyBuddy Android app" --notes "Latest build of the StudyBuddy Android app (loads the live app; updates arrive without reinstalling)."
