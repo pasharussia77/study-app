@@ -11,7 +11,7 @@ const NAMES = { none: 'Read everything', handwriting: 'Ignore handwriting (print
 export function buildReport({ version, device, health, profile, project, text, parsed, sum, files, items = [], check = null, events, notes }) {
   const L = [];
   const h = (t) => L.push('', '=== ' + t + ' ===');
-  L.push('FAMILY STUDY DIAGNOSTIC REPORT');
+  L.push('STUDYBUDDY DIAGNOSTIC REPORT');
   L.push('Created: ' + stamp(Date.now()));
   L.push('App version: ' + version);
   L.push('Account: ' + profile.name + (profile.test ? ' (testing account)' : ''));

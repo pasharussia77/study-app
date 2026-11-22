@@ -1,6 +1,6 @@
 {
-  "name": "Family Study",
-  "short_name": "Study",
+  "name": "StudyBuddy",
+  "short_name": "StudyBuddy",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

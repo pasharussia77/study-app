@@ -343,7 +343,7 @@ try:
         open_fold(); btn('Create diagnostic report').click()
         pg.get_by_test_id('send-report').click()
         pg.get_by_test_id('send-status').wait_for()
-        ok('report sent' in pg.inner_text('[data-testid=send-status]') and pg.evaluate('window.__sentReport.text').startswith('FAMILY STUDY'), 'report: Send report to Claude sends the whole report')
+        ok('report sent' in pg.inner_text('[data-testid=send-status]') and pg.evaluate('window.__sentReport.text').startswith('STUDYBUDDY'), 'report: Send report to Claude sends the whole report')
         ok(pg.get_by_test_id('download-report').is_visible(), 'report: a download button is there')
         pg.get_by_text('Or copy and paste it').click()
         ok(pg.locator('[data-testid=copy-1]').count() == 0 and 'Copy report' in text(), 'report: a short report is one part')
@@ -361,7 +361,7 @@ try:
         pg.locator('[data-testid=copy-0]').click(); pg.wait_for_timeout(300)
         ok('copied' in cls(0) and 'Copied part 1' in pg.locator('[data-testid=copy-0]').inner_text() and 'primary' in cls(1) and 'primary' not in cls(0), 'report: a copied part shows as copied and the next part lights up')
         rep = pg.locator('[data-testid=report]').input_value()
-        ok(rep.startswith('FAMILY STUDY') and 'note line 399' in rep, 'report: the box still holds the whole text')
+        ok(rep.startswith('STUDYBUDDY') and 'note line 399' in rep, 'report: the box still holds the whole text')
 
         # 0.16: a long card is not cut off at the top, has a visible scroll bar, and the label stays off the text.
         pg.evaluate('localStorage.clear()'); pg.goto(URL)
