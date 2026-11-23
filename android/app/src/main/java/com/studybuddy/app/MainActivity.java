@@ -58,6 +58,7 @@ public class MainActivity extends Activity {
     boolean onFallback = false;
     PermissionRequest pendingPerm;
     ValueCallback<Uri[]> chooserCb;
+    Uri camUri;
 
     @Override
     protected void onCreate(Bundle b) {
@@ -129,8 +130,27 @@ public class MainActivity extends Activity {
             public boolean onShowFileChooser(WebView w, ValueCallback<Uri[]> cb, FileChooserParams p) {
                 if (chooserCb != null) chooserCb.onReceiveValue(null);
                 chooserCb = cb;
-                try { startActivityForResult(p.createIntent(), REQ_FILE); }
-                catch (Exception e) { chooserCb = null; return false; }
+                camUri = null;
+                try {
+                    if (p.isCaptureEnabled()) {
+                        // "Take photo": open the camera app directly, saving into Pictures/StudyBuddy
+                        ContentValues cv = new ContentValues();
+                        cv.put(MediaStore.Images.Media.DISPLAY_NAME, "StudyBuddy_" + System.currentTimeMillis() + ".jpg");
+                        cv.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+                        cv.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/StudyBuddy");
+                        camUri = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv);
+                        Intent ci = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+                        ci.putExtra(MediaStore.EXTRA_OUTPUT, camUri);
+                        ci.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        startActivityForResult(ci, REQ_FILE);
+                    } else {
+                        startActivityForResult(p.createIntent(), REQ_FILE);
+                    }
+                }
+                catch (Exception e) {
+                    if (camUri != null) { try { getContentResolver().delete(camUri, null, null); } catch (Exception x) { } camUri = null; }
+                    chooserCb = null; return false;
+                }
                 return true;
             }
         });
@@ -179,7 +199,11 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
         if (req == REQ_FILE && chooserCb != null) {
-            chooserCb.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(res, data));
+            if (camUri != null) {
+                if (res == Activity.RESULT_OK) chooserCb.onReceiveValue(new Uri[]{camUri});
+                else { try { getContentResolver().delete(camUri, null, null); } catch (Exception x) { } chooserCb.onReceiveValue(null); }
+                camUri = null;
+            } else chooserCb.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(res, data));
             chooserCb = null;
         } else super.onActivityResult(req, res, data);
     }

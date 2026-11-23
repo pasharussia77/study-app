@@ -148,7 +148,7 @@ export default function BlockMap({ file, blocks, areas, activeId, onPick, pageLa
               const turn = tilt ? { rotate: `${tilt.toFixed(2)}deg`, transformOrigin: `${(((ln.x - r.x) / Math.max(r.w, 0.001)) * 100).toFixed(1)}% 0` } : {};
               return (
               <div key={b.id + k} className={'rd-area' + (on ? ' on' : '')} data-testid="area" data-bid={b.id}
-                style={{ left: `${r.x * 100 - 0.2}%`, top: `${r.y * 100}%`, width: `${Math.max(r.w * 100 + 0.1, 0.5)}%`, height: `${r.h * 100}%`, borderColor: on ? c.line : c.soft, background: on ? c.fill : c.pale, ...turn }} />
+                style={{ left: `${r.x * 100 - 0.2}%`, top: `${r.y * 100}%`, width: `${Math.max(r.w * 100 + 0.1, 0.5)}%`, height: `${r.h * 100}%`, borderColor: on ? c.line : 'transparent', background: on ? c.fill : c.pale, ...turn }} />
               );
             });
           })}
